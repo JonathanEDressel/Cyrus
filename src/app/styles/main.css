@@ -1,0 +1,134 @@
+/* Main layout shell styles — header, footer, content area */
+
+/* Import the shared auth/login styles */
+@import url('login.css');
+
+/* ---- Utility ---- */
+.d-none { display: none !important; }
+
+/* ---- Header ---- */
+.app-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 56px;
+  background: #0f172a;
+  border-bottom: 1px solid #1e293b;
+  z-index: 100;
+}
+
+.header-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 1.5rem;
+}
+
+.header-logo {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.header-logo img {
+  height: 28px;
+  width: auto;
+}
+
+.header-brand {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #22c55e;
+  letter-spacing: -0.5px;
+}
+
+.header-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.header-nav a {
+  color: #94a3b8;
+  text-decoration: none;
+  font-size: 0.9rem;
+  font-weight: 500;
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  transition: color 0.2s, background 0.2s;
+}
+
+.header-nav a:hover,
+.header-nav a.active {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.header-user-btn {
+  background: none;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  color: #cbd5e1;
+  padding: 0.4rem 0.75rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s;
+}
+
+.header-user-btn:hover {
+  border-color: #22c55e;
+  color: #22c55e;
+}
+
+/* ---- Main content ---- */
+#app-content {
+  min-height: 100vh;
+}
+
+/* When header is visible, push content down */
+.app-header:not(.d-none) ~ #app-content {
+  padding-top: 56px;
+}
+
+/* ---- Footer ---- */
+.app-footer {
+  background: #0f172a;
+  border-top: 1px solid #1e293b;
+  padding: 1rem 0;
+}
+
+.footer-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.85rem;
+  color: #64748b;
+}
+
+.footer-links {
+  display: flex;
+  gap: 1.5rem;
+}
+
+.footer-links a {
+  color: #64748b;
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.footer-links a:hover {
+  color: #22c55e;
+}

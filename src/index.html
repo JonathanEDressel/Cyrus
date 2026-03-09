@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; font-src 'self' https://cdnjs.cloudflare.com; img-src 'self' data:; connect-src 'self' http://127.0.0.1:5000">
+  <title>Kraking</title>
+  <link rel="stylesheet" href="app/styles/main.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+  <!-- Header (shared across all pages) -->
+  <header id="app-header" class="app-header d-none">
+    <div class="header-inner">
+      <div class="header-logo">
+        <img src="assets/images/kraking-logo.png" alt="Kraking" onerror="this.style.display='none'" />
+        <span class="header-brand">Kraking</span>
+      </div>
+      <nav class="header-nav" id="header-nav">
+        <a href="#" data-route="home" class="nav-link"><i class="fa-solid fa-house"></i> Home</a>
+        <a href="#" data-route="positions" class="nav-link"><i class="fa-solid fa-chart-line"></i> Positions</a>
+        <a href="#" data-route="openorders" class="nav-link"><i class="fa-solid fa-clock-rotate-left"></i> Open Orders</a>
+        <a href="#" data-route="commands" class="nav-link"><i class="fa-solid fa-bolt"></i> Custom Commands</a>
+        <a href="#" data-route="profile" class="nav-link"><i class="fa-solid fa-user"></i> Profile</a>
+      </nav>
+      <div class="header-actions" id="header-actions">
+        <button class="header-user-btn" id="logout-btn">
+          <i class="fa-solid fa-right-from-bracket"></i> Logout
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main content area — partials are loaded here -->
+  <main id="app-content"></main>
+
+  <!-- Footer (shared across all pages) -->
+  <footer id="app-footer" class="app-footer d-none">
+    <div class="footer-inner">
+      <span>&copy; 2026 Kraking. All rights reserved.</span>
+      <div class="footer-links">
+        <a href="#" data-route="privacy">Privacy</a>
+        <a href="#" data-route="terms">Terms</a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Service layer (loaded in dependency order) -->
+  <script src="../dist/app/app.config.js"></script>
+  <script src="../dist/app/models/usermodel.js"></script>
+  <script src="../dist/app/services/dataaccess.js"></script>
+  <script src="../dist/app/services/authdata.js"></script>
+  <script src="../dist/app/services/userdata.js"></script>
+  <script src="../dist/app/services/controllers/authcontroller.js"></script>
+  <script src="../dist/app/services/controllers/usercontroller.js"></script>
+  <!-- Router + app entry point -->
+  <script src="../dist/app/router.js"></script>
+  <script src="../dist/app/app.js"></script>
+</body>
+</html>

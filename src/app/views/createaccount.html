@@ -1,0 +1,104 @@
+﻿<!-- Create Account partial — loaded into #app-content by the router -->
+  <main class="auth-container">
+    <div class="auth-card wide">
+      <div class="auth-logo">
+        <img src="assets/images/kraking-logo.png" alt="Logo" onerror="this.style.display='none'"/>
+      </div>
+
+      <h2 class="auth-title">Create Account</h2>
+      <p class="auth-subtitle">Set up your local Kraking account</p>
+
+      <div class="alert alert-info mb-3" role="alert">
+        <i class="fa-solid fa-shield-halved me-2"></i>
+        <strong>Your data stays private.</strong> All information is stored locally on your device only and never sent to any remote servers.
+      </div>
+
+      <div class="alert alert-success mb-3 d-none" role="alert" id="success-alert">
+        <i class="fa-solid fa-circle-check me-2"></i>
+        <span id="success-message"></span>
+      </div>
+
+      <form class="auth-form" onsubmit="return false;">
+        <div class="form-group">
+          <label for="username" class="form-label">Username</label>
+          <input 
+            id="username" 
+            type="text" 
+            class="form-control" 
+            placeholder="Choose a username"
+            autocomplete="username"
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="password" class="form-label">Password</label>
+          <input 
+            id="password" 
+            type="password" 
+            class="form-control" 
+            placeholder="Create a password (min 6 characters)"
+            autocomplete="new-password"
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="confirmPassword" class="form-label">Confirm Password</label>
+          <input 
+            id="confirmPassword" 
+            type="password" 
+            class="form-control" 
+            placeholder="Confirm your password"
+            autocomplete="new-password"
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="krakenApiKey" class="form-label">
+            Kraken API Key
+            <a href="https://www.kraken.com/u/security/api" target="_blank" class="link-small ms-2" style="font-weight: normal;">
+              <i class="fa-solid fa-external-link"></i> Get API Key
+            </a>
+          </label>
+          <input 
+            id="krakenApiKey" 
+            type="text" 
+            class="form-control" 
+            placeholder="Enter your Kraken API key"
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="krakenPrivateKey" class="form-label">Kraken Private Key</label>
+          <input 
+            id="krakenPrivateKey" 
+            type="password" 
+            class="form-control" 
+            placeholder="Enter your Kraken private key"
+          />
+          <small class="form-text text-muted mt-2">
+            <i class="fa-solid fa-lock"></i> Your API keys are encrypted and stored locally on your device
+          </small>
+        </div>
+
+        <div class="alert alert-warning d-none" role="alert" id="error-alert">
+          <span id="error-message"></span>
+        </div>
+
+        <div class="form-actions">
+          <button type="button" class="btn btn-outline btn-full mb-2" id="back-to-login-btn">
+            <i class="fa-solid fa-arrow-left me-2"></i>
+            Back to Sign In
+          </button>
+
+          <button 
+            type="button"
+            class="btn btn-primary btn-full" 
+            id="create-account-btn"
+          >
+            <span id="btn-text">Create Account</span>
+            <i class="fa-solid fa-user-plus ms-2"></i>
+          </button>
+        </div>
+      </form>
+    </div>
+  </main>

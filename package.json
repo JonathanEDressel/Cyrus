@@ -1,0 +1,20 @@
+{
+  "name": "kraking",
+  "version": "1.0.0",
+  "description": "A desktop application built with Electron",
+  "main": "dist/main.js",
+  "scripts": {
+    "start": "npm run build && electron .",
+    "build": "tsc",
+    "watch": "tsc -w",
+    "dev": "npm run build && electron . --dev"
+  },
+  "keywords": ["electron", "desktop"],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "electron": "^28.2.0",
+    "typescript": "^5.3.3"
+  }
+}

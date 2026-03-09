@@ -1,0 +1,97 @@
+<!-- Home / Overview partial — loaded into #app-content by the router -->
+<div class="page-container">
+
+  <!-- Overview summary cards -->
+  <div class="overview-header">
+    <h1 class="page-title">Dashboard</h1>
+    <p class="page-subtitle">Overview of your Kraken account</p>
+  </div>
+
+  <div class="summary-cards">
+    <div class="summary-card">
+      <div class="summary-icon"><i class="fa-solid fa-wallet"></i></div>
+      <div class="summary-body">
+        <span class="summary-label">Total Balance</span>
+        <span class="summary-value" id="total-balance">--</span>
+      </div>
+    </div>
+
+    <div class="summary-card">
+      <div class="summary-icon"><i class="fa-solid fa-chart-line"></i></div>
+      <div class="summary-body">
+        <span class="summary-label">Open Positions</span>
+        <span class="summary-value" id="open-positions-count">--</span>
+      </div>
+    </div>
+
+    <div class="summary-card">
+      <div class="summary-icon"><i class="fa-solid fa-clock-rotate-left"></i></div>
+      <div class="summary-body">
+        <span class="summary-label">Open Orders</span>
+        <span class="summary-value" id="open-orders-count">--</span>
+      </div>
+    </div>
+
+    <div class="summary-card">
+      <div class="summary-icon"><i class="fa-solid fa-bolt"></i></div>
+      <div class="summary-body">
+        <span class="summary-label">Custom Commands</span>
+        <span class="summary-value" id="custom-commands-count">--</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Recent activity / positions preview -->
+  <div class="overview-section">
+    <div class="section-header">
+      <h2 class="section-title">Recent Positions</h2>
+      <button class="btn-link-sm" id="view-all-positions">View All <i class="fa-solid fa-arrow-right"></i></button>
+    </div>
+    <div class="data-table-wrapper">
+      <table class="data-table" id="positions-table">
+        <thead>
+          <tr>
+            <th>Pair</th>
+            <th>Side</th>
+            <th>Size</th>
+            <th>Entry Price</th>
+            <th>Current Price</th>
+            <th>P&L</th>
+          </tr>
+        </thead>
+        <tbody id="positions-tbody">
+          <tr class="empty-row">
+            <td colspan="6">Loading positions...</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="overview-section">
+    <div class="section-header">
+      <h2 class="section-title">Open Orders</h2>
+      <button class="btn-link-sm" id="view-all-orders">View All <i class="fa-solid fa-arrow-right"></i></button>
+    </div>
+    <div class="data-table-wrapper">
+      <table class="data-table" id="orders-table">
+        <thead>
+          <tr>
+            <th>Pair</th>
+            <th>Type</th>
+            <th>Side</th>
+            <th>Price</th>
+            <th>Volume</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="orders-tbody">
+          <tr class="empty-row">
+            <td colspan="6">Loading orders...</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
