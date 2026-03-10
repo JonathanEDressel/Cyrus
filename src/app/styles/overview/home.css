@@ -1,12 +1,9 @@
-/* Home / Overview dashboard styles */
-
 .page-container {
   max-width: 1200px;
   margin: 0 auto;
   padding: 2rem 1.5rem;
 }
 
-/* ---- Page header ---- */
 .overview-header {
   margin-bottom: 2rem;
 }
@@ -24,7 +21,6 @@
   margin: 0;
 }
 
-/* ---- Summary cards ---- */
 .summary-cards {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -81,7 +77,6 @@
   line-height: 1.2;
 }
 
-/* ---- Sections ---- */
 .overview-section {
   margin-bottom: 2rem;
 }
@@ -118,7 +113,6 @@
   color: #16a34a;
 }
 
-/* ---- Data tables ---- */
 .data-table-wrapper {
   background: #1e293b;
   border: 1px solid #334155;
@@ -165,11 +159,9 @@
   font-style: italic;
 }
 
-/* P&L colors */
 .pnl-positive { color: #22c55e; }
 .pnl-negative { color: #ef4444; }
 
-/* Order side styling */
 .side-buy {
   color: #22c55e;
   font-weight: 600;
@@ -184,7 +176,6 @@
   font-size: 0.8rem;
 }
 
-/* Status badge */
 .status-badge {
   display: inline-block;
   padding: 0.2em 0.6em;

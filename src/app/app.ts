@@ -1,7 +1,4 @@
-// App entry point — register routes and load the initial page
-
 (function () {
-  // Register all routes
   router.register('login', {
     view: 'app/views/login.html',
     viewModel: '../dist/app/viewmodels/login.js',
@@ -26,7 +23,6 @@
     title: 'Home',
   });
 
-  // Placeholder routes — views will be built out later
   router.register('positions', {
     view: 'app/views/overview/home.html',
     viewModel: '../dist/app/viewmodels/overview/home.js',
@@ -67,8 +63,8 @@
     title: 'Profile',
   });
 
-  // ---- Determine initial route ----
   if (AuthController.isAuthenticated()) {
+    KrakenStore.start();
     router.navigate('home');
   } else {
     router.navigate('login');

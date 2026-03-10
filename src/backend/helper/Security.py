@@ -10,18 +10,15 @@ import hashlib
 
 
 def hash_password(password: str) -> str:
-    """Hash a password using bcrypt."""
     salt = bcrypt.gensalt()
     return bcrypt.hashpw(password.encode('utf-8'), salt).decode('utf-8')
 
 
 def verify_password(password: str, hashed: str) -> bool:
-    """Verify a password against its hash."""
     return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
 
 
 def generate_token(user_id: int, username: str) -> str:
-    """Generate a JWT token for the user."""
     payload = {
         'user_id': user_id,
         'username': username,
@@ -32,12 +29,10 @@ def generate_token(user_id: int, username: str) -> str:
 
 
 def decode_token(token: str) -> dict:
-    """Decode and validate a JWT token."""
     return jwt.decode(token, current_app.config['SECRET_KEY'], algorithms=['HS256'])
 
 
 def token_required(f):
-    """Decorator to require a valid JWT token."""
     @wraps(f)
     def decorated(*args, **kwargs):
         token = None
@@ -65,17 +60,12 @@ def token_required(f):
 
 
 def _get_encryption_key() -> bytes:
-    """Generate a Fernet key from the Flask SECRET_KEY."""
-    # Use the SECRET_KEY to derive a consistent 32-byte key
     key_material = current_app.config['SECRET_KEY'].encode('utf-8')
-    # Generate a 32-byte key using SHA-256
     key = hashlib.sha256(key_material).digest()
-    # Fernet requires a base64-encoded 32-byte key
     return base64.urlsafe_b64encode(key)
 
 
 def encrypt_api_key(api_key: str) -> str:
-    """Encrypt an API key using Fernet symmetric encryption."""
     if not api_key:
         return None
     
@@ -85,7 +75,6 @@ def encrypt_api_key(api_key: str) -> str:
 
 
 def decrypt_api_key(encrypted_key: str) -> str:
-    """Decrypt an API key using Fernet symmetric encryption."""
     if not encrypted_key:
         return None
     

@@ -1,4 +1,3 @@
-/* ---- Rule Form ---- */
 .rule-form {
   display: flex;
   flex-direction: column;
@@ -101,7 +100,6 @@
   cursor: not-allowed;
 }
 
-/* ---- Rules Table ---- */
 .rule-name-cell {
   font-weight: 600;
   color: #e2e8f0;
@@ -192,7 +190,6 @@
   border-color: rgba(239, 68, 68, 0.3);
 }
 
-/* ---- Logs ---- */
 .result-cell {
   max-width: 250px;
   overflow: hidden;
@@ -221,7 +218,6 @@
   color: #ef4444;
 }
 
-/* ---- Alerts ---- */
 .alert-success {
   padding: 0.75rem 1rem;
   border-radius: 8px;

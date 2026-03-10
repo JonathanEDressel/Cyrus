@@ -3,7 +3,6 @@ from models.UserModel import UserModel
 
 
 class AuthDbContext:
-    """Database operations for authentication."""
     
     @staticmethod
     def get_user_by_username(username: str) -> UserModel:

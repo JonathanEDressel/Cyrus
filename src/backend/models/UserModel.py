@@ -3,7 +3,6 @@ from typing import Optional
 
 
 class UserModel:
-    """User model representing a user in the database."""
     
     def __init__(self, id: int, username: str, password_hash: str,
                  kraken_api_key_encrypted: Optional[str] = None,
@@ -20,7 +19,6 @@ class UserModel:
     
     @staticmethod
     def from_row(row: dict) -> 'UserModel':
-        """Create a UserModel from a database row (dictionary)."""
         if row is None:
             return None
         
@@ -31,11 +29,10 @@ class UserModel:
             kraken_api_key_encrypted=row.get('kraken_api_key_encrypted'),
             kraken_private_key_encrypted=row.get('kraken_private_key_encrypted'),
             created_at=row.get('created_at'),
-            last_login=row.get('last_login')  # Use .get() to handle NULL values
+            last_login=row.get('last_login')
         )
     
     def to_dict(self) -> dict:
-        """Convert the user model to a dictionary (excluding password)."""
         return {
             'id': self.id,
             'username': self.username,

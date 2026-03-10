@@ -9,7 +9,6 @@ auth_bp = Blueprint('auth', __name__)
 
 @auth_bp.route('/register', methods=['POST'])
 def register():
-    """Create a new user account."""
     try:
         data = request.get_json()
         
@@ -41,7 +40,6 @@ def register():
         
         password_hashed = hash_password(password)
         
-        # Encrypt the Kraken API keys before storing
         api_key_encrypted = encrypt_api_key(kraken_api_key)
         private_key_encrypted = encrypt_api_key(kraken_private_key)
         
@@ -63,7 +61,6 @@ def register():
 
 @auth_bp.route('/login', methods=['POST'])
 def login():
-    """Authenticate a user and return a JWT token."""
     try:
         data = request.get_json()
         

@@ -6,13 +6,11 @@ from Routes import register_routes
 from helper.SetupDatabase import setup_database
 from automation.worker import start_worker
 
-# Load environment variables
 load_dotenv()
 
 def create_app():
     app = Flask(__name__)
     
-    # Configuration from environment
     app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'change-this-to-a-random-secret-key')
     app.config['MYSQL_HOST'] = os.getenv('MYSQL_HOST', 'localhost')
     app.config['MYSQL_PORT'] = int(os.getenv('MYSQL_PORT', 3306))
@@ -20,17 +18,13 @@ def create_app():
     app.config['MYSQL_PASSWORD'] = os.getenv('MYSQL_PASSWORD', '')
     app.config['MYSQL_DATABASE'] = os.getenv('MYSQL_DATABASE', 'kraking_db')
     
-    # Initialize extensions
     cors.init_app(app, resources={r"/api/*": {"origins": "*"}})
     
-    # Setup database (within app context)
     with app.app_context():
         setup_database()
     
-    # Register routes
     register_routes(app)
 
-    # Start automation worker
     start_worker(app)
     
     return app

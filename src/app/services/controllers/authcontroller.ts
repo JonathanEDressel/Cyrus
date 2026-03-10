@@ -31,6 +31,7 @@ class AuthController {
    * Log out — clear stored session data
    */
   static logout(): void {
+    KrakenStore.stop();
     localStorage.removeItem(AppConfig.TOKEN_KEY);
     localStorage.removeItem(AppConfig.USER_KEY);
   }

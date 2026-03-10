@@ -12,9 +12,6 @@ from threading import Lock
 kraken_bp = Blueprint('kraken', __name__)
 
 
-# ============================================
-# Rate Limiter for Kraken API calls
-# ============================================
 class KrakenRateLimiter:
     def __init__(self, max_calls=10, window_seconds=60):
         self.max_calls = max_calls
@@ -95,10 +92,6 @@ def rate_limit_kraken(f):
     return decorated_function
 
 
-# ============================================
-# Routes
-# ============================================
-
 @kraken_bp.route('/open-orders', methods=['GET'])
 @token_required
 @rate_limit_kraken
@@ -156,7 +149,6 @@ def withdrawal_addresses():
         if not user.kraken_api_key_encrypted or not user.kraken_private_key_encrypted:
             return bad_request("Kraken API keys not configured. Please add them in your profile.")
 
-        # Decrypt the keys before using them
         api_key = decrypt_api_key(user.kraken_api_key_encrypted)
         private_key = decrypt_api_key(user.kraken_private_key_encrypted)
 
@@ -176,10 +168,6 @@ def withdrawal_addresses():
 @kraken_bp.route('/rate-limit-status', methods=['GET'])
 @token_required
 def rate_limit_status():
-    """
-    Get the current rate limit status for the authenticated user.
-    Useful for monitoring API usage.
-    """
     try:
         user_id = request.user_id
         remaining = rate_limiter.get_remaining_calls(user_id)

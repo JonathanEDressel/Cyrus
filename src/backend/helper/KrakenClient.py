@@ -40,11 +40,6 @@ def get_open_orders(api_key: str, private_key: str) -> dict:
 
 
 def get_withdrawal_addresses(api_key: str, private_key: str) -> dict:
-    """
-    Get whitelisted withdrawal addresses for common assets.
-    Note: Kraken's API requires querying per asset, so we check common ones.
-    """
-    # Common assets to check for withdrawal methods
     common_assets = ['XBT', 'ETH', 'USDT', 'USDC', 'SOL', 'ADA', 'DOT', 'MATIC', 'XRP', 'LTC']
     
     all_addresses = []
@@ -75,7 +70,6 @@ def get_withdrawal_addresses(api_key: str, private_key: str) -> dict:
             if response.status_code == 200:
                 result = response.json()
                 if result.get('error') and len(result['error']) > 0:
-                    # Skip assets with errors (like no withdrawal methods configured)
                     continue
                     
                 methods = result.get('result', [])
@@ -88,14 +82,12 @@ def get_withdrawal_addresses(api_key: str, private_key: str) -> dict:
                         'fee': method.get('fee', '0'),
                     })
         except:
-            # Skip assets that fail
             continue
     
     return {'error': [], 'result': all_addresses}
 
 
 def get_closed_orders(api_key: str, private_key: str) -> dict:
-    """Get recently closed orders from Kraken."""
     urlpath = '/0/private/ClosedOrders'
     nonce = str(int(time.time() * 1000))
     data = {'nonce': nonce}
@@ -119,16 +111,6 @@ def get_closed_orders(api_key: str, private_key: str) -> dict:
 
 def withdraw_funds(api_key: str, private_key: str, asset: str,
                    key: str, amount: str) -> dict:
-    """
-    Withdraw funds to a whitelisted address.
-    
-    Args:
-        api_key: Kraken API key
-        private_key: Kraken private key
-        asset: The asset to withdraw (e.g. 'XBT', 'ETH')
-        key: The withdrawal key name (whitelisted address label in Kraken)
-        amount: Amount to withdraw
-    """
     urlpath = '/0/private/Withdraw'
     nonce = str(int(time.time() * 1000))
     data = {

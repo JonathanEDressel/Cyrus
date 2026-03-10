@@ -3,9 +3,6 @@ from models.AutomationModel import AutomationRule, AutomationLog
 
 
 class AutomationDbContext:
-    """Database operations for automation rules and logs."""
-
-    # ---- Rules ----
 
     @staticmethod
     def create_rule(user_id: int, rule_name: str, trigger_type: str,
@@ -89,8 +86,6 @@ class AutomationDbContext:
         )
         return [r['user_id'] for r in rows]
 
-    # ---- Order Snapshots ----
-
     @staticmethod
     def upsert_order_snapshot(user_id: int, order_id: str, pair: str,
                               side: str, status: str, volume: str, filled: str) -> None:
@@ -124,8 +119,6 @@ class AutomationDbContext:
             'DELETE FROM order_snapshots WHERE user_id = %s AND order_id = %s',
             (user_id, order_id)
         )
-
-    # ---- Automation Log ----
 
     @staticmethod
     def create_log(rule_id: int, user_id: int, trigger_event: str,

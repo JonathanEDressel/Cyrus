@@ -1,28 +1,20 @@
 (function () {
 
 class WhitelistController {
-  private refreshTimer: number | null = null;
-  private readonly REFRESH_INTERVAL = 30000;
+  private unsubscribe: (() => void) | null = null;
 
   constructor() {
     this.init();
   }
 
   private init(): void {
-    this.attachEventListeners();
-    this.loadAddresses();
-    this.startAutoRefresh();
-  }
+    this.render();
 
-  private attachEventListeners(): void {
-  }
-
-  private startAutoRefresh(): void {
-    this.refreshTimer = window.setInterval(() => this.loadAddresses(), this.REFRESH_INTERVAL);
+    this.unsubscribe = KrakenStore.onUpdate(() => this.render());
 
     const observer = new MutationObserver(() => {
       if (!document.getElementById('addresses-table')) {
-        this.stopAutoRefresh();
+        if (this.unsubscribe) this.unsubscribe();
         observer.disconnect();
       }
     });
@@ -30,24 +22,21 @@ class WhitelistController {
     if (content) observer.observe(content, { childList: true });
   }
 
-  private stopAutoRefresh(): void {
-    if (this.refreshTimer !== null) {
-      window.clearInterval(this.refreshTimer);
-      this.refreshTimer = null;
-    }
-  }
+  private render(): void {
+    const addresses = KrakenStore.withdrawalAddresses;
+    const error = KrakenStore.error;
+    const lastUpdated = KrakenStore.lastUpdated;
 
-  private async loadAddresses(): Promise<void> {
-    try {
-      this.setRefreshLabel('Refreshing...');
-      const addresses = await KrakenController.getWithdrawalAddresses();
+    if (error) {
+      this.showError(error);
+      this.setRefreshLabel('');
+    } else {
+      this.hideError();
       this.renderAddresses(addresses);
       this.updateCountTitle(addresses.length);
-      this.setRefreshLabel(`Last updated: ${new Date().toLocaleTimeString()}`);
-      this.hideError();
-    } catch (error: any) {
-      this.showError(error.message || 'Failed to fetch withdrawal addresses');
-      this.setRefreshLabel('');
+      if (lastUpdated) {
+        this.setRefreshLabel(`Last updated: ${lastUpdated.toLocaleTimeString()}`);
+      }
     }
   }
 

@@ -1,28 +1,20 @@
 (function () {
 
 class OpenOrdersController {
-  private refreshTimer: number | null = null;
-  private readonly REFRESH_INTERVAL = 15000;
+  private unsubscribe: (() => void) | null = null;
 
   constructor() {
     this.init();
   }
 
   private init(): void {
-    this.attachEventListeners();
-    this.loadOrders();
-    this.startAutoRefresh();
-  }
+    this.render();
 
-  private attachEventListeners(): void {
-  }
-
-  private startAutoRefresh(): void {
-    this.refreshTimer = window.setInterval(() => this.loadOrders(), this.REFRESH_INTERVAL);
+    this.unsubscribe = KrakenStore.onUpdate(() => this.render());
 
     const observer = new MutationObserver(() => {
       if (!document.getElementById('orders-table')) {
-        this.stopAutoRefresh();
+        if (this.unsubscribe) this.unsubscribe();
         observer.disconnect();
       }
     });
@@ -30,24 +22,21 @@ class OpenOrdersController {
     if (content) observer.observe(content, { childList: true });
   }
 
-  private stopAutoRefresh(): void {
-    if (this.refreshTimer !== null) {
-      window.clearInterval(this.refreshTimer);
-      this.refreshTimer = null;
-    }
-  }
+  private render(): void {
+    const orders = KrakenStore.openOrders;
+    const error = KrakenStore.error;
+    const lastUpdated = KrakenStore.lastUpdated;
 
-  private async loadOrders(): Promise<void> {
-    try {
-      this.setRefreshLabel('Refreshing...');
-      const orders = await KrakenController.getOpenOrders();
+    if (error) {
+      this.showError(error);
+      this.setRefreshLabel('');
+    } else {
+      this.hideError();
       this.renderOrders(orders);
       this.updateCountTitle(orders.length);
-      this.setRefreshLabel(`Last updated: ${new Date().toLocaleTimeString()}`);
-      this.hideError();
-    } catch (error: any) {
-      this.showError(error.message || 'Failed to fetch open orders');
-      this.setRefreshLabel('');
+      if (lastUpdated) {
+        this.setRefreshLabel(`Last updated: ${lastUpdated.toLocaleTimeString()}`);
+      }
     }
   }
 

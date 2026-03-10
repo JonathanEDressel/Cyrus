@@ -102,6 +102,7 @@ class LoginController {
       this.setSuccessMsg('Login successful!');
       console.log('Login successful! - ', user);
 
+      KrakenStore.start();
       router.navigate('home');
 
     } catch (error: any) {

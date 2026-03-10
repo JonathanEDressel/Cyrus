@@ -3,7 +3,6 @@ from flask import jsonify
 
 
 def handle_error(e, status_code=500):
-    """Standard error response handler."""
     error_message = str(e)
     trace = traceback.format_exc()
     

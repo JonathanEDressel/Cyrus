@@ -3,12 +3,10 @@ from helper.InitiateConnection import get_db_connection
 
 
 def setup_database():
-    """Create database tables if they don't exist."""
     conn = get_db_connection()
     cursor = conn.cursor()
     
     try:
-        # Users table with last_login column
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS users (
                 id INT AUTO_INCREMENT PRIMARY KEY,
@@ -22,7 +20,6 @@ def setup_database():
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
         ''')
 
-        # Automation rules table
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS automation_rules (
                 id INT AUTO_INCREMENT PRIMARY KEY,

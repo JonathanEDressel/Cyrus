@@ -3,7 +3,6 @@ from typing import Optional
 
 
 class AutomationRule:
-    """Model representing an automation rule."""
     
     def __init__(self, id: int, user_id: int, rule_name: str,
                  trigger_type: str, action_type: str,
@@ -76,7 +75,6 @@ class AutomationRule:
 
 
 class AutomationLog:
-    """Model representing an automation execution log entry."""
 
     def __init__(self, id: int, rule_id: int, user_id: int,
                  trigger_event: str, action_executed: str,

@@ -1,5 +1,4 @@
-﻿/* Login page styles for Electron app */
-body {
+﻿body {
   display: block;
   min-height: 100vh;
   margin: 0;
@@ -393,7 +392,6 @@ body {
   background-color: #16a34a;
 }
 
-/* Responsive */
 @media (max-width: 480px) {
   .auth-card {
     padding: 2rem 1.5rem;

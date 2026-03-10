@@ -1,4 +1,3 @@
-// User model interface for the frontend
 interface UserModel {
   id: number;
   username: string;

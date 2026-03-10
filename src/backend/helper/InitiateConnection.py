@@ -3,7 +3,6 @@ from flask import current_app
 
 
 def get_db_connection():
-    """Get a connection to the MySQL database."""
     conn = mysql.connector.connect(
         host=current_app.config['MYSQL_HOST'],
         port=current_app.config['MYSQL_PORT'],
@@ -15,5 +14,4 @@ def get_db_connection():
 
 
 def get_cursor(conn, dictionary=True):
-    """Get a cursor from connection."""
     return conn.cursor(dictionary=dictionary)

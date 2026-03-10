@@ -1,12 +1,7 @@
-/* Main layout shell styles — header, footer, content area */
-
-/* Import the shared auth/login styles */
 @import url('login.css');
 
-/* ---- Utility ---- */
 .d-none { display: none !important; }
 
-/* ---- Header ---- */
 .app-header {
   position: fixed;
   top: 0;
@@ -90,17 +85,14 @@
   color: #22c55e;
 }
 
-/* ---- Main content ---- */
 #app-content {
   min-height: 100vh;
 }
 
-/* When header is visible, push content down */
 .app-header:not(.d-none) ~ #app-content {
   padding-top: 56px;
 }
 
-/* ---- Footer ---- */
 .app-footer {
   background: #0f172a;
   border-top: 1px solid #1e293b;

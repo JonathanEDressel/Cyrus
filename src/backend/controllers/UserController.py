@@ -11,7 +11,6 @@ user_bp = Blueprint('user', __name__)
 @user_bp.route('/profile', methods=['GET'])
 @token_required
 def get_profile():
-    """Get the current user's profile."""
     try:
         user = UserDbContext.get_user_by_id(request.user_id)
         
@@ -27,7 +26,6 @@ def get_profile():
 @user_bp.route('/update-password', methods=['PUT'])
 @token_required
 def update_password():
-    """Update the current user's password."""
     try:
         data = request.get_json()
         
@@ -43,7 +41,6 @@ def update_password():
         if len(new_password) < 6:
             return bad_request("New password must be at least 6 characters")
         
-        # Verify current password
         user = UserDbContext.get_user_by_id(request.user_id)
         if not user:
             return not_found("User not found")
@@ -51,7 +48,6 @@ def update_password():
         if not verify_password(current_password, user.password_hash):
             return bad_request("Current password is incorrect")
         
-        # Update password
         new_hash = hash_password(new_password)
         UserDbContext.update_password(request.user_id, new_hash)
         
@@ -92,7 +88,6 @@ def update_username():
 @user_bp.route('/update-keys', methods=['PUT'])
 @token_required
 def update_kraken_keys():
-    """Update the user's Kraken API keys."""
     try:
         data = request.get_json()
         
@@ -105,7 +100,6 @@ def update_kraken_keys():
         if not api_key or not private_key:
             return bad_request("Both API key and private key are required")
         
-        # Encrypt the Kraken API keys before storing
         api_key_encrypted = encrypt_api_key(api_key)
         private_key_encrypted = encrypt_api_key(private_key)
         
@@ -120,7 +114,6 @@ def update_kraken_keys():
 @user_bp.route('/delete', methods=['DELETE'])
 @token_required
 def delete_account():
-    """Delete the current user's account."""
     try:
         UserDbContext.delete_user(request.user_id)
         return success_response(message="Account deleted successfully")

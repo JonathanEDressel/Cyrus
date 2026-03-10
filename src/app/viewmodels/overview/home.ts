@@ -1,7 +1,6 @@
 (function () {
 class HomeController {
-  private refreshTimer: number | null = null;
-  private readonly REFRESH_INTERVAL = 15000;
+  private unsubscribe: (() => void) | null = null;
 
   constructor() {
     this.init();
@@ -10,7 +9,17 @@ class HomeController {
   private init(): void {
     this.attachEventListeners();
     this.loadDashboardData();
-    this.startAutoRefresh();
+
+    this.unsubscribe = KrakenStore.onUpdate(() => this.renderFromStore());
+
+    const observer = new MutationObserver(() => {
+      if (!document.getElementById('orders-tbody')) {
+        if (this.unsubscribe) this.unsubscribe();
+        observer.disconnect();
+      }
+    });
+    const content = document.getElementById('app-content');
+    if (content) observer.observe(content, { childList: true });
   }
 
   private attachEventListeners(): void {
@@ -22,46 +31,24 @@ class HomeController {
     });
   }
 
-  private startAutoRefresh(): void {
-    this.refreshTimer = window.setInterval(() => this.loadOpenOrders(), this.REFRESH_INTERVAL);
-
-    const observer = new MutationObserver(() => {
-      if (!document.getElementById('orders-tbody')) {
-        this.stopAutoRefresh();
-        observer.disconnect();
-      }
-    });
-    const content = document.getElementById('app-content');
-    if (content) observer.observe(content, { childList: true });
-  }
-
-  private stopAutoRefresh(): void {
-    if (this.refreshTimer !== null) {
-      window.clearInterval(this.refreshTimer);
-      this.refreshTimer = null;
-    }
-  }
-
-  private async loadDashboardData(): Promise<void> {
+  private loadDashboardData(): void {
     this.setCardValue('total-balance', '$0.00');
     this.setCardValue('open-positions-count', '0');
-    this.setCardValue('open-orders-count', '0');
     this.setCardValue('custom-commands-count', '0');
 
     this.setTableEmpty('positions-tbody', 6, 'No open positions');
-    this.setTableEmpty('orders-tbody', 6, 'Loading orders...');
 
-    await this.loadOpenOrders();
+    this.renderFromStore();
   }
 
-  private async loadOpenOrders(): Promise<void> {
-    try {
-      const orders = await KrakenController.getOpenOrders();
-      this.renderOrders(orders);
-      this.setCardValue('open-orders-count', orders.length.toString());
-    } catch (error: any) {
+  private renderFromStore(): void {
+    const orders = KrakenStore.openOrders;
+    if (KrakenStore.error) {
       this.setTableEmpty('orders-tbody', 6, 'Failed to load orders');
       this.setCardValue('open-orders-count', '--');
+    } else {
+      this.renderOrders(orders);
+      this.setCardValue('open-orders-count', orders.length.toString());
     }
   }
 
@@ -74,7 +61,6 @@ class HomeController {
       return;
     }
 
-    // Show only the first 5 orders on the dashboard
     const displayOrders = orders.slice(0, 5);
 
     tbody.innerHTML = displayOrders.map((o: any) => {
