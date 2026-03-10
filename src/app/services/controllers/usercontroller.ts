@@ -17,6 +17,16 @@ class UserController {
   /**
    * Update the user's password
    */
+  static async updateUsername(username: string): Promise<UserModel> {
+    const token = AuthController.getToken();
+    if (!token) {
+      throw new Error('Not authenticated');
+    }
+    const response = await UserData.updateUsername(username, token);
+    localStorage.setItem(AppConfig.USER_KEY, JSON.stringify(response.data));
+    return response.data;
+  }
+
   static async updatePassword(currentPassword: string, newPassword: string): Promise<void> {
     const token = AuthController.getToken();
     if (!token) {

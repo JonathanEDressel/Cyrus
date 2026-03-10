@@ -17,7 +17,7 @@ class UserDbContext:
     def update_kraken_keys(user_id: int, api_key_encrypted: str, private_key_encrypted: str) -> bool:
         execute_non_query(
             '''UPDATE users 
-               SET kraken_api_key_encrypted = %s, kraken_private_key_encrypted = %s, updated_at = CURRENT_TIMESTAMP
+               SET kraken_api_key_encrypted = %s, kraken_private_key_encrypted = %s
                WHERE id = %s''',
             (api_key_encrypted, private_key_encrypted, user_id)
         )
@@ -27,12 +27,22 @@ class UserDbContext:
     def update_password(user_id: int, password_hash: str) -> bool:
         execute_non_query(
             '''UPDATE users 
-               SET password_hash = %s, updated_at = CURRENT_TIMESTAMP
+               SET password_hash = %s
                WHERE id = %s''',
             (password_hash, user_id)
         )
         return True
     
+    @staticmethod
+    def update_username(user_id: int, username: str) -> bool:
+        execute_non_query(
+            '''UPDATE users 
+               SET username = %s
+               WHERE id = %s''',
+            (username, user_id)
+        )
+        return True
+
     @staticmethod
     def delete_user(user_id: int) -> bool:
         execute_non_query(

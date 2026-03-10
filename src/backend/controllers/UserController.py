@@ -1,6 +1,7 @@
 from flask import Blueprint, request
 from controllers.UserDbContext import UserDbContext
-from helper.Security import token_required, hash_password, verify_password
+from controllers.AuthDbContext import AuthDbContext
+from helper.Security import token_required, hash_password, verify_password, encrypt_api_key
 from helper.ErrorHandler import handle_error, bad_request, not_found
 from helper.Helper import success_response
 
@@ -60,6 +61,34 @@ def update_password():
         return handle_error(e)
 
 
+@user_bp.route('/update-username', methods=['PUT'])
+@token_required
+def update_username():
+    try:
+        data = request.get_json()
+
+        if not data:
+            return bad_request("No data provided")
+
+        new_username = data.get('username', '').strip()
+
+        if not new_username or len(new_username) < 3:
+            return bad_request("Username must be at least 3 characters")
+
+        if AuthDbContext.username_exists(new_username):
+            existing = AuthDbContext.get_user_by_username(new_username)
+            if existing and existing.id != request.user_id:
+                return bad_request("Username is already taken")
+
+        UserDbContext.update_username(request.user_id, new_username)
+
+        user = UserDbContext.get_user_by_id(request.user_id)
+        return success_response(data=user.to_dict(), message="Username updated successfully")
+
+    except Exception as e:
+        return handle_error(e)
+
+
 @user_bp.route('/update-keys', methods=['PUT'])
 @token_required
 def update_kraken_keys():
@@ -76,8 +105,11 @@ def update_kraken_keys():
         if not api_key or not private_key:
             return bad_request("Both API key and private key are required")
         
-        # TODO: Encrypt keys before storing
-        UserDbContext.update_kraken_keys(request.user_id, api_key, private_key)
+        # Encrypt the Kraken API keys before storing
+        api_key_encrypted = encrypt_api_key(api_key)
+        private_key_encrypted = encrypt_api_key(private_key)
+        
+        UserDbContext.update_kraken_keys(request.user_id, api_key_encrypted, private_key_encrypted)
         
         return success_response(message="Kraken API keys updated successfully")
         

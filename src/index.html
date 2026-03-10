@@ -9,7 +9,6 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
-  <!-- Header (shared across all pages) -->
   <header id="app-header" class="app-header d-none">
     <div class="header-inner">
       <div class="header-logo">
@@ -18,8 +17,9 @@
       </div>
       <nav class="header-nav" id="header-nav">
         <a href="#" data-route="home" class="nav-link"><i class="fa-solid fa-house"></i> Home</a>
-        <a href="#" data-route="positions" class="nav-link"><i class="fa-solid fa-chart-line"></i> Positions</a>
+        <!-- <a href="#" data-route="positions" class="nav-link"><i class="fa-solid fa-chart-line"></i> Positions</a> -->
         <a href="#" data-route="openorders" class="nav-link"><i class="fa-solid fa-clock-rotate-left"></i> Open Orders</a>
+        <a href="#" data-route="whitelist" class="nav-link"><i class="fa-solid fa-address-book"></i> Whitelisted Addresses</a>
         <a href="#" data-route="commands" class="nav-link"><i class="fa-solid fa-bolt"></i> Custom Commands</a>
         <a href="#" data-route="profile" class="nav-link"><i class="fa-solid fa-user"></i> Profile</a>
       </nav>
@@ -31,10 +31,8 @@
     </div>
   </header>
 
-  <!-- Main content area — partials are loaded here -->
   <main id="app-content"></main>
 
-  <!-- Footer (shared across all pages) -->
   <footer id="app-footer" class="app-footer d-none">
     <div class="footer-inner">
       <span>&copy; 2026 Kraking. All rights reserved.</span>
@@ -45,15 +43,82 @@
     </div>
   </footer>
 
-  <!-- Service layer (loaded in dependency order) -->
+  <div class="donation-widget">
+    <button class="donation-toggle" id="donation-toggle">
+      <i class="fa-solid fa-heart"></i>
+    </button>
+    <div class="donation-modal d-none" id="donation-modal">
+      <div class="donation-header">
+        <h3><i class="fa-solid fa-heart me-2"></i>Support Kraking</h3>
+        <button class="donation-close" id="donation-close">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <div class="donation-body">
+        <p class="donation-message">If you find Kraking helpful, consider supporting the project!</p>
+        <div class="donation-option">
+          <div class="donation-label"><i class="fa-brands fa-bitcoin"></i> Bitcoin (BTC Network)</div>
+          <div class="donation-address-wrapper">
+            <div class="donation-address" data-address="32BJw5mpyQ6fuLeiR5yrAAR2H8gerB9GAD">32BJw5mpyQ6fuLeiR5yrAAR2H8gerB9GAD</div>
+            <button class="copy-btn" data-copy="32BJw5mpyQ6fuLeiR5yrAAR2H8gerB9GAD" title="Copy address">
+              <i class="fa-solid fa-copy"></i>
+            </button>
+          </div>
+        </div>
+        <div class="donation-option">
+          <div class="donation-label"><i class="fa-brands fa-ethereum"></i> Ethereum (ETH Network)</div>
+          <div class="donation-address-wrapper">
+            <div class="donation-address" data-address="0xc0066CCD708376cF3fA34CF5a3a8eB88AF58c97A">0xc0066CCD708376cF3fA34CF5a3a8eB88AF58c97A</div>
+            <button class="copy-btn" data-copy="0xc0066CCD708376cF3fA34CF5a3a8eB88AF58c97A" title="Copy address">
+              <i class="fa-solid fa-copy"></i>
+            </button>
+          </div>
+        </div>
+        <div class="donation-option">
+          <div class="donation-label"><i class="fa-solid fa-s"></i> Solana (SOL Network)</div>
+          <div class="donation-address-wrapper">
+            <div class="donation-address" data-address="7vfBGpjZTEZEsKNi1ZdYYBPGq1uFzWvLuV6xRP13tSo9">7vfBGpjZTEZEsKNi1ZdYYBPGq1uFzWvLuV6xRP13tSo9</div>
+            <button class="copy-btn" data-copy="7vfBGpjZTEZEsKNi1ZdYYBPGq1uFzWvLuV6xRP13tSo9" title="Copy address">
+              <i class="fa-solid fa-copy"></i>
+            </button>
+          </div>
+        </div>
+        <div class="donation-option">
+          <div class="donation-label"><i class="fa-solid fa-x"></i> Ripple (XRP Network - Address/Tag)</div>
+          <div class="donation-address-wrapper">
+            <div class="donation-address" data-address="rLHzPsX6oXkzU2qL12kHCH8G8cnZv1rBJh / 204756592">rLHzPsX6oXkzU2qL12kHCH8G8cnZv1rBJh / 204756592</div>
+            <button class="copy-btn" data-copy="rLHzPsX6oXkzU2qL12kHCH8G8cnZv1rBJh / 204756592" title="Copy address">
+              <i class="fa-solid fa-copy"></i>
+            </button>
+          </div>
+        </div>
+        <div class="donation-option">
+          <div class="donation-label"><i class="fa-solid fa-dog"></i> Shiba Inu (SHIB/ETH Network)</div>
+          <div class="donation-address-wrapper">
+            <div class="donation-address" data-address="0xc0066CCD708376cF3fA34CF5a3a8eB88AF58c97A">0xc0066CCD708376cF3fA34CF5a3a8eB88AF58c97A</div>
+            <button class="copy-btn" data-copy="0xc0066CCD708376cF3fA34CF5a3a8eB88AF58c97A" title="Copy address">
+              <i class="fa-solid fa-copy"></i>
+            </button>
+          </div>
+        </div>
+        <div class="donation-option">
+          <div class="donation-label"><i class="fa-solid fa-dollar-sign"></i> Venmo</div>
+          <a href="https://account.venmo.com/u/JonathanDressel" class="donation-link" target="_blank">@venmo</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="donation.js"></script>
   <script src="../dist/app/app.config.js"></script>
   <script src="../dist/app/models/usermodel.js"></script>
   <script src="../dist/app/services/dataaccess.js"></script>
   <script src="../dist/app/services/authdata.js"></script>
   <script src="../dist/app/services/userdata.js"></script>
+  <script src="../dist/app/services/krakendata.js"></script>
   <script src="../dist/app/services/controllers/authcontroller.js"></script>
   <script src="../dist/app/services/controllers/usercontroller.js"></script>
-  <!-- Router + app entry point -->
+  <script src="../dist/app/services/controllers/krakencontroller.js"></script>
   <script src="../dist/app/router.js"></script>
   <script src="../dist/app/app.js"></script>
 </body>

@@ -1,5 +1,6 @@
 (function () {
-class HomeController {
+
+class OpenOrdersController {
   private refreshTimer: number | null = null;
   private readonly REFRESH_INTERVAL = 15000;
 
@@ -9,24 +10,18 @@ class HomeController {
 
   private init(): void {
     this.attachEventListeners();
-    this.loadDashboardData();
+    this.loadOrders();
     this.startAutoRefresh();
   }
 
   private attachEventListeners(): void {
-    document.getElementById('view-all-positions')?.addEventListener('click', () => {
-      router.navigate('positions');
-    });
-    document.getElementById('view-all-orders')?.addEventListener('click', () => {
-      router.navigate('openorders');
-    });
   }
 
   private startAutoRefresh(): void {
-    this.refreshTimer = window.setInterval(() => this.loadOpenOrders(), this.REFRESH_INTERVAL);
+    this.refreshTimer = window.setInterval(() => this.loadOrders(), this.REFRESH_INTERVAL);
 
     const observer = new MutationObserver(() => {
-      if (!document.getElementById('orders-tbody')) {
+      if (!document.getElementById('orders-table')) {
         this.stopAutoRefresh();
         observer.disconnect();
       }
@@ -42,26 +37,17 @@ class HomeController {
     }
   }
 
-  private async loadDashboardData(): Promise<void> {
-    this.setCardValue('total-balance', '$0.00');
-    this.setCardValue('open-positions-count', '0');
-    this.setCardValue('open-orders-count', '0');
-    this.setCardValue('custom-commands-count', '0');
-
-    this.setTableEmpty('positions-tbody', 6, 'No open positions');
-    this.setTableEmpty('orders-tbody', 6, 'Loading orders...');
-
-    await this.loadOpenOrders();
-  }
-
-  private async loadOpenOrders(): Promise<void> {
+  private async loadOrders(): Promise<void> {
     try {
+      this.setRefreshLabel('Refreshing...');
       const orders = await KrakenController.getOpenOrders();
       this.renderOrders(orders);
-      this.setCardValue('open-orders-count', orders.length.toString());
+      this.updateCountTitle(orders.length);
+      this.setRefreshLabel(`Last updated: ${new Date().toLocaleTimeString()}`);
+      this.hideError();
     } catch (error: any) {
-      this.setTableEmpty('orders-tbody', 6, 'Failed to load orders');
-      this.setCardValue('open-orders-count', '--');
+      this.showError(error.message || 'Failed to fetch open orders');
+      this.setRefreshLabel('');
     }
   }
 
@@ -70,23 +56,24 @@ class HomeController {
     if (!tbody) return;
 
     if (orders.length === 0) {
-      tbody.innerHTML = '<tr class="empty-row"><td colspan="6">No open orders</td></tr>';
+      tbody.innerHTML = '<tr class="empty-row"><td colspan="9">No open orders</td></tr>';
       return;
     }
 
-    // Show only the first 5 orders on the dashboard
-    const displayOrders = orders.slice(0, 5);
-
-    tbody.innerHTML = displayOrders.map((o: any) => {
+    tbody.innerHTML = orders.map((o: any) => {
       const sideClass = o.side === 'buy' ? 'side-buy' : 'side-sell';
+      const opened = o.opentm ? new Date(o.opentm * 1000).toLocaleString() : '--';
       const formattedPair = this.formatPair(o.pair);
       return `<tr>
+        <td class="order-id-cell">${this.escapeHtml(o.id)}</td>
         <td>${this.escapeHtml(formattedPair)}</td>
-        <td>${this.escapeHtml(o.type)}</td>
         <td><span class="${sideClass}">${this.escapeHtml(o.side)}</span></td>
+        <td>${this.escapeHtml(o.type)}</td>
         <td>${this.escapeHtml(o.price)}</td>
         <td>${this.escapeHtml(o.volume)}</td>
+        <td>${this.escapeHtml(o.filled)}</td>
         <td><span class="status-badge">${this.escapeHtml(o.status)}</span></td>
+        <td>${this.escapeHtml(opened)}</td>
       </tr>`;
     }).join('');
   }
@@ -134,16 +121,28 @@ class HomeController {
     return base;
   }
 
-  private setCardValue(id: string, value: string): void {
-    const el = document.getElementById(id);
-    if (el) el.textContent = value;
+  private updateCountTitle(count: number): void {
+    const el = document.getElementById('orders-count-title');
+    if (el) el.textContent = `Orders (${count})`;
   }
 
-  private setTableEmpty(tbodyId: string, colspan: number, message: string): void {
-    const tbody = document.getElementById(tbodyId);
-    if (tbody) {
-      tbody.innerHTML = `<tr class="empty-row"><td colspan="${colspan}">${message}</td></tr>`;
+  private setRefreshLabel(text: string): void {
+    const el = document.getElementById('refresh-label');
+    if (el) el.textContent = text ? `\u2014 ${text}` : '';
+  }
+
+  private showError(message: string): void {
+    const el = document.getElementById('orders-error');
+    const msgEl = document.getElementById('orders-error-message');
+    if (el && msgEl) {
+      msgEl.textContent = message;
+      el.classList.remove('d-none');
     }
+  }
+
+  private hideError(): void {
+    const el = document.getElementById('orders-error');
+    if (el) el.classList.add('d-none');
   }
 
   private escapeHtml(str: string): string {
@@ -153,6 +152,6 @@ class HomeController {
   }
 }
 
-new HomeController();
+new OpenOrdersController();
 
 })();

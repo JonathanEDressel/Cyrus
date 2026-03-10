@@ -1,6 +1,6 @@
 from flask import Blueprint, request
 from controllers.AuthDbContext import AuthDbContext
-from helper.Security import hash_password, verify_password, generate_token
+from helper.Security import hash_password, verify_password, generate_token, encrypt_api_key
 from helper.ErrorHandler import handle_error, bad_request
 from helper.Helper import success_response, created_response
 
@@ -41,8 +41,9 @@ def register():
         
         password_hashed = hash_password(password)
         
-        api_key_encrypted = kraken_api_key
-        private_key_encrypted = kraken_private_key
+        # Encrypt the Kraken API keys before storing
+        api_key_encrypted = encrypt_api_key(kraken_api_key)
+        private_key_encrypted = encrypt_api_key(kraken_private_key)
         
         user = AuthDbContext.create_user(
             username=username,

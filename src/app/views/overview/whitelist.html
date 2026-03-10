@@ -1,0 +1,33 @@
+<div class="page-container">
+  <div class="overview-header">
+    <h1 class="page-title">Whitelisted Addresses</h1>
+    <p class="page-subtitle">Your withdrawal addresses on Kraken <span class="auto-refresh-label" id="refresh-label"></span></p>
+  </div>
+
+  <div class="alert alert-warning d-none" id="addresses-error">
+    <span id="addresses-error-message"></span>
+  </div>
+
+  <div class="overview-section">
+    <div class="section-header">
+      <h2 class="section-title" id="addresses-count-title">Addresses</h2>
+    </div>
+    <div class="data-table-wrapper">
+      <table class="data-table" id="addresses-table">
+        <thead>
+          <tr>
+            <th>Asset</th>
+            <th>Method / Address</th>
+            <th>Limit</th>
+            <th>Fee</th>
+          </tr>
+        </thead>
+        <tbody id="addresses-tbody">
+          <tr class="empty-row">
+            <td colspan="4">Loading addresses...</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>

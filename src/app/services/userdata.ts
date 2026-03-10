@@ -14,6 +14,17 @@ class UserData {
    * PUT /api/user/update-password
    * Updates the user's password
    */
+  static async updateUsername(
+    username: string,
+    token: string
+  ): Promise<ApiResponse<UserModel>> {
+    return DataAccess.put(
+      `${AppConfig.API_BASE}/user/update-username`,
+      { username },
+      token
+    );
+  }
+
   static async updatePassword(
     currentPassword: string,
     newPassword: string,
@@ -21,7 +32,7 @@ class UserData {
   ): Promise<ApiResponse<any>> {
     return DataAccess.put(
       `${AppConfig.API_BASE}/user/update-password`,
-      { current_password: currentPassword, new_password: newPassword },
+      { currentPassword, newPassword },
       token
     );
   }
@@ -37,7 +48,7 @@ class UserData {
   ): Promise<ApiResponse<any>> {
     return DataAccess.put(
       `${AppConfig.API_BASE}/user/update-keys`,
-      { kraken_api_key: krakenApiKey, kraken_private_key: krakenPrivateKey },
+      { krakenApiKey, krakenPrivateKey },
       token
     );
   }

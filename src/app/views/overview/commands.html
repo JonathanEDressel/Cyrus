@@ -1,0 +1,138 @@
+<div class="page-container">
+  <div class="overview-header">
+    <h1 class="page-title">Custom Commands</h1>
+    <p class="page-subtitle">Automation rules for your Kraken orders</p>
+  </div>
+
+  <div class="alert alert-warning d-none" id="commands-error">
+    <span id="commands-error-message"></span>
+  </div>
+
+  <div class="alert alert-success d-none" id="commands-success">
+    <span id="commands-success-message"></span>
+  </div>
+
+  <!-- Create New Rule -->
+  <div class="overview-section">
+    <div class="section-header">
+      <h2 class="section-title">Create Rule</h2>
+    </div>
+    <form id="create-rule-form" class="rule-form">
+      <div class="form-row">
+        <div class="form-group">
+          <label for="rule-name">Rule Name</label>
+          <input type="text" id="rule-name" placeholder="e.g. Auto-withdraw BTC after sell" required>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label for="trigger-type">When (Trigger)</label>
+          <select id="trigger-type">
+            <option value="order_filled">Order is Filled</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="trigger-order-id">Order ID</label>
+          <input type="text" id="trigger-order-id" placeholder="Kraken order ID to watch">
+        </div>
+      </div>
+
+      <div class="form-divider">
+        <span class="form-divider-text">THEN</span>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label for="action-type">Do (Action)</label>
+          <select id="action-type">
+            <option value="withdraw_crypto">Withdraw Crypto</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label for="action-asset">Asset</label>
+          <select id="action-asset">
+            <option value="XBT">BTC</option>
+            <option value="ETH">ETH</option>
+            <option value="USDT">USDT</option>
+            <option value="USDC">USDC</option>
+            <option value="SOL">SOL</option>
+            <option value="ADA">ADA</option>
+            <option value="DOT">DOT</option>
+            <option value="MATIC">MATIC</option>
+            <option value="XRP">XRP</option>
+            <option value="LTC">LTC</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="action-address-key">Withdrawal Address Key</label>
+          <input type="text" id="action-address-key" placeholder="Whitelisted address label in Kraken" required>
+        </div>
+        <div class="form-group">
+          <label for="action-amount">Amount</label>
+          <input type="text" id="action-amount" placeholder="e.g. 0.5 or all" required>
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <button type="submit" class="btn-primary" id="create-rule-btn">
+          <i class="fa-solid fa-plus"></i> Create Rule
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Active Rules -->
+  <div class="overview-section">
+    <div class="section-header">
+      <h2 class="section-title" id="rules-count-title">Active Rules</h2>
+    </div>
+    <div class="data-table-wrapper">
+      <table class="data-table" id="rules-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Trigger</th>
+            <th>Action</th>
+            <th>Status</th>
+            <th>Triggered</th>
+            <th>Controls</th>
+          </tr>
+        </thead>
+        <tbody id="rules-tbody">
+          <tr class="empty-row">
+            <td colspan="6">Loading rules...</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Execution Log -->
+  <div class="overview-section">
+    <div class="section-header">
+      <h2 class="section-title">Execution Log</h2>
+    </div>
+    <div class="data-table-wrapper">
+      <table class="data-table" id="logs-table">
+        <thead>
+          <tr>
+            <th>Time</th>
+            <th>Trigger</th>
+            <th>Action</th>
+            <th>Result</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="logs-tbody">
+          <tr class="empty-row">
+            <td colspan="5">Loading logs...</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>

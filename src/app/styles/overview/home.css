@@ -168,3 +168,30 @@
 /* P&L colors */
 .pnl-positive { color: #22c55e; }
 .pnl-negative { color: #ef4444; }
+
+/* Order side styling */
+.side-buy {
+  color: #22c55e;
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.8rem;
+}
+
+.side-sell {
+  color: #ef4444;
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.8rem;
+}
+
+/* Status badge */
+.status-badge {
+  display: inline-block;
+  padding: 0.2em 0.6em;
+  font-size: 0.78rem;
+  font-weight: 600;
+  border-radius: 6px;
+  background: rgba(34, 197, 94, 0.1);
+  color: #22c55e;
+  text-transform: capitalize;
+}

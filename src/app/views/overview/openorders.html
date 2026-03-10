@@ -1,0 +1,38 @@
+<div class="page-container">
+  <div class="overview-header">
+    <h1 class="page-title">Open Orders</h1>
+    <p class="page-subtitle">Your active orders on Kraken <span class="auto-refresh-label" id="refresh-label"></span></p>
+  </div>
+
+  <div class="alert alert-warning d-none" id="orders-error">
+    <span id="orders-error-message"></span>
+  </div>
+
+  <div class="overview-section">
+    <div class="section-header">
+      <h2 class="section-title" id="orders-count-title">Orders</h2>
+    </div>
+    <div class="data-table-wrapper">
+      <table class="data-table" id="orders-table">
+        <thead>
+          <tr>
+            <th>Order ID</th>
+            <th>Pair</th>
+            <th>Side</th>
+            <th>Type</th>
+            <th>Price</th>
+            <th>Volume</th>
+            <th>Filled</th>
+            <th>Status</th>
+            <th>Opened</th>
+          </tr>
+        </thead>
+        <tbody id="orders-tbody">
+          <tr class="empty-row">
+            <td colspan="9">Loading orders...</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>

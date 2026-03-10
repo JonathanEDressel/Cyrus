@@ -1,0 +1,44 @@
+.auto-refresh-label {
+  font-size: 0.8rem;
+  color: #64748b;
+  font-weight: 400;
+}
+
+.side-buy {
+  color: #22c55e;
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.8rem;
+}
+
+.side-sell {
+  color: #ef4444;
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.8rem;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 0.2em 0.6em;
+  font-size: 0.78rem;
+  font-weight: 600;
+  border-radius: 6px;
+  background: rgba(34, 197, 94, 0.1);
+  color: #22c55e;
+  text-transform: capitalize;
+}
+
+#orders-error {
+  margin-bottom: 1.5rem;
+}
+
+.order-id-cell {
+  font-family: 'Courier New', monospace;
+  font-size: 0.75rem;
+  color: #94a3b8;
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

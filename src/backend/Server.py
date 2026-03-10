@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 from Extensions import cors
 from Routes import register_routes
 from helper.SetupDatabase import setup_database
+from automation.worker import start_worker
 
 # Load environment variables
 load_dotenv()
@@ -28,6 +29,9 @@ def create_app():
     
     # Register routes
     register_routes(app)
+
+    # Start automation worker
+    start_worker(app)
     
     return app
 

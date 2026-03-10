@@ -1,0 +1,47 @@
+.auto-refresh-label {
+  font-size: 0.8rem;
+  color: #64748b;
+  font-weight: 400;
+}
+
+.asset-badge {
+  display: inline-block;
+  padding: 0.3em 0.7em;
+  font-size: 0.8rem;
+  font-weight: 700;
+  border-radius: 6px;
+  background: rgba(99, 102, 241, 0.1);
+  color: #6366f1;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.address-cell {
+  font-family: 'Courier New', monospace;
+  font-size: 0.85rem;
+  color: #cbd5e1;
+  word-break: break-all;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 0.2em 0.6em;
+  font-size: 0.78rem;
+  font-weight: 600;
+  border-radius: 6px;
+  text-transform: capitalize;
+}
+
+.status-active {
+  background: rgba(34, 197, 94, 0.1);
+  color: #22c55e;
+}
+
+.status-new {
+  background: rgba(251, 191, 36, 0.1);
+  color: #fbbf24;
+}
+
+#addresses-error {
+  margin-bottom: 1.5rem;
+}

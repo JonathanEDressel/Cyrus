@@ -1,0 +1,77 @@
+<div class="page-container">
+  <div class="overview-header">
+    <h1 class="page-title">Profile</h1>
+    <p class="page-subtitle">Manage your account settings</p>
+  </div>
+
+  <div class="profile-sections">
+    <section class="profile-section">
+      <div class="section-header">
+        <h2 class="section-title"><i class="fa-solid fa-user me-2"></i>Username</h2>
+      </div>
+      <div class="alert alert-success d-none" data-alert="username-success"><i class="fa-solid fa-circle-check me-2"></i><span></span></div>
+      <div class="alert alert-warning d-none" data-alert="username-error"><span></span></div>
+      <div class="profile-card">
+        <form id="username-form" onsubmit="return false;">
+          <div class="form-group">
+            <label for="profile-username" class="form-label">Username</label>
+            <input id="profile-username" type="text" class="form-control" placeholder="Enter new username" />
+          </div>
+          <button type="button" class="btn btn-primary" id="save-username-btn">
+            Save Username <i class="fa-solid fa-floppy-disk ms-2"></i>
+          </button>
+        </form>
+      </div>
+    </section>
+
+    <section class="profile-section">
+      <div class="section-header">
+        <h2 class="section-title"><i class="fa-solid fa-key me-2"></i>Kraken API Keys</h2>
+      </div>
+      <div class="alert alert-success d-none" data-alert="keys-success"><i class="fa-solid fa-circle-check me-2"></i><span></span></div>
+      <div class="alert alert-warning d-none" data-alert="keys-error"><span></span></div>
+      <div class="profile-card">
+        <form id="keys-form" onsubmit="return false;">
+          <div class="form-group">
+            <label for="profile-api-key" class="form-label">API Key</label>
+            <input id="profile-api-key" type="password" class="form-control" placeholder="Enter Kraken API key" />
+          </div>
+          <div class="form-group">
+            <label for="profile-private-key" class="form-label">Private Key</label>
+            <input id="profile-private-key" type="password" class="form-control" placeholder="Enter Kraken private key" />
+          </div>
+          <button type="button" class="btn btn-primary" id="save-keys-btn">
+            Save Keys <i class="fa-solid fa-floppy-disk ms-2"></i>
+          </button>
+        </form>
+      </div>
+    </section>
+
+    <section class="profile-section">
+      <div class="section-header">
+        <h2 class="section-title"><i class="fa-solid fa-lock me-2"></i>Change Password</h2>
+      </div>
+      <div class="alert alert-success d-none" data-alert="password-success"><i class="fa-solid fa-circle-check me-2"></i><span></span></div>
+      <div class="alert alert-warning d-none" data-alert="password-error"><span></span></div>
+      <div class="profile-card">
+        <form id="password-form" onsubmit="return false;">
+          <div class="form-group">
+            <label for="profile-current-password" class="form-label">Current Password</label>
+            <input id="profile-current-password" type="password" class="form-control" placeholder="Enter current password" />
+          </div>
+          <div class="form-group">
+            <label for="profile-new-password" class="form-label">New Password</label>
+            <input id="profile-new-password" type="password" class="form-control" placeholder="Enter new password" />
+          </div>
+          <div class="form-group">
+            <label for="profile-confirm-password" class="form-label">Confirm New Password</label>
+            <input id="profile-confirm-password" type="password" class="form-control" placeholder="Confirm new password" />
+          </div>
+          <button type="button" class="btn btn-primary" id="save-password-btn">
+            Update Password <i class="fa-solid fa-floppy-disk ms-2"></i>
+          </button>
+        </form>
+      </div>
+    </section>
+  </div>
+</div>

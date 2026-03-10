@@ -36,25 +36,33 @@
   });
 
   router.register('openorders', {
-    view: 'app/views/overview/home.html',
-    viewModel: '../dist/app/viewmodels/overview/home.js',
-    style: 'app/styles/overview/home.css',
+    view: 'app/views/overview/openorders.html',
+    viewModel: '../dist/app/viewmodels/overview/openorders.js',
+    style: 'app/styles/overview/openorders.css',
     showChrome: true,
     title: 'Open Orders',
   });
 
+  router.register('whitelist', {
+    view: 'app/views/overview/whitelist.html',
+    viewModel: '../dist/app/viewmodels/overview/whitelist.js',
+    style: 'app/styles/overview/whitelist.css',
+    showChrome: true,
+    title: 'Whitelisted Addresses',
+  });
+
   router.register('commands', {
-    view: 'app/views/overview/home.html',
-    viewModel: '../dist/app/viewmodels/overview/home.js',
-    style: 'app/styles/overview/home.css',
+    view: 'app/views/overview/commands.html',
+    viewModel: '../dist/app/viewmodels/overview/commands.js',
+    style: 'app/styles/overview/commands.css',
     showChrome: true,
     title: 'Custom Commands',
   });
 
   router.register('profile', {
-    view: 'app/views/overview/home.html',
-    viewModel: '../dist/app/viewmodels/overview/home.js',
-    style: 'app/styles/overview/home.css',
+    view: 'app/views/overview/profile.html',
+    viewModel: '../dist/app/viewmodels/overview/profile.js',
+    style: 'app/styles/overview/profile.css',
     showChrome: true,
     title: 'Profile',
   });
