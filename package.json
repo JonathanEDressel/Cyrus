@@ -7,14 +7,51 @@
     "start": "npm run build && electron .",
     "build": "tsc",
     "watch": "tsc -w",
-    "dev": "npm run build && electron . --dev"
+    "dev": "npm run build && electron . --dev",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder",
+    "build:backend": "cd src/backend && pyinstaller server.spec",
+    "build:all": "npm run build && npm run build:backend && npm run dist"
   },
-  "keywords": ["electron", "desktop"],
-  "author": "",
-  "license": "ISC",
+  "build": {
+    "appId": "com.kraking.app",
+    "productName": "Kraking",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "src/index.html",
+      "src/app/**/*",
+      "src/assets/**/*",
+      "!src/**/*.ts",
+      "!src/backend/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "src/backend/dist/KrakingServer.exe",
+        "to": "backend/KrakingServer.exe"
+      }
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "src/assets/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "installerIcon": "src/assets/icon.ico",
+      "uninstallerIcon": "src/assets/icon.ico"
+    }
+  },
   "devDependencies": {
     "@types/node": "^20.11.0",
     "electron": "^28.2.0",
+    "electron-builder": "^24.13.3",
     "typescript": "^5.3.3"
   }
 }

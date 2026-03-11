@@ -225,6 +225,96 @@ Flask debug mode is enabled by default in `Server.py`. The server will auto-relo
 
 ---
 
+## Building for Distribution
+
+To package the application into a standalone Windows installer (.exe) that users can install and run without needing Python or Node.js:
+
+### Prerequisites
+
+Ensure you have installed the build dependencies:
+
+```bash
+# Install PyInstaller for Python backend packaging
+pip install pyinstaller
+
+# Install electron-builder for Electron frontend packaging
+npm install --save-dev electron-builder
+```
+
+### Building the Installer
+
+**Option 1: Build Everything at Once**
+
+```bash
+npm run build:all
+```
+
+This single command will:
+1. Compile TypeScript files
+2. Package the Python backend into `KrakingServer.exe`
+3. Build the Electron app installer
+
+**Option 2: Build Step-by-Step**
+
+```bash
+# 1. Compile TypeScript
+npm run build
+
+# 2. Package Python backend
+npm run build:backend
+
+# 3. Create installer
+npm run dist
+```
+
+### Build Output
+
+After building, you'll find the installer at:
+
+```
+release/Kraking Setup 1.0.0.exe
+```
+
+### What the Installer Includes
+
+The installer is a completely self-contained package that includes:
+- Electron desktop application
+- Python Flask backend server (compiled as executable)
+- All dependencies (no separate Python or Node.js installation needed)
+- SQLite database engine (built into Python)
+
+### How It Works for End Users
+
+When a user installs and runs your application:
+
+1. **Installation:** User runs `Kraking Setup 1.0.0.exe` and chooses install location (default: `C:\Program Files\Kraking`)
+2. **Launch:** User opens Kraking from Start Menu or Desktop shortcut
+3. **Auto-Start Backend:** Electron automatically starts the Python backend in the background
+4. **Database:** SQLite database is created in user's AppData folder (`%APPDATA%\Kraking\kraking.db`)
+5. **Data Storage:** All user data (accounts, API keys, automation rules) stored locally in their SQLite database
+6. **Shutdown:** When user closes the app, the backend process automatically terminates
+
+### Distribution
+
+The `Kraking Setup 1.0.0.exe` file can be distributed to users who can then:
+- Double-click to install
+- No need to install Python, Node.js, or MySQL
+- No manual database setup required
+- Works completely offline
+- All data stored locally and securely
+
+### Optional: Code Signing
+
+For production distribution, consider code signing your executable to avoid Windows SmartScreen warnings:
+
+1. Obtain a code signing certificate
+2. Update `package.json` build config with certificate details
+3. Rebuild with signing enabled
+
+Without code signing, users may see a "Windows protected your PC" warning on first install (they can click "More info" → "Run anyway").
+
+---
+
 ## Troubleshooting
 
 ### Backend Issues
