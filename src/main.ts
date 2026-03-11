@@ -79,7 +79,14 @@ function createWindow() {
     }
   });
 
-  mainWindow.loadFile(path.join(__dirname, '../index.html'));
+  // In production, index.html is in src/ directory relative to resources
+  // In development, index.html is in src/ directory
+  const isDev = !app.isPackaged;
+  const indexPath = isDev 
+    ? path.join(__dirname, '../index.html')
+    : path.join(__dirname, '../src/index.html');
+
+  mainWindow.loadFile(indexPath);
 
   mainWindow.on('closed', () => {
     mainWindow = null;

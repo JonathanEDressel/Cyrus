@@ -70,7 +70,10 @@ cd Kraking
 3. **Install Python Dependencies**
    ```bash
    pip install -r requirements.txt
+   pip install pyinstaller
    ```
+   
+   **Note:** PyInstaller is needed for building the distributable executable. Install it now to avoid issues later.
 
 4. **Create `.env` File** (Optional)
    
@@ -231,37 +234,36 @@ To package the application into a standalone Windows installer (.exe) that users
 
 ### Prerequisites
 
-Ensure you have installed the build dependencies:
+The build dependencies should already be installed if you followed the initial setup:
+
+- **PyInstaller** - Installed in `src/backend/venv` during backend setup
+- **electron-builder** - Install now if not already installed:
 
 ```bash
-# Install PyInstaller for Python backend packaging
-pip install pyinstaller
-
-# Install electron-builder for Electron frontend packaging
 npm install --save-dev electron-builder
 ```
 
 ### Building the Installer
 
-**Option 1: Build Everything at Once**
-
-```bash
-npm run build:all
-```
-
-This single command will:
-1. Compile TypeScript files
-2. Package the Python backend into `KrakingServer.exe`
-3. Build the Electron app installer
-
-**Option 2: Build Step-by-Step**
+**Manual Build Process (Recommended):**
 
 ```bash
 # 1. Compile TypeScript
 npm run build
 
-# 2. Package Python backend
-npm run build:backend
+# 2. Activate venv and build Python backend
+cd src/backend
+# Windows:
+venv\Scripts\activate
+# macOS/Linux:
+source venv/bin/activate
+
+# Build backend executable
+pyinstaller server.spec
+
+# Deactivate and return to root
+deactivate
+cd ../..
 
 # 3. Create installer
 npm run dist
