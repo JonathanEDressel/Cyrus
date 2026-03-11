@@ -1,4 +1,5 @@
 class KrakenStore {
+  private static readonly DEFAULT_INTERVAL = 60000;
   private static readonly ORDER_INTERVAL = 15000;
   private static readonly ADDRESS_INTERVAL = 3600000;
   private static orderTimer: number | null = null;
@@ -16,7 +17,7 @@ class KrakenStore {
     KrakenStore.refreshOrders();
     KrakenStore.refreshAddresses();
     KrakenStore.orderTimer = window.setInterval(() => KrakenStore.refreshOrders(), KrakenStore.ORDER_INTERVAL);
-    KrakenStore.addressTimer = window.setInterval(() => KrakenStore.refreshAddresses(), KrakenStore.ADDRESS_INTERVAL);
+    KrakenStore.addressTimer = window.setInterval(() => KrakenStore.refreshAddresses(), KrakenStore.DEFAULT_INTERVAL); //ADDRESS_INTERVAL
   }
 
   static stop(): void {

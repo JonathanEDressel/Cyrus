@@ -1,7 +1,7 @@
 {
   "name": "kraking",
   "version": "1.0.0",
-  "description": "A desktop application built with Electron",
+  "description": "Automated trades and transfers for Kraken exchange",
   "main": "dist/main.js",
   "scripts": {
     "start": "npm run build && electron .",

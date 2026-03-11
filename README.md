@@ -432,8 +432,8 @@ If you find this project helpful, consider donating:
 
 - **Bitcoin:** `32BJw5mpyQ6fuLeiR5yrAAR2H8gerB9GAD`
 - **Ethereum:** `0xc0066CCD708376cF3fA34CF5a3a8eB88AF58c97A`
-- **Solana:** Add your address
-- **XRP:** Add your address
+- **Solana:** 7vfBGpjZTEZEsKNi1ZdYYBPGq1uFzWvLuV6xRP13tSo9
+- **XRP/Tag:** rLHzPsX6oXkzU2qL12kHCH8G8cnZv1rBJh / 204756592
 
 ---
 
