@@ -22,6 +22,7 @@
     "files": [
       "dist/**/*",
       "src/index.html",
+      "src/donation.js",
       "src/app/**/*",
       "src/assets/**/*",
       "!src/**/*.ts",
@@ -41,6 +42,9 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
+      "allowElevation": true,
+      "perMachine": false,
+      "deleteAppDataOnUninstall": false,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true
     }

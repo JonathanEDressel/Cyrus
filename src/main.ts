@@ -34,13 +34,23 @@ function startBackend() {
   
   const backendPath = getBackendPath();
   
+  console.log('[BACKEND] Looking for backend at:', backendPath);
+  
   if (!fs.existsSync(backendPath)) {
     console.error('[ERROR] Backend executable not found:', backendPath);
+    console.error('[ERROR] resourcesPath:', process.resourcesPath);
     return;
   }
   
   const dbPath = getDbPath();
-  console.log('[BACKEND] Starting with DB at:', dbPath);
+  console.log('[BACKEND] Database will be created at:', dbPath);
+  
+  // Ensure the directory exists
+  const dbDir = path.dirname(dbPath);
+  if (!fs.existsSync(dbDir)) {
+    console.log('[BACKEND] Creating directory:', dbDir);
+    fs.mkdirSync(dbDir, { recursive: true });
+  }
   
   const env = {
     ...process.env,
@@ -49,9 +59,11 @@ function startBackend() {
     API_PORT: '5000'
   };
   
+  console.log('[BACKEND] Starting backend server...');
+  
   backendProcess = spawn(backendPath, [], {
     env,
-    windowsHide: true
+    windowsHide: false  // Changed to false to see console output
   });
   
   backendProcess.stdout?.on('data', (data) => {
@@ -65,6 +77,10 @@ function startBackend() {
   backendProcess.on('close', (code) => {
     console.log(`[BACKEND] Process exited with code ${code}`);
     backendProcess = null;
+  });
+  
+  backendProcess.on('error', (err) => {
+    console.error(`[BACKEND] Failed to start:`, err);
   });
 }
 
@@ -87,6 +103,11 @@ function createWindow() {
     : path.join(__dirname, '../src/index.html');
 
   mainWindow.loadFile(indexPath);
+  
+  // Open DevTools to see backend logs (helpful for debugging)
+  if (!isDev) {
+    mainWindow.webContents.openDevTools();
+  }
 
   mainWindow.on('closed', () => {
     mainWindow = null;

@@ -19,7 +19,7 @@ def _get_kraken_signature(urlpath: str, data: dict, secret: str) -> str:
 
 def get_open_orders(api_key: str, private_key: str) -> dict:
     urlpath = '/0/private/OpenOrders'
-    nonce = str(int(time.time() * 1000))
+    nonce = str(int(time.time() * 1_000_000))
     data = {'nonce': nonce}
 
     signature = _get_kraken_signature(urlpath, data, private_key)
@@ -41,7 +41,7 @@ def get_open_orders(api_key: str, private_key: str) -> dict:
 
 def execute_crypto_withdrawal(api_key: str, private_key: str, asset: str, address_nickname: str, amount: str) -> dict:
     urlpath = '/0/private/Withdraw'
-    nonce = str(int(time.time() * 1000))
+    nonce = str(int(time.time() * 1_000_000))
     
     data = {
         'nonce': nonce,
@@ -78,7 +78,7 @@ def get_withdrawal_addresses(api_key: str, private_key: str) -> dict:
     common_assets = ['XBT', 'ETH', 'USDT', 'USDC', 'SOL', 'ADA', 'DOT', 'MATIC', 'XRP', 'LTC']
     
     urlpath = '/0/private/WithdrawAddresses'
-    nonce = str(int(time.time() * 1000))
+    nonce = str(int(time.time() * 1_000_000))
     
     data = {
         'nonce': nonce
@@ -127,7 +127,7 @@ def get_withdrawal_addresses(api_key: str, private_key: str) -> dict:
 
 def get_closed_orders(api_key: str, private_key: str) -> dict:
     urlpath = '/0/private/ClosedOrders'
-    nonce = str(int(time.time() * 1000))
+    nonce = str(int(time.time() * 1_000_000))
     data = {'nonce': nonce}
 
     signature = _get_kraken_signature(urlpath, data, private_key)
@@ -150,7 +150,7 @@ def get_closed_orders(api_key: str, private_key: str) -> dict:
 def withdraw_funds(api_key: str, private_key: str, asset: str,
                    key: str, amount: str) -> dict:
     urlpath = '/0/private/Withdraw'
-    nonce = str(int(time.time() * 1000))
+    nonce = str(int(time.time() * 1_000_000))
     data = {
         'nonce': nonce,
         'asset': asset,

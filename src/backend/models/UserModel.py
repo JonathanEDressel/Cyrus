@@ -33,9 +33,17 @@ class UserModel:
         )
     
     def to_dict(self) -> dict:
+        # SQLite returns datetime as string, MySQL as datetime object
+        def format_datetime(dt):
+            if dt is None:
+                return None
+            if isinstance(dt, str):
+                return dt  # Already a string from SQLite
+            return dt.isoformat()  # datetime object from MySQL
+        
         return {
             'id': self.id,
             'username': self.username,
-            'created_at': self.created_at.isoformat() if self.created_at else None,
-            'last_login': self.last_login.isoformat() if self.last_login else None
+            'created_at': format_datetime(self.created_at),
+            'last_login': format_datetime(self.last_login)
         }

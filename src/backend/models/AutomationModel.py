@@ -55,6 +55,14 @@ class AutomationRule:
         )
 
     def to_dict(self) -> dict:
+        # SQLite returns datetime as string, MySQL as datetime object
+        def format_datetime(dt):
+            if dt is None:
+                return None
+            if isinstance(dt, str):
+                return dt  # Already a string from SQLite
+            return dt.isoformat()  # datetime object from MySQL
+        
         return {
             'id': self.id,
             'user_id': self.user_id,
@@ -68,8 +76,8 @@ class AutomationRule:
             'action_address_key': self.action_address_key,
             'action_amount': self.action_amount,
             'is_active': self.is_active,
-            'created_at': self.created_at.isoformat() if self.created_at else None,
-            'last_triggered_at': self.last_triggered_at.isoformat() if self.last_triggered_at else None,
+            'created_at': format_datetime(self.created_at),
+            'last_triggered_at': format_datetime(self.last_triggered_at),
             'trigger_count': self.trigger_count,
         }
 
@@ -105,6 +113,14 @@ class AutomationLog:
         )
 
     def to_dict(self) -> dict:
+        # SQLite returns datetime as string, MySQL as datetime object
+        def format_datetime(dt):
+            if dt is None:
+                return None
+            if isinstance(dt, str):
+                return dt  # Already a string from SQLite
+            return dt.isoformat()  # datetime object from MySQL
+        
         return {
             'id': self.id,
             'rule_id': self.rule_id,
@@ -113,5 +129,5 @@ class AutomationLog:
             'action_executed': self.action_executed,
             'action_result': self.action_result,
             'status': self.status,
-            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'created_at': format_datetime(self.created_at),
         }
