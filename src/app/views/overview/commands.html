@@ -34,7 +34,9 @@
         </div>
         <div class="form-group">
           <label for="trigger-order-id">Order ID</label>
-          <input type="text" id="trigger-order-id" placeholder="Kraken order ID to watch">
+          <select id="trigger-order-id" required>
+            <option value="" disabled selected>Loading orders...</option>
+          </select>
         </div>
       </div>
 
@@ -54,26 +56,20 @@
       <div class="form-row">
         <div class="form-group">
           <label for="action-asset">Asset</label>
-          <select id="action-asset">
-            <option value="XBT">BTC</option>
-            <option value="ETH">ETH</option>
-            <option value="USDT">USDT</option>
-            <option value="USDC">USDC</option>
-            <option value="SOL">SOL</option>
-            <option value="ADA">ADA</option>
-            <option value="DOT">DOT</option>
-            <option value="MATIC">MATIC</option>
-            <option value="XRP">XRP</option>
-            <option value="LTC">LTC</option>
+          <select id="action-asset" disabled>
+            <option value="" disabled selected>Select an order first</option>
           </select>
         </div>
         <div class="form-group">
           <label for="action-address-key">Withdrawal Address Key</label>
-          <input type="text" id="action-address-key" placeholder="Whitelisted address label in Kraken" required>
+          <select id="action-address-key" disabled required>
+            <option value="" disabled selected>Select an order first</option>
+          </select>
         </div>
         <div class="form-group">
           <label for="action-amount">Amount</label>
-          <input type="text" id="action-amount" placeholder="e.g. 0.5 or all" required>
+          <input type="number" id="action-amount" step="any" min="0" placeholder="Select an order first" disabled required>
+          <span class="form-hint" id="amount-hint"></span>
         </div>
       </div>
 

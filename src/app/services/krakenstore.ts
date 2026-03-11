@@ -1,6 +1,8 @@
 class KrakenStore {
-  private static readonly REFRESH_INTERVAL = 15000;
-  private static timer: number | null = null;
+  private static readonly ORDER_INTERVAL = 15000;
+  private static readonly ADDRESS_INTERVAL = 3600000;
+  private static orderTimer: number | null = null;
+  private static addressTimer: number | null = null;
   private static listeners: Array<() => void> = [];
 
   static openOrders: any[] = [];
@@ -9,16 +11,22 @@ class KrakenStore {
   static error: string | null = null;
 
   static start(): void {
-    if (KrakenStore.timer !== null) return;
+    if (KrakenStore.orderTimer !== null) return;
 
-    KrakenStore.refresh();
-    KrakenStore.timer = window.setInterval(() => KrakenStore.refresh(), KrakenStore.REFRESH_INTERVAL);
+    KrakenStore.refreshOrders();
+    KrakenStore.refreshAddresses();
+    KrakenStore.orderTimer = window.setInterval(() => KrakenStore.refreshOrders(), KrakenStore.ORDER_INTERVAL);
+    KrakenStore.addressTimer = window.setInterval(() => KrakenStore.refreshAddresses(), KrakenStore.ADDRESS_INTERVAL);
   }
 
   static stop(): void {
-    if (KrakenStore.timer !== null) {
-      window.clearInterval(KrakenStore.timer);
-      KrakenStore.timer = null;
+    if (KrakenStore.orderTimer !== null) {
+      window.clearInterval(KrakenStore.orderTimer);
+      KrakenStore.orderTimer = null;
+    }
+    if (KrakenStore.addressTimer !== null) {
+      window.clearInterval(KrakenStore.addressTimer);
+      KrakenStore.addressTimer = null;
     }
     KrakenStore.openOrders = [];
     KrakenStore.withdrawalAddresses = [];
@@ -34,22 +42,30 @@ class KrakenStore {
     };
   }
 
-  static async refresh(): Promise<void> {
+  private static notify(): void {
+    for (const cb of KrakenStore.listeners) {
+      try { cb(); } catch (_) {}
+    }
+  }
+
+  static async refreshOrders(): Promise<void> {
     try {
-      const [orders, addresses] = await Promise.all([
-        KrakenController.getOpenOrders(),
-        KrakenController.getWithdrawalAddresses(),
-      ]);
-      KrakenStore.openOrders = orders;
-      KrakenStore.withdrawalAddresses = addresses;
+      KrakenStore.openOrders = await KrakenController.getOpenOrders();
       KrakenStore.lastUpdated = new Date();
       KrakenStore.error = null;
     } catch (err: any) {
       KrakenStore.error = err.message || 'Failed to fetch Kraken data';
     }
+    KrakenStore.notify();
+  }
 
-    for (const cb of KrakenStore.listeners) {
-      try { cb(); } catch (_) {}
+  static async refreshAddresses(): Promise<void> {
+    try {
+      KrakenStore.withdrawalAddresses = await KrakenController.getWithdrawalAddresses();
+      KrakenStore.error = null;
+    } catch (err: any) {
+      KrakenStore.error = err.message || 'Failed to fetch withdrawal addresses';
     }
+    KrakenStore.notify();
   }
 }

@@ -107,7 +107,6 @@ def get_withdrawal_addresses(api_key: str, private_key: str) -> dict:
                 
             raw_addresses = result.get('result', [])
             formatted_addresses = []
-            
             for addr in raw_addresses:
                 formatted_addresses.append({
                     'nickname_key': addr.get('key', ''),

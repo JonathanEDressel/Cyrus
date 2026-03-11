@@ -29,6 +29,9 @@ class HomeController {
     document.getElementById('view-all-orders')?.addEventListener('click', () => {
       router.navigate('openorders');
     });
+    document.getElementById('view-all-commands')?.addEventListener('click', () => {
+      router.navigate('commands');
+    });
   }
 
   private loadDashboardData(): void {
@@ -39,6 +42,7 @@ class HomeController {
     this.setTableEmpty('positions-tbody', 6, 'No open positions');
 
     this.renderFromStore();
+    this.loadCommands();
   }
 
   private renderFromStore(): void {
@@ -118,6 +122,47 @@ class HomeController {
     if (base === 'XBT') return 'BTC';
     if (base === 'XDG') return 'DOGE';
     return base;
+  }
+
+  private async loadCommands(): Promise<void> {
+    try {
+      const rules = await AutomationController.getRules();
+      this.renderCommands(rules);
+      this.setCardValue('custom-commands-count', rules.length.toString());
+    } catch {
+      this.setTableEmpty('commands-tbody', 4, 'Failed to load commands');
+    }
+  }
+
+  private renderCommands(rules: any[]): void {
+    const tbody = document.getElementById('commands-tbody');
+    if (!tbody) return;
+
+    if (rules.length === 0) {
+      tbody.innerHTML = '<tr class="empty-row"><td colspan="4">No custom commands</td></tr>';
+      return;
+    }
+
+    const display = rules.slice(0, 5);
+
+    tbody.innerHTML = display.map((r: any) => {
+      const statusClass = r.is_active ? 'status-active' : 'status-inactive';
+      const statusText = r.is_active ? 'Active' : 'Paused';
+      const orderId = r.trigger_order_id
+        ? this.escapeHtml(r.trigger_order_id.substring(0, 10)) + '...'
+        : 'Any';
+      const trigger = `<span class="trigger-badge">Order Filled</span> <span class="mono-text">${orderId}</span>`;
+      const action = r.action_type === 'withdraw_crypto'
+        ? `Withdraw <strong>${this.escapeHtml(r.action_amount)}</strong> <span class="asset-badge">${this.escapeHtml(r.action_asset)}</span>`
+        : this.escapeHtml(r.action_type);
+
+      return `<tr>
+        <td>${this.escapeHtml(r.rule_name)}</td>
+        <td>${trigger}</td>
+        <td>${action}</td>
+        <td><span class="status-badge ${statusClass}">${statusText}</span></td>
+      </tr>`;
+    }).join('');
   }
 
   private setCardValue(id: string, value: string): void {

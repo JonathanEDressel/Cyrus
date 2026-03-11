@@ -48,6 +48,18 @@
   color: #475569;
 }
 
+.form-hint {
+  font-size: 0.75rem;
+  color: #6366f1;
+  margin-top: 0.15rem;
+}
+
+.form-group select:disabled,
+.form-group input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .form-divider {
   display: flex;
   align-items: center;
