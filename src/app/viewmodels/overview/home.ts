@@ -32,6 +32,9 @@ class HomeController {
     document.getElementById('view-all-commands')?.addEventListener('click', () => {
       router.navigate('commands');
     });
+    document.getElementById('view-all-commands2')?.addEventListener('click', () => {
+      router.navigate('commands');
+    });
   }
 
   private loadDashboardData(): void {
@@ -97,9 +100,7 @@ class HomeController {
       return;
     }
 
-    const displayOrders = orders.slice(0, 5);
-
-    tbody.innerHTML = displayOrders.map((o: any) => {
+    tbody.innerHTML = orders.map((o: any) => {
       const sideClass = o.side === 'buy' ? 'side-buy' : 'side-sell';
       const formattedPair = this.formatPair(o.pair);
       return `<tr>
@@ -175,9 +176,7 @@ class HomeController {
       return;
     }
 
-    const display = rules.slice(0, 5);
-
-    tbody.innerHTML = display.map((r: any) => {
+    tbody.innerHTML = rules.map((r: any) => {
       const statusClass = r.is_active ? 'status-active' : 'status-inactive';
       const statusText = r.is_active ? 'Active' : 'Paused';
       const orderId = r.trigger_order_id
