@@ -402,7 +402,7 @@ Flask debug mode is enabled by default in `Server.py`. The server will auto-relo
   - Keys are automatically encrypted during registration and profile updates
   - Keys are decrypted only when making API calls to Kraken
   - **Important:** If you have existing users with unencrypted keys, they must re-enter their keys through the profile page
-- JWT tokens expire after 24 hours
+- JWT tokens expire after 30 days
 - Passwords are hashed with bcrypt (salt rounds: 12)
 - All API requests use prepared SQL statements to prevent injection
 - CORS is enabled only for `http://127.0.0.1:5000`
