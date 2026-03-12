@@ -14,6 +14,10 @@ class KrakenStore {
   static start(): void {
     if (KrakenStore.orderTimer !== null) return;
 
+    // Don't start polling if keys aren't valid
+    const status = ApiKeyState.status;
+    if (status === 'none' || status === 'invalid') return;
+
     KrakenStore.refreshOrders();
     KrakenStore.refreshAddresses();
     KrakenStore.orderTimer = window.setInterval(() => KrakenStore.refreshOrders(), KrakenStore.ORDER_INTERVAL);

@@ -64,7 +64,13 @@
   });
 
   if (AuthController.isAuthenticated()) {
-    KrakenStore.start();
+    ApiKeyWarning.init();
+    // Load key status first, then start KrakenStore only if keys are valid
+    UserController.refreshKeyStatus().then(() => {
+      if (ApiKeyState.status === 'valid') {
+        KrakenStore.start();
+      }
+    });
     router.navigate('home');
   } else {
     router.navigate('login');

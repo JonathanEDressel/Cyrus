@@ -12,4 +12,11 @@ class KrakenData {
       token
     );
   }
+
+  static async getBalance(token: string): Promise<ApiResponse<Record<string, string>>> {
+    return DataAccess.get<Record<string, string>>(
+      `${AppConfig.API_BASE}/kraken/balance`,
+      token
+    );
+  }
 }

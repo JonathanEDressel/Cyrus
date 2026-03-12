@@ -1,15 +1,19 @@
-from flask import Blueprint, request, make_response
+from flask import Blueprint, request, make_response, jsonify
 from controllers.UserDbContext import UserDbContext
 from helper.Security import token_required, decrypt_api_key
 from helper.ErrorHandler import handle_error, bad_request, not_found
 from helper.Helper import success_response
-from helper.KrakenClient import get_open_orders, get_withdrawal_addresses
+from helper.KrakenClient import get_open_orders, get_withdrawal_addresses, get_account_balance
 from functools import wraps
 from time import time
 from collections import defaultdict
 from threading import Lock
 
 kraken_bp = Blueprint('kraken', __name__)
+
+
+def _keys_invalid_response(message):
+    return jsonify({"success": False, "result": message, "keys_invalid": True}), 403
 
 
 class KrakenRateLimiter:
@@ -103,7 +107,10 @@ def open_orders():
             return not_found("User not found")
 
         if not user.kraken_api_key_encrypted or not user.kraken_private_key_encrypted:
-            return bad_request("Kraken API keys not configured. Please add them in your profile.")
+            return _keys_invalid_response("Kraken API keys not configured. Please add them in your profile.")
+
+        if not user.keys_validated:
+            return _keys_invalid_response("Kraken API keys have not been validated. Please validate them in your profile.")
 
         api_key = decrypt_api_key(user.kraken_api_key_encrypted)
         private_key = decrypt_api_key(user.kraken_private_key_encrypted)
@@ -147,7 +154,10 @@ def withdrawal_addresses():
             return not_found("User not found")
 
         if not user.kraken_api_key_encrypted or not user.kraken_private_key_encrypted:
-            return bad_request("Kraken API keys not configured. Please add them in your profile.")
+            return _keys_invalid_response("Kraken API keys not configured. Please add them in your profile.")
+
+        if not user.keys_validated:
+            return _keys_invalid_response("Kraken API keys have not been validated. Please validate them in your profile.")
 
         api_key = decrypt_api_key(user.kraken_api_key_encrypted)
         private_key = decrypt_api_key(user.kraken_private_key_encrypted)
@@ -180,5 +190,39 @@ def rate_limit_status():
             'window_seconds': rate_limiter.window_seconds
         })
     
+    except Exception as e:
+        return handle_error(e)
+
+
+@kraken_bp.route('/balance', methods=['GET'])
+@token_required
+@rate_limit_kraken
+def balance():
+    try:
+        user = UserDbContext.get_user_by_id(request.user_id)
+
+        if not user:
+            return not_found("User not found")
+
+        if not user.kraken_api_key_encrypted or not user.kraken_private_key_encrypted:
+            return _keys_invalid_response("Kraken API keys not configured. Please add them in your profile.")
+
+        if not user.keys_validated:
+            return _keys_invalid_response("Kraken API keys have not been validated. Please validate them in your profile.")
+
+        api_key = decrypt_api_key(user.kraken_api_key_encrypted)
+        private_key = decrypt_api_key(user.kraken_private_key_encrypted)
+
+        result = get_account_balance(api_key, private_key)
+
+        if result.get('error') and len(result['error']) > 0:
+            return bad_request(result['error'][0])
+
+        balances = result.get('result', {})
+        # Filter out zero balances
+        non_zero = {asset: amount for asset, amount in balances.items() if float(amount) > 0}
+
+        return success_response(data=non_zero)
+
     except Exception as e:
         return handle_error(e)

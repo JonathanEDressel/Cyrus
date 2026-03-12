@@ -4,6 +4,9 @@ interface UserModel {
   created_at: string;
   updated_at: string;
   last_login: string;
+  has_keys: boolean;
+  keys_validated: boolean;
+  keys_last_validated: string | null;
 }
 
 interface LoginResponse {

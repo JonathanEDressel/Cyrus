@@ -9,6 +9,8 @@ src/backend/build/
 src/backend/dist/
 *.spec
 
+./venv/
+
 .env
 .vscode/
 

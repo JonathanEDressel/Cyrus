@@ -12,6 +12,11 @@ class AutomationRule:
                  action_asset: Optional[str] = None,
                  action_address_key: Optional[str] = None,
                  action_amount: Optional[str] = None,
+                 use_filled_amount: bool = False,
+                 trigger_asset: Optional[str] = None,
+                 trigger_threshold: Optional[str] = None,
+                 last_executed_at: Optional[datetime] = None,
+                 cooldown_minutes: int = 1440,
                  is_active: bool = True,
                  created_at: Optional[datetime] = None,
                  last_triggered_at: Optional[datetime] = None,
@@ -27,6 +32,11 @@ class AutomationRule:
         self.action_asset = action_asset
         self.action_address_key = action_address_key
         self.action_amount = action_amount
+        self.use_filled_amount = use_filled_amount
+        self.trigger_asset = trigger_asset
+        self.trigger_threshold = trigger_threshold
+        self.last_executed_at = last_executed_at
+        self.cooldown_minutes = cooldown_minutes
         self.is_active = is_active
         self.created_at = created_at
         self.last_triggered_at = last_triggered_at
@@ -48,6 +58,11 @@ class AutomationRule:
             action_asset=row.get('action_asset'),
             action_address_key=row.get('action_address_key'),
             action_amount=row.get('action_amount'),
+            use_filled_amount=bool(row.get('use_filled_amount', False)),
+            trigger_asset=row.get('trigger_asset'),
+            trigger_threshold=row.get('trigger_threshold'),
+            last_executed_at=row.get('last_executed_at'),
+            cooldown_minutes=row.get('cooldown_minutes', 1440),
             is_active=row.get('is_active', True),
             created_at=row.get('created_at'),
             last_triggered_at=row.get('last_triggered_at'),
@@ -75,6 +90,11 @@ class AutomationRule:
             'action_asset': self.action_asset,
             'action_address_key': self.action_address_key,
             'action_amount': self.action_amount,
+            'use_filled_amount': self.use_filled_amount,
+            'trigger_asset': self.trigger_asset,
+            'trigger_threshold': self.trigger_threshold,
+            'last_executed_at': format_datetime(self.last_executed_at),
+            'cooldown_minutes': self.cooldown_minutes,
             'is_active': self.is_active,
             'created_at': format_datetime(self.created_at),
             'last_triggered_at': format_datetime(self.last_triggered_at),

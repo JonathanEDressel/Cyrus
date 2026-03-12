@@ -30,6 +30,11 @@ def setup_database():
                 action_asset TEXT,
                 action_address_key TEXT,
                 action_amount TEXT,
+                use_filled_amount BOOLEAN DEFAULT 0,
+                trigger_asset TEXT,
+                trigger_threshold TEXT,
+                last_executed_at DATETIME NULL,
+                cooldown_minutes INTEGER DEFAULT 1440,
                 is_active BOOLEAN DEFAULT 1,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 last_triggered_at DATETIME NULL,
@@ -72,6 +77,34 @@ def setup_database():
         conn.execute('CREATE INDEX IF NOT EXISTS idx_username ON users(username)')
         conn.execute('CREATE INDEX IF NOT EXISTS idx_user_active ON automation_rules(user_id, is_active)')
         conn.execute('CREATE INDEX IF NOT EXISTS idx_user_log ON automation_log(user_id, created_at)')
+
+        # Migration: add use_filled_amount column if it doesn't exist
+        try:
+            conn.execute('ALTER TABLE automation_rules ADD COLUMN use_filled_amount BOOLEAN DEFAULT 0')
+        except Exception:
+            pass  # Column already exists
+
+        # Migration: add balance_threshold columns
+        for migration in [
+            'ALTER TABLE automation_rules ADD COLUMN trigger_asset TEXT',
+            'ALTER TABLE automation_rules ADD COLUMN trigger_threshold TEXT',
+            'ALTER TABLE automation_rules ADD COLUMN last_executed_at DATETIME NULL',
+            'ALTER TABLE automation_rules ADD COLUMN cooldown_minutes INTEGER DEFAULT 1440',
+        ]:
+            try:
+                conn.execute(migration)
+            except Exception:
+                pass  # Column already exists
+
+        # Migration: add API key validation columns
+        for migration in [
+            'ALTER TABLE users ADD COLUMN keys_validated BOOLEAN DEFAULT 0',
+            'ALTER TABLE users ADD COLUMN keys_last_validated DATETIME NULL',
+        ]:
+            try:
+                conn.execute(migration)
+            except Exception:
+                pass  # Column already exists
         
         conn.commit()
         print("[DATABASE] Tables created/verified successfully")

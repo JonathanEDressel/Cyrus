@@ -9,7 +9,19 @@ class AuthController {
     localStorage.setItem(AppConfig.TOKEN_KEY, response.data.token);
     localStorage.setItem(AppConfig.USER_KEY, JSON.stringify(response.data.user));
 
-    return response.data.user;
+    // Set initial key status from profile, then validate against Kraken
+    const user = response.data.user;
+    if (!user.has_keys) {
+      ApiKeyState.setStatus('none');
+    } else if (user.keys_validated) {
+      ApiKeyState.setStatus('valid');
+    } else {
+      ApiKeyState.setStatus('invalid');
+      // Kick off async validation (don't await — let login complete)
+      UserController.validateKeys().catch(() => {});
+    }
+
+    return user;
   }
 
   /**
@@ -32,6 +44,7 @@ class AuthController {
    */
   static logout(): void {
     KrakenStore.stop();
+    ApiKeyState.reset();
     localStorage.removeItem(AppConfig.TOKEN_KEY);
     localStorage.removeItem(AppConfig.USER_KEY);
   }

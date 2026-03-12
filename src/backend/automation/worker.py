@@ -55,7 +55,7 @@ class AutomationWorker:
         from controllers.AutomationDbContext import AutomationDbContext
         from controllers.UserDbContext import UserDbContext
         from helper.Security import decrypt_api_key
-        from helper.KrakenClient import get_open_orders, get_closed_orders
+        from helper.KrakenClient import get_open_orders, get_closed_orders, get_account_balance, get_minimum_withdrawal
         
         user_ids = AutomationDbContext.get_users_with_active_rules()
         
@@ -68,7 +68,7 @@ class AutomationWorker:
             
             try:
                 self._process_user(user_id, AutomationDbContext, UserDbContext, decrypt_api_key,
-                                   get_open_orders, get_closed_orders)
+                                   get_open_orders, get_closed_orders, get_account_balance, get_minimum_withdrawal)
             except Exception as e:
                 print(f"[WORKER] Error processing user {user_id}: {e}")
                 traceback.print_exc()
@@ -76,7 +76,7 @@ class AutomationWorker:
             time.sleep(2)
     
     def _process_user(self, user_id, AutomationDbContext, UserDbContext, decrypt_api_key,
-                      get_open_orders, get_closed_orders):
+                      get_open_orders, get_closed_orders, get_account_balance=None, get_minimum_withdrawal=None):
         user = UserDbContext.get_user_by_id(user_id)
         if not user or not user.kraken_api_key_encrypted or not user.kraken_private_key_encrypted:
             return
@@ -127,7 +127,77 @@ class AutomationWorker:
                 volume=order.get('vol', '0'),
                 filled=order.get('vol_exec', '0'),
             )
+
+        # Process balance_threshold rules
+        balance_rules = [r for r in rules if r.trigger_type == 'balance_threshold']
+        if balance_rules and get_account_balance:
+            self._poll_balances(balance_rules, user, api_key, private_key,
+                                AutomationDbContext, get_account_balance, get_minimum_withdrawal)
     
+    def _poll_balances(self, balance_rules, user, api_key, private_key,
+                       AutomationDbContext, get_account_balance, get_minimum_withdrawal):
+        try:
+            balance_result = get_account_balance(api_key, private_key)
+            if balance_result.get('error') and len(balance_result['error']) > 0:
+                print(f"[WORKER] Balance API error for user {user.id}: {balance_result['error']}")
+                return
+
+            balances = balance_result.get('result', {})
+
+            for rule in balance_rules:
+                if self._stop_event.is_set():
+                    return
+
+                if not AutomationDbContext.is_cooldown_elapsed(rule.id):
+                    continue
+
+                asset = rule.trigger_asset
+                threshold = float(rule.trigger_threshold)
+                current_balance = float(balances.get(asset, '0'))
+
+                if current_balance < threshold:
+                    continue
+
+                # Check minimum withdrawal
+                min_withdrawal = get_minimum_withdrawal(asset) if get_minimum_withdrawal else 0
+                withdraw_amount = current_balance
+
+                if withdraw_amount < min_withdrawal:
+                    print(f"[WORKER] Balance {withdraw_amount} {asset} below minimum withdrawal {min_withdrawal}")
+                    continue
+
+                trigger_event = f"Balance {asset} = {current_balance} >= threshold {threshold}"
+
+                try:
+                    result = self._execute_withdraw(api_key, private_key, rule, str(withdraw_amount))
+
+                    AutomationDbContext.create_log(
+                        rule_id=rule.id,
+                        user_id=rule.user_id,
+                        trigger_event=trigger_event,
+                        action_executed=f"Withdraw {withdraw_amount} {rule.action_asset} to {rule.action_address_key}",
+                        action_result=str(result),
+                        status='success' if not result.get('error') else 'failed',
+                    )
+
+                    AutomationDbContext.mark_rule_triggered(rule.id)
+                    print(f"[WORKER] Balance rule '{rule.rule_name}' executed for user {rule.user_id}")
+
+                except Exception as e:
+                    AutomationDbContext.create_log(
+                        rule_id=rule.id,
+                        user_id=rule.user_id,
+                        trigger_event=trigger_event,
+                        action_executed=f"Withdraw {rule.action_asset} to {rule.action_address_key}",
+                        action_result=str(e),
+                        status='error',
+                    )
+                    print(f"[WORKER] Balance rule '{rule.rule_name}' failed: {e}")
+
+        except Exception as e:
+            print(f"[WORKER] Error polling balances for user {user.id}: {e}")
+            traceback.print_exc()
+
     def _rule_matches_order(self, rule, order_id: str, snapshot: dict) -> bool:
         if rule.trigger_type == 'order_filled':
             if rule.trigger_order_id and rule.trigger_order_id == order_id:
@@ -143,13 +213,15 @@ class AutomationWorker:
         
         try:
             if rule.action_type == 'withdraw_crypto':
-                result = self._execute_withdraw(api_key, private_key, rule)
+                withdraw_amount = self._resolve_amount(rule, snapshot)
+                result = self._execute_withdraw(api_key, private_key, rule, withdraw_amount)
                 
+                amount_note = " (filled amount)" if rule.use_filled_amount else ""
                 AutomationDbContext.create_log(
                     rule_id=rule.id,
                     user_id=rule.user_id,
                     trigger_event=trigger_event,
-                    action_executed=f"Withdraw {rule.action_amount} {rule.action_asset} to {rule.action_address_key}",
+                    action_executed=f"Withdraw {withdraw_amount} {rule.action_asset} to {rule.action_address_key}{amount_note}",
                     action_result=str(result),
                     status='success' if not result.get('error') else 'failed',
                 )
@@ -162,13 +234,25 @@ class AutomationWorker:
                 rule_id=rule.id,
                 user_id=rule.user_id,
                 trigger_event=trigger_event,
-                action_executed=f"Withdraw {rule.action_amount} {rule.action_asset} to {rule.action_address_key}",
+                action_executed=f"Withdraw {rule.action_asset} to {rule.action_address_key}",
                 action_result=str(e),
                 status='error',
             )
             print(f"[WORKER] Rule '{rule.rule_name}' failed: {e}")
     
-    def _execute_withdraw(self, api_key: str, private_key: str, rule) -> dict:
+    def _resolve_amount(self, rule, snapshot: dict) -> str:
+        if not rule.use_filled_amount:
+            return rule.action_amount
+        
+        filled = snapshot.get('filled', '0')
+        filled_float = float(filled)
+        
+        if filled_float <= 0:
+            raise Exception("Order filled amount is zero or unavailable")
+        
+        return str(filled_float)
+    
+    def _execute_withdraw(self, api_key: str, private_key: str, rule, amount: str) -> dict:
         from helper.KrakenClient import withdraw_funds
         
         result = withdraw_funds(
@@ -176,7 +260,7 @@ class AutomationWorker:
             private_key=private_key,
             asset=rule.action_asset,
             key=rule.action_address_key,
-            amount=rule.action_amount,
+            amount=amount,
         )
         
         if result.get('error') and len(result['error']) > 0:

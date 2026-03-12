@@ -63,4 +63,16 @@ class UserData {
       token
     );
   }
+
+  /**
+   * POST /api/user/validate-keys
+   * Validates the user's Kraken API keys against the Kraken API
+   */
+  static async validateKeys(token: string): Promise<ApiResponse<{ valid: boolean | null; error?: string }>> {
+    return DataAccess.post(
+      `${AppConfig.API_BASE}/user/validate-keys`,
+      {},
+      token
+    );
+  }
 }

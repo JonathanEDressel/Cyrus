@@ -49,3 +49,33 @@ class UserDbContext:
             (user_id,)
         )
         return True
+
+    @staticmethod
+    def mark_keys_valid(user_id: int) -> bool:
+        execute_non_query(
+            '''UPDATE users 
+               SET keys_validated = 1, keys_last_validated = CURRENT_TIMESTAMP
+               WHERE id = ?''',
+            (user_id,)
+        )
+        return True
+
+    @staticmethod
+    def mark_keys_invalid(user_id: int) -> bool:
+        execute_non_query(
+            '''UPDATE users 
+               SET keys_validated = 0, keys_last_validated = CURRENT_TIMESTAMP
+               WHERE id = ?''',
+            (user_id,)
+        )
+        return True
+
+    @staticmethod
+    def clear_keys_validation(user_id: int) -> bool:
+        execute_non_query(
+            '''UPDATE users 
+               SET keys_validated = 0, keys_last_validated = NULL
+               WHERE id = ?''',
+            (user_id,)
+        )
+        return True

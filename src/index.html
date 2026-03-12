@@ -30,6 +30,21 @@
     </div>
   </header>
 
+  <div id="api-key-warning" class="api-key-warning d-none">
+    <div class="api-key-warning-inner">
+      <div class="api-key-warning-content">
+        <i class="fa-solid fa-triangle-exclamation"></i>
+        <span id="api-key-warning-message"></span>
+      </div>
+      <div class="api-key-warning-actions">
+        <button class="btn-warning-action" id="api-key-warning-settings" data-route="profile">Go to Settings</button>
+        <button class="btn-warning-dismiss" id="api-key-warning-dismiss" title="Dismiss">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+
   <main id="app-content"></main>
 
   <footer id="app-footer" class="app-footer d-none">
@@ -120,6 +135,7 @@
   <script src="../dist/app/services/controllers/usercontroller.js"></script>
   <script src="../dist/app/services/controllers/krakencontroller.js"></script>
   <script src="../dist/app/services/controllers/automationcontroller.js"></script>
+  <script src="../dist/app/services/apikeywarning.js"></script>
   <script src="../dist/app/services/krakenstore.js"></script>
   <script src="../dist/app/router.js"></script>
   <script src="../dist/app/app.js"></script>

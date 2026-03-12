@@ -14,6 +14,7 @@ class ProfileController {
     document.getElementById('save-username-btn')?.addEventListener('click', () => this.saveUsername());
     document.getElementById('save-keys-btn')?.addEventListener('click', () => this.saveKeys());
     document.getElementById('save-password-btn')?.addEventListener('click', () => this.savePassword());
+    document.getElementById('validate-keys-btn')?.addEventListener('click', () => this.validateKeys());
   }
 
   private async loadProfile(): Promise<void> {
@@ -54,11 +55,28 @@ class ProfileController {
 
     try {
       await UserController.updateKrakenKeys(apiKey, privateKey);
-      this.showSuccess('keys', 'Kraken API keys updated successfully');
+      this.showSuccess('keys', 'Kraken API keys updated successfully. Validating...');
       (document.getElementById('profile-api-key') as HTMLInputElement).value = '';
       (document.getElementById('profile-private-key') as HTMLInputElement).value = '';
+      // Auto-validate after saving
+      this.validateKeys();
     } catch (error: any) {
       this.showError('keys', error.message || 'Failed to update API keys');
+    }
+  }
+
+  private async validateKeys(): Promise<void> {
+    try {
+      const result = await UserController.validateKeys();
+      if (result.valid === true) {
+        this.showSuccess('keys', 'API keys validated successfully!');
+      } else if (result.valid === false) {
+        this.showError('keys', result.error || 'API keys are invalid');
+      } else {
+        this.showError('keys', result.error || 'Unable to verify keys — please try again later');
+      }
+    } catch (error: any) {
+      this.showError('keys', error.message || 'Failed to validate API keys');
     }
   }
 

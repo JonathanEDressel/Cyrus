@@ -30,13 +30,46 @@
           <label for="trigger-type">When (Trigger)</label>
           <select id="trigger-type">
             <option value="order_filled">Order is Filled</option>
+            <option value="balance_threshold">Balance Threshold</option>
+          </select>
+        </div>
+        <div class="form-group trigger-order-section" id="trigger-order-section">
+          <label for="trigger-order-id">Order ID</label>
+          <select id="trigger-order-id">
+            <option value="" disabled selected>Loading orders...</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Balance Threshold trigger fields -->
+      <div class="form-row trigger-balance-section d-none" id="trigger-balance-section">
+        <div class="form-group">
+          <label for="trigger-asset">Monitor Asset</label>
+          <select id="trigger-asset" disabled>
+            <option value="" disabled selected>Loading balances...</option>
           </select>
         </div>
         <div class="form-group">
-          <label for="trigger-order-id">Order ID</label>
-          <select id="trigger-order-id" required>
-            <option value="" disabled selected>Loading orders...</option>
-          </select>
+          <label for="trigger-threshold">Threshold Amount</label>
+          <input type="number" id="trigger-threshold" step="any" min="0" placeholder="e.g. 0.001" disabled>
+          <span class="form-hint" id="threshold-hint"></span>
+        </div>
+      </div>
+
+      <div class="form-row trigger-balance-section d-none" id="cooldown-section">
+        <div class="form-group">
+          <label>Cooldown Period</label>
+          <div class="cooldown-inputs">
+            <div class="cooldown-field">
+              <input type="number" id="cooldown-hours" min="0" value="24" step="1" placeholder="0">
+              <span class="cooldown-label">hours</span>
+            </div>
+            <div class="cooldown-field">
+              <input type="number" id="cooldown-minutes" min="0" max="59" value="0" step="1" placeholder="0">
+              <span class="cooldown-label">minutes</span>
+            </div>
+          </div>
+          <span class="form-hint">Minimum 1 minute between executions</span>
         </div>
       </div>
 
@@ -66,9 +99,30 @@
             <option value="" disabled selected>Select an order first</option>
           </select>
         </div>
+      </div>
+
+      <div class="form-row" id="amount-mode-section">
+        <div class="form-group">
+          <label>Amount Mode</label>
+          <div class="amount-mode-group">
+            <label class="radio-label">
+              <input type="radio" name="amount-mode" value="fixed" checked>
+              <span>Fixed Amount</span>
+            </label>
+            <label class="radio-label">
+              <input type="radio" name="amount-mode" value="filled" disabled>
+              <span>Use Filled Amount</span>
+            </label>
+          </div>
+          <span class="form-hint" id="amount-mode-hint"></span>
+        </div>
         <div class="form-group">
           <label for="action-amount">Amount</label>
           <input type="number" id="action-amount" step="any" min="0" placeholder="Select an order first" disabled required>
+          <div class="slider-container">
+            <input type="range" id="amount-slider" min="0" max="100" value="100" step="1" disabled>
+            <span class="slider-value" id="slider-value">100%</span>
+          </div>
           <span class="form-hint" id="amount-hint"></span>
         </div>
       </div>

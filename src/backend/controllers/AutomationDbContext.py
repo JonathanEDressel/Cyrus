@@ -9,16 +9,20 @@ class AutomationDbContext:
                     action_type: str, trigger_order_id: str = None,
                     trigger_pair: str = None, trigger_side: str = None,
                     action_asset: str = None, action_address_key: str = None,
-                    action_amount: str = None) -> int:
+                    action_amount: str = None, use_filled_amount: bool = False,
+                    trigger_asset: str = None, trigger_threshold: str = None,
+                    cooldown_minutes: int = 1440) -> int:
         return execute_insert(
             '''INSERT INTO automation_rules
                (user_id, rule_name, trigger_type, trigger_order_id,
                 trigger_pair, trigger_side, action_type, action_asset,
-                action_address_key, action_amount)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+                action_address_key, action_amount, use_filled_amount,
+                trigger_asset, trigger_threshold, cooldown_minutes)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
             (user_id, rule_name, trigger_type, trigger_order_id,
              trigger_pair, trigger_side, action_type, action_asset,
-             action_address_key, action_amount)
+             action_address_key, action_amount, use_filled_amount,
+             trigger_asset, trigger_threshold, cooldown_minutes)
         )
 
     @staticmethod
@@ -65,10 +69,24 @@ class AutomationDbContext:
     def mark_rule_triggered(rule_id: int) -> None:
         execute_non_query(
             '''UPDATE automation_rules 
-               SET last_triggered_at = datetime('now'), trigger_count = trigger_count + 1
+               SET last_triggered_at = datetime('now'), last_executed_at = datetime('now'),
+                   trigger_count = trigger_count + 1
                WHERE id = ?''',
             (rule_id,)
         )
+
+    @staticmethod
+    def is_cooldown_elapsed(rule_id: int) -> bool:
+        row = execute_query_one(
+            '''SELECT last_executed_at, cooldown_minutes FROM automation_rules WHERE id = ?''',
+            (rule_id,)
+        )
+        if not row or not row.get('last_executed_at'):
+            return True
+        from datetime import datetime, timedelta
+        last = datetime.fromisoformat(row['last_executed_at'])
+        cooldown = int(row.get('cooldown_minutes', 1440))
+        return datetime.utcnow() >= last + timedelta(minutes=cooldown)
 
     # ---- All active rules (for worker) ----
 

@@ -6,7 +6,7 @@ from helper.Helper import success_response, created_response
 
 automation_bp = Blueprint('automation', __name__)
 
-VALID_TRIGGER_TYPES = ['order_filled']
+VALID_TRIGGER_TYPES = ['order_filled', 'balance_threshold']
 VALID_ACTION_TYPES = ['withdraw_crypto']
 
 
@@ -47,18 +47,45 @@ def create_rule():
         if trigger_type == 'order_filled' and not trigger_order_id:
             return bad_request("Order ID is required for 'order_filled' trigger")
 
+        # Validate balance_threshold trigger params
+        trigger_asset = data.get('trigger_asset', '').strip() or None
+        trigger_threshold = data.get('trigger_threshold', '').strip() or None
+        cooldown_minutes = data.get('cooldown_minutes', 1440)
+
+        if trigger_type == 'balance_threshold':
+            if not trigger_asset:
+                return bad_request("Asset is required for 'balance_threshold' trigger")
+            if not trigger_threshold:
+                return bad_request("Threshold amount is required for 'balance_threshold' trigger")
+            try:
+                threshold_val = float(trigger_threshold)
+                if threshold_val <= 0:
+                    return bad_request("Threshold must be a positive number")
+            except (ValueError, TypeError):
+                return bad_request("Threshold must be a valid number")
+            try:
+                cooldown_minutes = int(cooldown_minutes)
+                if cooldown_minutes < 1:
+                    return bad_request("Cooldown must be at least 1 minute")
+            except (ValueError, TypeError):
+                return bad_request("Cooldown must be a valid number")
+
         # Validate action params
         action_asset = data.get('action_asset', '').strip() or None
         action_address_key = data.get('action_address_key', '').strip() or None
         action_amount = data.get('action_amount', '').strip() or None
+        use_filled_amount = bool(data.get('use_filled_amount', False))
 
         if action_type == 'withdraw_crypto':
             if not action_asset:
                 return bad_request("Asset is required for withdraw action")
             if not action_address_key:
                 return bad_request("Withdrawal address key is required for withdraw action")
-            if not action_amount:
-                return bad_request("Amount is required for withdraw action")
+            if trigger_type == 'balance_threshold':
+                # For balance_threshold, amount is the balance itself; no fixed amount needed
+                pass
+            elif not use_filled_amount and not action_amount:
+                return bad_request("Amount is required for withdraw action (or enable 'Use Filled Amount')")
 
         rule_id = AutomationDbContext.create_rule(
             user_id=request.user_id,
@@ -71,6 +98,10 @@ def create_rule():
             action_asset=action_asset,
             action_address_key=action_address_key,
             action_amount=action_amount,
+            use_filled_amount=use_filled_amount,
+            trigger_asset=trigger_asset,
+            trigger_threshold=trigger_threshold,
+            cooldown_minutes=cooldown_minutes,
         )
 
         rule = AutomationDbContext.get_rule_by_id(rule_id, request.user_id)
