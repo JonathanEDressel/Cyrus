@@ -468,4 +468,4 @@ If you find this project helpful, consider donating:
 
 ## Disclaimer
 
-This software is provided as-is. Use at your own risk. The developers are not responsible for any financial losses incurred through the use of this application. Always verify trades and orders directly on the Kraken platform.
+This software is provided as-is. Use at your own risk. The developers are not responsible for any financial losses incurred through the use of this application. Always verify trades and orders directly on the Exchange's platform.

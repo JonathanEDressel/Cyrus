@@ -41,6 +41,8 @@
 .auth-logo img {
   width: 88px;
   height: 88px;
+  max-width: 150px;
+  border-radius: 35px;
   object-fit: contain;
   filter: drop-shadow(0 0 18px rgba(6, 182, 212, 0.45));
 }
@@ -454,8 +456,5 @@
     font-size: 1.5rem;
   }
   
-  .auth-logo img {
-    max-width: 150px;
-  }
 }
 
