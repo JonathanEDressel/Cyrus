@@ -9,12 +9,12 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
-  <header id="app-header" class="app-header d-none">
-    <div class="header-inner">
+  <aside id="app-header" class="app-sidebar d-none">
+    <div class="sidebar-inner">
       <div class="header-logo">
-          <img src="assets/images/cyrus-logo.png" alt="Cyrus" onerror="this.style.display='none'" />
-          <span class="header-brand">Cyrus</span>
-        </div>
+        <img src="assets/images/cyrus-logo.png" alt="Cyrus" onerror="this.style.display='none'" />
+        <span class="header-brand">Cyrus</span>
+      </div>
       <nav class="header-nav" id="header-nav">
         <a href="#" data-route="home" class="nav-link"><i class="fa-solid fa-house"></i> Home</a>
         <a href="#" data-route="openorders" class="nav-link"><i class="fa-solid fa-clock-rotate-left"></i> Open Orders</a>
@@ -24,13 +24,20 @@
         <a href="#" data-route="privacy" class="nav-link"><i class="fa-solid fa-user-secret"></i> Privacy</a>
         <a href="#" data-route="about" class="nav-link"><i class="fa-solid fa-cross"></i> About</a>
       </nav>
-      <div class="header-actions" id="header-actions">
-        <button class="header-user-btn" id="logout-btn">
-          <i class="fa-solid fa-right-from-bracket"></i> Logout
-        </button>
-      </div>
     </div>
-  </header>
+  </aside>
+
+  <div id="exchange-panel" class="exchange-panel d-none">
+    <label class="exchange-panel-label">Exchange</label>
+    <select id="exchange-selector" class="exchange-selector">
+      <option value="all">All Exchanges</option>
+    </select>
+    <div class="header-actions" id="header-actions">
+      <button class="header-user-btn" id="logout-btn">
+        <i class="fa-solid fa-right-from-bracket"></i> Logout
+      </button>
+    </div>
+  </div>
 
   <div id="api-key-warning" class="api-key-warning d-none">
     <div class="api-key-warning-inner">
@@ -48,13 +55,6 @@
   </div>
 
   <main id="app-content"></main>
-
-  <div id="exchange-panel" class="exchange-panel d-none">
-    <label class="exchange-panel-label">Exchange</label>
-    <select id="exchange-selector" class="exchange-selector">
-      <option value="all">All Exchanges</option>
-    </select>
-  </div>
 
   <footer id="app-footer" class="app-footer d-none">
     <div class="footer-inner">
