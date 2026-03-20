@@ -82,7 +82,133 @@
         </button>
       </div>
       <div class="donation-body">
-        <p class="donation-message">If you find Cyrus helpful, consider supporting the project! We are constantly working to improve and add new features. We greatly appreciate any support you can provide!</p>
+        <p class="donation-message">Every option below is simply a way to support Cyrus. Your contribution — however small — helps keep the project alive and improving. Thank you!</p>
+        <p class="donation-message" style="margin-top: -0.5rem;">Payments are powered, managed, and secured by <strong style="color: #e2e8f0;">Stripe</strong>.</p>
+
+        <!-- Giving type toggle -->
+        <div class="giving-type-toggle">
+          <button class="giving-type-btn active" data-type="onetime">One Time</button>
+          <button class="giving-type-btn" data-type="monthly">Monthly</button>
+          <button class="giving-type-btn" data-type="annual">Annual</button>
+        </div>
+
+        <!-- One Time Panel -->
+        <div class="giving-panel active" id="giving-onetime">
+          <div class="giving-card giving-card--onetime">
+            <div class="giving-card-icon">
+              <i class="fa-solid fa-bolt-lightning"></i>
+            </div>
+            <div class="giving-card-name">Spark</div>
+            <div class="giving-card-price">Custom One-Time Payment</div>
+            <a href="https://buy.stripe.com/4gMdR8awWdSng4bfMQeAg06" class="giving-card-btn" target="_blank">Give a Spark</a>
+          </div>
+
+          <div class="crypto-divider"><span style="color: white;">or donate with crypto</span></div>
+
+          <div class="donation-option">
+            <div class="donation-label"><i class="fa-brands fa-bitcoin"></i> Bitcoin (BTC Network)</div>
+            <div class="donation-address-wrapper">
+              <div class="donation-address" data-address="32BJw5mpyQ6fuLeiR5yrAAR2H8gerB9GAD">32BJw5mpyQ6fuLeiR5yrAAR2H8gerB9GAD</div>
+              <button class="copy-btn" data-copy="32BJw5mpyQ6fuLeiR5yrAAR2H8gerB9GAD" title="Copy address">
+                <i class="fa-solid fa-copy"></i>
+              </button>
+            </div>
+          </div>
+          <div class="donation-option">
+            <div class="donation-label"><i class="fa-brands fa-ethereum"></i> Ethereum (ETH Network)</div>
+            <div class="donation-address-wrapper">
+              <div class="donation-address" data-address="0xc0066CCD708376cF3fA34CF5a3a8eB88AF58c97A">0xc0066CCD708376cF3fA34CF5a3a8eB88AF58c97A</div>
+              <button class="copy-btn" data-copy="0xc0066CCD708376cF3fA34CF5a3a8eB88AF58c97A" title="Copy address">
+                <i class="fa-solid fa-copy"></i>
+              </button>
+            </div>
+          </div>
+          <div class="donation-option">
+            <div class="donation-label"><i class="fa-solid fa-s"></i> Solana (SOL Network)</div>
+            <div class="donation-address-wrapper">
+              <div class="donation-address" data-address="7vfBGpjZTEZEsKNi1ZdYYBPGq1uFzWvLuV6xRP13tSo9">7vfBGpjZTEZEsKNi1ZdYYBPGq1uFzWvLuV6xRP13tSo9</div>
+              <button class="copy-btn" data-copy="7vfBGpjZTEZEsKNi1ZdYYBPGq1uFzWvLuV6xRP13tSo9" title="Copy address">
+                <i class="fa-solid fa-copy"></i>
+              </button>
+            </div>
+          </div>
+          <div class="donation-option">
+            <div class="donation-label"><i class="fa-solid fa-x"></i> Ripple (XRP Network - Address/Tag)</div>
+            <div class="donation-address-wrapper">
+              <div class="donation-address" data-address="rLHzPsX6oXkzU2qL12kHCH8G8cnZv1rBJh / 204756592">rLHzPsX6oXkzU2qL12kHCH8G8cnZv1rBJh / 204756592</div>
+              <button class="copy-btn" data-copy="rLHzPsX6oXkzU2qL12kHCH8G8cnZv1rBJh / 204756592" title="Copy address">
+                <i class="fa-solid fa-copy"></i>
+              </button>
+            </div>
+          </div>
+          <div class="donation-option">
+            <div class="donation-label"><i class="fa-solid fa-dog"></i> Shiba Inu (SHIB/ETH Network)</div>
+            <div class="donation-address-wrapper">
+              <div class="donation-address" data-address="0xc0066CCD708376cF3fA34CF5a3a8eB88AF58c97A">0xc0066CCD708376cF3fA34CF5a3a8eB88AF58c97A</div>
+              <button class="copy-btn" data-copy="0xc0066CCD708376cF3fA34CF5a3a8eB88AF58c97A" title="Copy address">
+                <i class="fa-solid fa-copy"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Monthly Panel -->
+        <div class="giving-panel" id="giving-monthly">
+          <div class="giving-card giving-card--helper">
+            <div class="giving-card-icon">
+              <i class="fa-solid fa-shield-halved"></i>
+            </div>
+            <div class="giving-card-badge">Helper</div>
+            <div class="giving-card-price">$10 <span class="giving-card-period">/month</span></div>
+            <a href="https://donate.stripe.com/fZuaEW8oO4hN8BJ0RWeAg00" class="giving-card-btn" target="_blank">Become a Helper</a>
+          </div>
+          <div class="giving-card giving-card--hero">
+            <div class="giving-card-icon">
+              <i class="fa-solid fa-star"></i>
+            </div>
+            <div class="giving-card-badge">Hero</div>
+            <div class="giving-card-price">$25 <span class="giving-card-period">/month</span></div>
+            <a href="https://donate.stripe.com/aFa8wObB001x4lt6cgeAg01" class="giving-card-btn" target="_blank">Become a Hero</a>
+          </div>
+          <div class="giving-card giving-card--conqueror">
+            <div class="giving-card-icon">
+              <i class="fa-solid fa-crown"></i>
+            </div>
+            <div class="giving-card-badge">Conqueror</div>
+            <div class="giving-card-price">$50 <span class="giving-card-period">/month</span></div>
+            <a href="https://donate.stripe.com/5kQ4gy34ug0vbNV448eAg05" class="giving-card-btn" target="_blank">Become a Conqueror</a>
+          </div>
+        </div>
+
+        <!-- Annual Panel -->
+        <div class="giving-panel" id="giving-annual">
+          <div class="giving-card giving-card--helper">
+            <div class="giving-card-icon">
+              <i class="fa-solid fa-shield-halved"></i>
+            </div>
+            <div class="giving-card-badge">Helper</div>
+            <div class="giving-card-price">$120 <span class="giving-card-period">/year</span></div>
+            <a href="https://donate.stripe.com/bJe7sK0Wm15B5pxcAEeAg02" class="giving-card-btn" target="_blank">Commit as Helper</a>
+          </div>
+          <div class="giving-card giving-card--hero">
+            <div class="giving-card-icon">
+              <i class="fa-solid fa-star"></i>
+            </div>
+            <div class="giving-card-badge">Hero</div>
+            <div class="giving-card-price">$300 <span class="giving-card-period">/year</span></div>
+            <a href="https://donate.stripe.com/6oUcN40Wm4hN6tB0RWeAg03" class="giving-card-btn" target="_blank">Commit as Hero</a>
+          </div>
+          <div class="giving-card giving-card--conqueror">
+            <div class="giving-card-icon">
+              <i class="fa-solid fa-crown"></i>
+            </div>
+            <div class="giving-card-badge">Conqueror</div>
+            <div class="giving-card-price">$600 <span class="giving-card-period">/year</span></div>
+            <a href="https://donate.stripe.com/eVqcN4cF48y39FNeIMeAg04" class="giving-card-btn" target="_blank">Commit as Conqueror</a>
+          </div>
+        </div>
+
+        <!--
         <div class="donation-option">
           <div class="donation-label"><i class="fa-brands fa-bitcoin"></i> Bitcoin (BTC Network)</div>
           <div class="donation-address-wrapper">
@@ -132,6 +258,7 @@
           <div class="donation-label"><i class="fa-solid fa-dollar-sign"></i> Venmo</div>
           <a href="https://account.venmo.com/u/JonathanDressel" class="donation-link" target="_blank">@Venmo Link</a>
         </div>
+        -->
       </div>
     </div>
   </div>

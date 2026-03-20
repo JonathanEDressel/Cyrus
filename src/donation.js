@@ -12,6 +12,16 @@
   });
 
   document.addEventListener('click', (e) => {
+    const typeBtn = e.target.closest('.giving-type-btn');
+    if (typeBtn) {
+      document.querySelectorAll('.giving-type-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.giving-panel').forEach(p => p.classList.remove('active'));
+      typeBtn.classList.add('active');
+      const type = typeBtn.getAttribute('data-type');
+      document.getElementById(`giving-${type}`)?.classList.add('active');
+      return;
+    }
+
     const copyBtn = e.target.closest('.copy-btn');
     if (!copyBtn) return;
 

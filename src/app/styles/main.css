@@ -605,7 +605,7 @@
   position: absolute;
   bottom: 72px;
   right: 0;
-  width: 340px;
+  width: 380px;
   background: #1e293b;
   border: 1px solid #334155;
   border-radius: 16px;
@@ -806,4 +806,249 @@
     width: calc(100vw - 32px);
     right: -8px;
   }
+}
+
+/* ── Giving Type Toggle ──────────────────────────────────── */
+.giving-type-toggle {
+  display: flex;
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 10px;
+  padding: 3px;
+  gap: 2px;
+  margin-bottom: 1rem;
+}
+
+/* ── Crypto divider in one-time panel ───────────────────── */
+.crypto-divider {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0.25rem 0;
+  color: #475569;
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+.crypto-divider::before,
+.crypto-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: #1e293b;
+}
+
+.giving-type-btn {
+  flex: 1;
+  background: none;
+  border: none;
+  color: #94a3b8;
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0.45rem 0;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+  letter-spacing: 0.3px;
+}
+
+.giving-type-btn:hover {
+  color: #e2e8f0;
+}
+
+.giving-type-btn.active {
+  background: #1e293b;
+  color: #06b6d4;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+}
+
+/* ── Giving Panels ───────────────────────────────────────── */
+.giving-panel {
+  display: none;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.giving-panel.active {
+  display: flex;
+}
+
+/* ── Giving Cards ────────────────────────────────────────── */
+.giving-card {
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 12px;
+  padding: 1rem 1.1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  transition: border-color 0.2s, transform 0.15s;
+  text-decoration: none;
+  text-align: center;
+}
+
+.giving-card:hover {
+  transform: translateY(-1px);
+}
+
+.giving-card-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.3rem;
+  flex-shrink: 0;
+}
+
+/* One-time */
+.giving-card--onetime {
+  border-color: rgba(99, 102, 241, 0.35);
+}
+.giving-card--onetime:hover { border-color: #6366f1; }
+.giving-card--onetime .giving-card-icon {
+  background: rgba(99, 102, 241, 0.15);
+  color: #818cf8;
+}
+.giving-card--onetime .giving-card-name {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #a5b4fc;
+}
+.giving-card--onetime .giving-card-price {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #e2e8f0;
+}
+.giving-card--onetime .giving-card-btn {
+  background: rgba(99, 102, 241, 0.15);
+  border-color: rgba(99, 102, 241, 0.4);
+  color: #818cf8;
+}
+.giving-card--onetime .giving-card-btn:hover {
+  background: rgba(99, 102, 241, 0.28);
+  border-color: #6366f1;
+}
+
+/* Helper */
+.giving-card--helper {
+  border-color: rgba(34, 197, 94, 0.3);
+}
+.giving-card--helper:hover { border-color: #22c55e; }
+.giving-card--helper .giving-card-icon {
+  background: rgba(34, 197, 94, 0.12);
+  color: #4ade80;
+}
+.giving-card--helper .giving-card-badge {
+  background: rgba(34, 197, 94, 0.12);
+  color: #4ade80;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+.giving-card--helper .giving-card-price { color: #4ade80; }
+.giving-card--helper .giving-card-btn {
+  background: rgba(34, 197, 94, 0.12);
+  border-color: rgba(34, 197, 94, 0.35);
+  color: #4ade80;
+}
+.giving-card--helper .giving-card-btn:hover {
+  background: rgba(34, 197, 94, 0.22);
+  border-color: #22c55e;
+}
+
+/* Hero */
+.giving-card--hero {
+  border-color: rgba(6, 182, 212, 0.35);
+}
+.giving-card--hero:hover { border-color: #06b6d4; }
+.giving-card--hero .giving-card-icon {
+  background: rgba(6, 182, 212, 0.12);
+  color: #22d3ee;
+}
+.giving-card--hero .giving-card-badge {
+  background: rgba(6, 182, 212, 0.12);
+  color: #22d3ee;
+  border: 1px solid rgba(6, 182, 212, 0.3);
+}
+.giving-card--hero .giving-card-price { color: #22d3ee; }
+.giving-card--hero .giving-card-btn {
+  background: rgba(6, 182, 212, 0.12);
+  border-color: rgba(6, 182, 212, 0.35);
+  color: #22d3ee;
+}
+.giving-card--hero .giving-card-btn:hover {
+  background: rgba(6, 182, 212, 0.22);
+  border-color: #06b6d4;
+}
+
+/* Conqueror */
+.giving-card--conqueror {
+  border-color: rgba(251, 191, 36, 0.35);
+}
+.giving-card--conqueror:hover { border-color: #f59e0b; }
+.giving-card--conqueror .giving-card-icon {
+  background: rgba(251, 191, 36, 0.12);
+  color: #fbbf24;
+}
+.giving-card--conqueror .giving-card-badge {
+  background: rgba(251, 191, 36, 0.12);
+  color: #fbbf24;
+  border: 1px solid rgba(251, 191, 36, 0.3);
+}
+.giving-card--conqueror .giving-card-price { color: #fbbf24; }
+.giving-card--conqueror .giving-card-btn {
+  background: rgba(251, 191, 36, 0.12);
+  border-color: rgba(251, 191, 36, 0.35);
+  color: #fbbf24;
+}
+.giving-card--conqueror .giving-card-btn:hover {
+  background: rgba(251, 191, 36, 0.22);
+  border-color: #f59e0b;
+}
+
+/* Shared card sub-elements */
+.giving-card-badge {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+}
+
+.giving-card-price {
+  font-size: 1.4rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.giving-card-period {
+  font-size: 0.85rem;
+  font-weight: 500;
+  opacity: 0.75;
+}
+
+.giving-card-desc {
+  font-size: 0.82rem;
+  color: #94a3b8;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.giving-card-btn {
+  margin-top: 0.25rem;
+  display: inline-block;
+  padding: 0.45rem 1rem;
+  border-radius: 7px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  border: 1px solid;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 0.2s, border-color 0.2s;
+  align-self: stretch;
+  text-align: center;
 }
