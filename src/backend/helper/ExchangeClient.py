@@ -85,8 +85,8 @@ def get_withdrawal_addresses(exchange: ccxt.Exchange) -> list[dict]:
                     }
                     for a in raw
                 ]
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[DEBUG] get_withdrawal_addresses failed: {e}")
     return []
 
 
@@ -102,8 +102,9 @@ def withdraw(exchange: ccxt.Exchange, asset: str, amount: str,
     extra = dict(params or {})
     if exchange.id == 'kraken':
         extra['key'] = address
-        # Kraken CCXT driver wants a real address string too — reuse nickname
-        return exchange.withdraw(asset, float(amount), address, tag=tag, params=extra)
+        addrs = get_withdrawal_addresses(exchange)
+        real_address = next((a['address'] for a in addrs if a['nickname_key'].strip() == address.strip()), address)
+        return exchange.withdraw(asset, float(amount), real_address, tag=tag, params=extra)
     return exchange.withdraw(asset, float(amount), address, tag=tag, params=extra)
 
 

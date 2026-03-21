@@ -280,7 +280,9 @@ class AutomationWorker:
                 action_exchange = get_user_exchange(user_id, rule.action_exchange_id)
                 if not action_exchange:
                     raise Exception("Action exchange connection not available")
-
+                
+                print("Executing withdrawal action for rule:", rule.rule_name)
+                print(f"Details: Withdraw {withdraw_amount} {asset} to {rule.action_address_key} on exchange {action_exchange.id}")
                 result = withdraw(
                     exchange=action_exchange,
                     asset=rule.action_asset,

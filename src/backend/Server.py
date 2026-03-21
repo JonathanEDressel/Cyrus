@@ -23,12 +23,10 @@ def create_app():
         run_column_migrations()
     
     register_routes(app)
-
-    start_worker(app)
-    
     return app
 
 if __name__ == '__main__':
     app = create_app()
     port = int(os.getenv('API_PORT', 5000))
-    app.run(host='127.0.0.1', port=port, debug=True)
+    start_worker(app)
+    app.run(host='127.0.0.1', port=port, debug=True, use_reloader=False)
