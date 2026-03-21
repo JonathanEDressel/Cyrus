@@ -297,8 +297,15 @@ pyinstaller server.spec
 deactivate
 cd ../..  
 
-# 3. Create installer
+# 3. Create new version
+npm version X.X.X
+
+# 4. Create installer
 npm run dist
+
+# 5. Create release
+ gh release create vX.X.X "release/Cyrus Setup X.X.X.exe" --title "vX.X.X" --notes "Your notes"
+
 ```
 
 > **Note:** Always run `pyinstaller` using the venv's own executable (`venv\Scripts\pyinstaller.exe`) to ensure it resolves packages from the correct environment.
