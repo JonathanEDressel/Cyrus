@@ -25,7 +25,7 @@ SUPPORTED_EXCHANGES: dict[str, dict] = {
         'api_key_url': 'https://www.kraken.com/u/security/api',
     },
     'coinbase': {
-        'name': 'Coinbase Advanced',
+        'name': 'Coinbase Advanced (Beta)',
         'ccxt_id': 'coinbaseadvanced',
         'requires_passphrase': False,
         'has_withdrawal_addresses': False,

@@ -24,7 +24,7 @@
 }
 
 .setting-toggle-desc {
-  color: #64748b;
+  color: whitesmoke;
   font-size: 0.82rem;
 }
 
@@ -82,6 +82,14 @@
   border: 1px solid #334155;
   border-radius: 12px;
   padding: 1.5rem;
+}
+
+.text-muted {
+  color: whitesmoke;
+}
+
+.form-text {
+  color: whitesmoke;
 }
 
 .profile-card .form-group {
