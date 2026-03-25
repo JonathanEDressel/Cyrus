@@ -96,7 +96,6 @@ class LoginController {
       donationWidget.style.display = user.donation_modal_enabled ? 'block' : 'none';
   }
 
-
   async login(): Promise<void> {
     const emailInput = document.getElementById('email') as HTMLInputElement;
     const passwordInput = document.getElementById('password') as HTMLInputElement;
