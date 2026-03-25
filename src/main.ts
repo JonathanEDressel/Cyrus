@@ -10,16 +10,13 @@ function getBackendPath(): string {
   const isDev = !app.isPackaged;
   
   if (isDev) {
-    // Development: Python script (run manually)
     return '';
   } else {
-    // Production: Bundled executable in resources
     return path.join(process.resourcesPath, 'backend', 'CyrusServer.exe');
   }
 }
 
 function getDbPath(): string {
-  // Store database in user's app data folder
   const userDataPath = app.getPath('userData');
   return path.join(userDataPath, 'kraking.db');
 }
@@ -45,7 +42,6 @@ function startBackend() {
   const dbPath = getDbPath();
   console.log('[BACKEND] Database will be created at:', dbPath);
   
-  // Ensure the directory exists
   const dbDir = path.dirname(dbPath);
   if (!fs.existsSync(dbDir)) {
     console.log('[BACKEND] Creating directory:', dbDir);
@@ -63,7 +59,7 @@ function startBackend() {
   
   backendProcess = spawn(backendPath, [], {
     env,
-    windowsHide: false  // Changed to false to see console output
+    windowsHide: false  
   });
   
   backendProcess.stdout?.on('data', (data) => {
@@ -101,7 +97,6 @@ function createWindow() {
 
   mainWindow.loadFile(indexPath);
 
-  // Open external links (e.g. Venmo) in the system browser, not in-app
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     if (!url.startsWith('file://')) {
       shell.openExternal(url);

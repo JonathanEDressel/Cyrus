@@ -15,6 +15,7 @@ interface UserModel {
   updated_at: string;
   last_login: string;
   notifications_enabled: boolean;
+  donation_modal_enabled: boolean;
   exchange_connections: ExchangeConnection[];
   has_validated_connection: boolean;
 }

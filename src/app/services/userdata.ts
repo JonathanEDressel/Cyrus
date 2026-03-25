@@ -50,4 +50,5 @@ class UserData {
       { donation_modal_enabled: enabled },
       token
     );
+  }
 }

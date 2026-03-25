@@ -84,6 +84,19 @@ class LoginController {
     router.navigate('forgotpassword');
   }
 
+  async loadData(): Promise<void> {
+    const user = await UserController.getProfile();
+    if (!user) {
+      console.error('Failed to load user profile');
+      return;
+    }
+
+    const donationWidget = document.getElementById('donation-widget');
+    if(donationWidget !== null)
+      donationWidget.style.display = user.donation_modal_enabled ? 'block' : 'none';
+  }
+
+
   async login(): Promise<void> {
     const emailInput = document.getElementById('email') as HTMLInputElement;
     const passwordInput = document.getElementById('password') as HTMLInputElement;
@@ -101,6 +114,8 @@ class LoginController {
 
       this.setSuccessMsg('Login successful!');
       console.log('Login successful! - ', user);
+      
+      await this.loadData();
 
       ApiKeyWarning.init();
 

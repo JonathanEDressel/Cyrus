@@ -53,6 +53,8 @@ class ProfileController {
       if (usernameInput) usernameInput.value = user.username;
       const notifToggle = document.getElementById('notifications-toggle') as HTMLInputElement;
       if (notifToggle) notifToggle.checked = user.notifications_enabled !== false;
+      const notifModalToggle = document.getElementById('donation-modal-toggle') as HTMLInputElement;  
+      if (notifModalToggle) notifModalToggle.checked = user.donation_modal_enabled !== false;
       NotificationService.setEnabled(user.notifications_enabled !== false);
     } catch (error: any) {
       this.showError('username', error.message || 'Failed to load profile');
@@ -244,6 +246,9 @@ class ProfileController {
 
   private async saveDonationModal(enabled: boolean): Promise<void> {
     try {
+      const modal = document.getElementById('donation-widget');
+      if (modal) 
+        modal.style.display = enabled ? 'block' : 'none';
       await UserController.updateDonationModal(enabled);
       this.showSuccess('donation-modal', `Donation modal ${enabled ? 'enabled' : 'disabled'}`);
     } catch (error: any) {

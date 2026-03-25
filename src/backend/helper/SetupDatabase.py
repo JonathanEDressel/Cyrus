@@ -3,7 +3,6 @@ from helper.InitiateConnection import get_db_connection
 
 def setup_database():
     conn = get_db_connection()
-    
     try:
         conn.execute('''
             CREATE TABLE IF NOT EXISTS users (
@@ -12,7 +11,7 @@ def setup_database():
                 password_hash TEXT NOT NULL,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 last_login DATETIME NULL,
-                notifications_enabled INTEGER NOT NULL DEFAULT 1
+                notifications_enabled INTEGER NOT NULL DEFAULT 1,
                 donation_modal_enabled INTEGER NOT NULL DEFAULT 1
             )
         ''')
