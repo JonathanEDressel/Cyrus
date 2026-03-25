@@ -71,6 +71,12 @@ class UserController {
     await UserData.updateNotifications(enabled, token);
   }
 
+  static async updateDonationModal(enabled: boolean): Promise<void> {
+    const token = AuthController.getToken();
+    if (!token) throw new Error('Not authenticated');
+    await UserData.updateDonationModal(enabled, token);
+  }
+
   /**
    * Load connection status from user profile.
    * Sets ApiKeyState based on exchange_connections.

@@ -13,6 +13,7 @@ def setup_database():
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 last_login DATETIME NULL,
                 notifications_enabled INTEGER NOT NULL DEFAULT 1
+                donation_modal_enabled INTEGER NOT NULL DEFAULT 1
             )
         ''')
 
@@ -109,17 +110,17 @@ def setup_database():
             try:
                 conn.execute(migration)
             except Exception:
-                pass  # Column already exists
+                pass
 
         try:
             conn.execute('ALTER TABLE order_snapshots ADD COLUMN exchange_connection_id INTEGER REFERENCES exchange_connections(id) ON DELETE SET NULL')
         except Exception:
-            pass  # Column already exists
+            pass  
 
         try:
             conn.execute('ALTER TABLE exchange_connections ADD COLUMN is_sandbox INTEGER NOT NULL DEFAULT 0')
         except Exception:
-            pass  # Column already exists
+            pass  
 
         for migration in [
             'ALTER TABLE automation_rules ADD COLUMN use_filled_amount BOOLEAN DEFAULT 0',
@@ -131,12 +132,17 @@ def setup_database():
             try:
                 conn.execute(migration)
             except Exception:
-                pass  # Column already exists
+                pass  
 
         try:
             conn.execute('ALTER TABLE users ADD COLUMN notifications_enabled INTEGER NOT NULL DEFAULT 1')
         except Exception:
-            pass  # Column already exists
+            pass  
+
+        try:
+            conn.execute('ALTER TABLE users ADD COLUMN donation_modal_enabled INTEGER NOT NULL DEFAULT 1')
+        except Exception:
+            pass  
 
         conn.commit()
         print("[DATABASE] Tables created/verified successfully")

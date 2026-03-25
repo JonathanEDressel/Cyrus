@@ -43,4 +43,11 @@ class UserData {
       token
     );
   }
+
+  static async updateDonationModal(enabled: boolean, token: string): Promise<ApiResponse<UserModel>> {
+    return DataAccess.put(
+      `${AppConfig.API_BASE}/user/update-donation-modal`,
+      { donation_modal_enabled: enabled },
+      token
+    );
 }

@@ -117,6 +117,19 @@ def update_notifications():
     except Exception as e:
         return handle_error(e)
 
+@user_bp.route('/update-donation-modal', methods=['PUT'])
+@token_required
+def update_donation_modal():
+    try:
+        data = request.get_json()
+        if data is None or 'donation_modal_enabled' not in data:
+            return bad_request("donation_modal_enabled is required")
+        enabled = bool(data['donation_modal_enabled'])
+        UserDbContext.update_donation_modal(request.user_id, enabled)
+        user = UserDbContext.get_user_by_id(request.user_id)
+        return success_response(data=user.to_dict(), message="Donation modal preference saved")
+    except Exception as e:
+        return handle_error(e)
 
 @user_bp.route('/delete', methods=['DELETE'])
 @token_required

@@ -47,3 +47,11 @@ class UserDbContext:
             (1 if enabled else 0, user_id)
         )
         return True
+    
+    @staticmethod
+    def update_donation_modal(user_id: int, enabled: bool) -> bool:
+        execute_non_query(
+            'UPDATE users SET donation_modal_enabled = ? WHERE id = ?',
+            (1 if enabled else 0, user_id)
+        )
+        return True

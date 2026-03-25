@@ -24,6 +24,11 @@ class ProfileController {
       this.saveNotifications(enabled);
     });
 
+    document.getElementById('donation-modal-toggle')?.addEventListener('change', (e) => {
+      const enabled = (e.target as HTMLInputElement).checked;
+      this.saveDonationModal(enabled);
+    });
+
     document.getElementById('new-exchange-name')?.addEventListener('change', () => {
       const select = document.getElementById('new-exchange-name') as HTMLSelectElement;
       const exchange = this.supportedExchanges.find(e => e.id === select.value);
@@ -234,6 +239,17 @@ class ProfileController {
       const toggle = document.getElementById('notifications-toggle') as HTMLInputElement;
       if (toggle) toggle.checked = !enabled;
       NotificationService.setEnabled(!enabled);
+    }
+  }
+
+  private async saveDonationModal(enabled: boolean): Promise<void> {
+    try {
+      await UserController.updateDonationModal(enabled);
+      this.showSuccess('donation-modal', `Donation modal ${enabled ? 'enabled' : 'disabled'}`);
+    } catch (error: any) {
+        this.showError('donation-modal', error.message || 'Failed to save donation modal preference');
+      const toggle = document.getElementById('donation-modal-toggle') as HTMLInputElement;
+      if (toggle) toggle.checked = !enabled;
     }
   }
 
