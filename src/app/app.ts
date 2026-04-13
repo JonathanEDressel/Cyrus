@@ -92,6 +92,11 @@
   });
 
   if (AuthController.isAuthenticated()) {
+    // Verify the token is still valid before navigating to protected routes
+    const tokenValid = await UserController.verifyToken();
+    if (!tokenValid) {
+      router.navigate('login');
+    } else {
     ApiKeyWarning.init();
     UserController.refreshKeyStatus().then(async () => {
       if (ApiKeyState.status === 'valid') {
@@ -130,6 +135,7 @@
     });
 
     router.navigate('home');
+    }
   } else {
     router.navigate('login');
   }

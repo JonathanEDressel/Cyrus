@@ -81,6 +81,26 @@ class UserController {
    * Load connection status from user profile.
    * Sets ApiKeyState based on exchange_connections.
    */
+  /**
+   * Verify the stored token is still valid by hitting a protected endpoint.
+   * Returns true if valid, false if the token is missing, expired, or rejected.
+   * Clears stored credentials if the backend explicitly returns 401.
+   */
+  static async verifyToken(): Promise<boolean> {
+    const token = AuthController.getToken();
+    if (!token) return false;
+    try {
+      await UserData.getProfile(token);
+      return true;
+    } catch (err: any) {
+      // 401 = token expired or invalid → clear credentials
+      if (err.message && (err.message.includes('401') || err.message.toLowerCase().includes('token'))) {
+        AuthController.logout();
+      }
+      return false;
+    }
+  }
+
   static async refreshKeyStatus(): Promise<void> {
     try {
       const user = await UserController.getProfile();
