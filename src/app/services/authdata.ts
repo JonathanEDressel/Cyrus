@@ -20,4 +20,25 @@ class AuthData {
       request
     );
   }
+
+  /**
+   * GET /api/auth/accounts
+   * Returns all accounts with command counts (no auth required)
+   */
+  static async getAccounts(): Promise<ApiResponse<AccountSummary[]>> {
+    return DataAccess.get<AccountSummary[]>(
+      `${AppConfig.API_BASE}/auth/accounts`
+    );
+  }
+
+  /**
+   * PUT /api/auth/accounts/:id/toggle-active
+   * Toggles account active status (no auth required)
+   */
+  static async toggleAccountActive(userId: number): Promise<ApiResponse<any>> {
+    return DataAccess.put<any>(
+      `${AppConfig.API_BASE}/auth/accounts/${userId}/toggle-active`,
+      {}
+    );
+  }
 }

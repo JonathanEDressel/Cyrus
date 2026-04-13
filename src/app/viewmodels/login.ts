@@ -26,12 +26,14 @@ class LoginController {
 
     const forgotPasswordLink = document.getElementById('forgot-password-link');
     const createAccountBtn = document.getElementById('create-account-btn');
+    const viewAccountsBtn = document.getElementById('view-accounts-btn');
 
     forgotPasswordLink?.addEventListener('click', (e) => {
       e.preventDefault();
       this.forgotPassword();
     });
     createAccountBtn?.addEventListener('click', () => this.createAccount());
+    viewAccountsBtn?.addEventListener('click', () => router.navigate('accounts'));
   }
 
   private checkRouteParams(): void {
@@ -116,17 +118,24 @@ class LoginController {
       
       await this.loadData();
 
+      if (user.is_active === false) {
+        console.log('Account is deactivated — API calls disabled');
+      }
+
       ApiKeyWarning.init();
 
-      // Load connections and start ExchangeStore in 'all' mode
-      try {
-        await ExchangeStore.loadConnections();
-        if (ExchangeStore.connections.length > 0) {
-          ExchangeStore.start('all');
-        }
-      } catch {}
+      // Load connections and start ExchangeStore in 'all' mode (skip if inactive)
+      if (user.is_active !== false) {
+        try {
+          await ExchangeStore.loadConnections();
+          if (ExchangeStore.connections.length > 0) {
+            ExchangeStore.start('all');
+          }
+        } catch {}
 
-      NotificationService.start();
+        NotificationService.start();
+      }
+
       router.navigate('home');
 
     } catch (error: any) {

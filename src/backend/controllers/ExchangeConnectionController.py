@@ -1,6 +1,6 @@
 from flask import Blueprint, request
 from controllers.ExchangeConnectionDbContext import ExchangeConnectionDbContext
-from helper.Security import token_required, encrypt_api_key
+from helper.Security import token_required, encrypt_api_key, active_required
 from helper.ErrorHandler import handle_error, bad_request, not_found
 from helper.Helper import success_response, created_response
 from helper.ExchangeRegistry import (
@@ -28,6 +28,7 @@ def _format_connection(row: dict) -> dict:
 
 @exchange_bp.route('/supported', methods=['GET'])
 @token_required
+@active_required
 def supported_exchanges():
     try:
         return success_response(data=get_supported_exchanges())
@@ -37,6 +38,7 @@ def supported_exchanges():
 
 @exchange_bp.route('/connections', methods=['GET'])
 @token_required
+@active_required
 def list_connections():
     try:
         rows = ExchangeConnectionDbContext.get_connections_by_user(request.user_id)
@@ -47,6 +49,7 @@ def list_connections():
 
 @exchange_bp.route('/connections', methods=['POST'])
 @token_required
+@active_required
 def add_connection():
     try:
         data = request.get_json()
@@ -98,6 +101,7 @@ def add_connection():
 
 @exchange_bp.route('/connections/<int:conn_id>', methods=['PUT'])
 @token_required
+@active_required
 def update_connection(conn_id):
     try:
         row = ExchangeConnectionDbContext.get_connection(conn_id, request.user_id)
@@ -131,6 +135,7 @@ def update_connection(conn_id):
 
 @exchange_bp.route('/connections/<int:conn_id>', methods=['DELETE'])
 @token_required
+@active_required
 def delete_connection(conn_id):
     try:
         row = ExchangeConnectionDbContext.get_connection(conn_id, request.user_id)
@@ -153,6 +158,7 @@ def delete_connection(conn_id):
 
 @exchange_bp.route('/connections/<int:conn_id>/validate', methods=['POST'])
 @token_required
+@active_required
 def validate_connection(conn_id):
     try:
         row = ExchangeConnectionDbContext.get_connection(conn_id, request.user_id)

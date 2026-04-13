@@ -3,7 +3,7 @@ import bcrypt
 import datetime
 from functools import wraps
 from flask import request, current_app
-from helper.ErrorHandler import unauthorized
+from helper.ErrorHandler import unauthorized, forbidden
 from cryptography.fernet import Fernet
 import base64
 import hashlib
@@ -56,6 +56,16 @@ def token_required(f):
         
         return f(*args, **kwargs)
     
+    return decorated
+
+
+def active_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        from controllers.AuthDbContext import AuthDbContext
+        if not AuthDbContext.is_user_active(request.user_id):
+            return forbidden("Account is deactivated. API calls are disabled.")
+        return f(*args, **kwargs)
     return decorated
 
 

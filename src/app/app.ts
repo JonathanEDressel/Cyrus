@@ -15,6 +15,14 @@
     title: 'Create Account',
   });
 
+  router.register('accounts', {
+    view: 'app/views/accounts.html',
+    viewModel: '../dist/app/viewmodels/accounts.js',
+    style: 'app/styles/login.css',
+    showChrome: false,
+    title: 'All Accounts',
+  });
+
   router.register('home', {
     view: 'app/views/overview/home.html',
     viewModel: '../dist/app/viewmodels/overview/home.js',

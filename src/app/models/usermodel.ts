@@ -16,8 +16,17 @@ interface UserModel {
   last_login: string;
   notifications_enabled: boolean;
   donation_modal_enabled: boolean;
+  is_active: boolean;
   exchange_connections: ExchangeConnection[];
   has_validated_connection: boolean;
+}
+
+interface AccountSummary {
+  id: number;
+  username: string;
+  created_at: string | null;
+  is_active: boolean;
+  command_count: number;
 }
 
 interface LoginResponse {

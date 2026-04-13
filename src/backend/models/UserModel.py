@@ -8,14 +8,16 @@ class UserModel:
                  created_at: Optional[datetime] = None,
                  last_login: Optional[datetime] = None,
                  notifications_enabled: bool = True,
-                 donation_modal_enabled: bool = True):
+                 donation_modal_enabled: bool = True,
+                 is_active: bool = True):
         self.id = id
         self.username = username
         self.password_hash = password_hash
         self.created_at = created_at
         self.last_login = last_login
-        self.notifications_enabled = notifications_enabled,
+        self.notifications_enabled = notifications_enabled
         self.donation_modal_enabled = donation_modal_enabled
+        self.is_active = is_active
     
     @staticmethod
     def from_row(row: dict) -> 'UserModel':
@@ -30,6 +32,7 @@ class UserModel:
             last_login=row.get('last_login'),
             notifications_enabled=bool(row.get('notifications_enabled', 1)),
             donation_modal_enabled=bool(row.get('donation_modal_enabled', 1)),
+            is_active=bool(row.get('is_active', 1)),
         )
     
     def to_dict(self) -> dict:
@@ -47,4 +50,5 @@ class UserModel:
             'last_login': format_datetime(self.last_login),
             'notifications_enabled': self.notifications_enabled,
             'donation_modal_enabled': self.donation_modal_enabled,
+            'is_active': self.is_active,
         }

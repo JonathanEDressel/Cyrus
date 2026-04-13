@@ -1,7 +1,7 @@
 from flask import Blueprint, request
 from controllers.AutomationDbContext import AutomationDbContext
 from controllers.ExchangeConnectionDbContext import ExchangeConnectionDbContext
-from helper.Security import token_required
+from helper.Security import token_required, active_required
 from helper.ErrorHandler import handle_error, bad_request, not_found
 from helper.Helper import success_response, created_response
 from helper.ExchangeRegistry import get_minimum_withdrawal, get_all_minimums
@@ -14,6 +14,7 @@ VALID_ACTION_TYPES = ['withdraw_crypto', 'convert_crypto']
 
 @automation_bp.route('/rules', methods=['GET'])
 @token_required
+@active_required
 def get_rules():
     try:
         rules = AutomationDbContext.get_rules_by_user(request.user_id)
@@ -24,6 +25,7 @@ def get_rules():
 
 @automation_bp.route('/rules', methods=['POST'])
 @token_required
+@active_required
 def create_rule():
     try:
         data = request.get_json()
@@ -176,6 +178,7 @@ def create_rule():
 
 @automation_bp.route('/rules/<int:rule_id>', methods=['GET'])
 @token_required
+@active_required
 def get_rule(rule_id):
     try:
         rule = AutomationDbContext.get_rule_by_id(rule_id, request.user_id)
@@ -188,6 +191,7 @@ def get_rule(rule_id):
 
 @automation_bp.route('/rules/<int:rule_id>/toggle', methods=['PUT'])
 @token_required
+@active_required
 def toggle_rule(rule_id):
     try:
         rule = AutomationDbContext.get_rule_by_id(rule_id, request.user_id)
@@ -206,6 +210,7 @@ def toggle_rule(rule_id):
 
 @automation_bp.route('/rules/<int:rule_id>', methods=['DELETE'])
 @token_required
+@active_required
 def delete_rule(rule_id):
     try:
         rule = AutomationDbContext.get_rule_by_id(rule_id, request.user_id)
@@ -221,6 +226,7 @@ def delete_rule(rule_id):
 
 @automation_bp.route('/withdrawal-minimums', methods=['GET'])
 @token_required
+@active_required
 def get_withdrawal_minimums():
     try:
         exchange_name = request.args.get('exchange', 'kraken').strip().lower()
@@ -232,6 +238,7 @@ def get_withdrawal_minimums():
 
 @automation_bp.route('/logs', methods=['GET'])
 @token_required
+@active_required
 def get_logs():
     try:
         limit = request.args.get('limit', 50, type=int)
@@ -244,6 +251,7 @@ def get_logs():
 
 @automation_bp.route('/rules/<int:rule_id>/logs', methods=['GET'])
 @token_required
+@active_required
 def get_rule_logs(rule_id):
     try:
         rule = AutomationDbContext.get_rule_by_id(rule_id, request.user_id)

@@ -1,0 +1,45 @@
+<!-- Accounts partial — loaded into #app-content by the router -->
+  <main class="auth-container">
+    <div class="auth-card wide">
+      <div class="auth-logo">
+        <img src="assets/images/cyrus-logo.png" alt="Logo" onerror="this.style.display='none'"/>
+      </div>
+
+      <h2 class="auth-title">All Accounts</h2>
+      <p class="auth-subtitle mb-3" style="color: white;">Manage local accounts</p>
+
+      <div class="alert alert-warning d-none" role="alert" id="error-alert">
+        <span id="error-message"></span>
+      </div>
+
+      <div id="accounts-loading" class="text-center mb-3" style="color: #64748b;">
+        <i class="fa-solid fa-spinner fa-spin me-2"></i> Loading accounts...
+      </div>
+
+      <div id="accounts-empty" class="d-none text-center mb-3" style="color: #64748b;">
+        <i class="fa-solid fa-users-slash me-2"></i> No accounts found. Create one to get started.
+      </div>
+
+      <div id="accounts-table-wrapper" class="d-none">
+        <table class="accounts-table">
+          <thead>
+            <tr>
+              <th>Username</th>
+              <th>Commands</th>
+              <th>Created</th>
+              <th>Active</th>
+            </tr>
+          </thead>
+          <tbody id="accounts-list">
+          </tbody>
+        </table>
+      </div>
+
+      <div class="form-actions mt-4">
+        <button type="button" class="btn btn-outline btn-full" id="back-to-login-btn">
+          <i class="fa-solid fa-arrow-left me-2"></i>
+          Back to Sign In
+        </button>
+      </div>
+    </div>
+  </main>

@@ -34,3 +34,10 @@ def not_found(message="Not found"):
         "success": False,
         "result": message
     }), 404
+
+
+def forbidden(message="Forbidden"):
+    return jsonify({
+        "success": False,
+        "result": message
+    }), 403

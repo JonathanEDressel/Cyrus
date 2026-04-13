@@ -2,7 +2,7 @@ from flask import Blueprint, request
 from controllers.AuthDbContext import AuthDbContext
 from controllers.ExchangeConnectionDbContext import ExchangeConnectionDbContext
 from helper.Security import hash_password, verify_password, generate_token
-from helper.ErrorHandler import handle_error, bad_request
+from helper.ErrorHandler import handle_error, bad_request, not_found
 from helper.Helper import success_response, created_response
 
 auth_bp = Blueprint('auth', __name__)
@@ -96,5 +96,42 @@ def login():
             message="Login successful"
         )
         
+    except Exception as e:
+        return handle_error(e)
+
+
+@auth_bp.route('/accounts', methods=['GET'])
+def get_accounts():
+    try:
+        accounts = AuthDbContext.get_all_accounts()
+        return success_response(data=[
+            {
+                'id': a['id'],
+                'username': a['username'],
+                'created_at': a['created_at'],
+                'is_active': bool(a['is_active']),
+                'command_count': a['command_count'],
+            }
+            for a in accounts
+        ])
+    except Exception as e:
+        return handle_error(e)
+
+
+@auth_bp.route('/accounts/<int:user_id>/toggle-active', methods=['PUT'])
+def toggle_account_active(user_id):
+    try:
+        updated = AuthDbContext.toggle_user_active(user_id)
+        if not updated:
+            return not_found("Account not found")
+        return success_response(
+            data={
+                'id': updated['id'],
+                'username': updated['username'],
+                'created_at': updated['created_at'],
+                'is_active': bool(updated['is_active']),
+            },
+            message="Account status updated"
+        )
     except Exception as e:
         return handle_error(e)

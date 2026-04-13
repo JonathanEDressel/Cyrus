@@ -54,6 +54,7 @@ class AutomationWorker:
     
     def _poll_cycle(self):
         from controllers.AutomationDbContext import AutomationDbContext
+        from controllers.AuthDbContext import AuthDbContext
         from controllers.ExchangeConnectionDbContext import ExchangeConnectionDbContext
         from helper.ExchangeRegistry import get_user_exchange, get_connection_row, get_minimum_withdrawal
         from helper.ExchangeClient import get_open_orders, get_closed_orders, get_balance, withdraw, convert
@@ -66,6 +67,9 @@ class AutomationWorker:
         for user_id in user_ids:
             if self._stop_event.is_set():
                 return
+
+            if not AuthDbContext.is_user_active(user_id):
+                continue
             
             try:
                 self._process_user(user_id, AutomationDbContext, ExchangeConnectionDbContext,
