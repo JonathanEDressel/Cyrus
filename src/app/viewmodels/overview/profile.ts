@@ -29,6 +29,11 @@ class ProfileController {
       this.saveDonationModal(enabled);
     });
 
+    document.getElementById('theme-toggle')?.addEventListener('change', (e) => {
+      const isDark = (e.target as HTMLInputElement).checked;
+      this.saveTheme(isDark ? 'dark' : 'light');
+    });
+
     document.getElementById('new-exchange-name')?.addEventListener('change', () => {
       const select = document.getElementById('new-exchange-name') as HTMLSelectElement;
       const exchange = this.supportedExchanges.find(e => e.id === select.value);
@@ -55,6 +60,8 @@ class ProfileController {
       if (notifToggle) notifToggle.checked = user.notifications_enabled !== false;
       const notifModalToggle = document.getElementById('donation-modal-toggle') as HTMLInputElement;  
       if (notifModalToggle) notifModalToggle.checked = user.donation_modal_enabled !== false;
+      const themeToggle = document.getElementById('theme-toggle') as HTMLInputElement;
+      if (themeToggle) themeToggle.checked = user.theme !== 'light';
       NotificationService.setEnabled(user.notifications_enabled !== false);
     } catch (error: any) {
       this.showError('username', error.message || 'Failed to load profile');
@@ -255,6 +262,20 @@ class ProfileController {
         this.showError('donation-modal', error.message || 'Failed to save donation modal preference');
       const toggle = document.getElementById('donation-modal-toggle') as HTMLInputElement;
       if (toggle) toggle.checked = !enabled;
+    }
+  }
+
+  private async saveTheme(theme: string): Promise<void> {
+    try {
+      applyTheme(theme);
+      await UserController.updateTheme(theme);
+      this.showSuccess('notifications', `Theme switched to ${theme} mode`);
+    } catch (error: any) {
+      this.showError('notifications', error.message || 'Failed to save theme preference');
+      const revert = theme === 'dark' ? 'light' : 'dark';
+      applyTheme(revert);
+      const toggle = document.getElementById('theme-toggle') as HTMLInputElement;
+      if (toggle) toggle.checked = revert === 'dark';
     }
   }
 

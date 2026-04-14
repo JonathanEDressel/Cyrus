@@ -131,6 +131,22 @@ def update_donation_modal():
     except Exception as e:
         return handle_error(e)
 
+@user_bp.route('/update-theme', methods=['PUT'])
+@token_required
+def update_theme():
+    try:
+        data = request.get_json()
+        if data is None or 'theme' not in data:
+            return bad_request("theme is required")
+        theme = data['theme']
+        if theme not in ('dark', 'light'):
+            return bad_request("theme must be 'dark' or 'light'")
+        UserDbContext.update_theme(request.user_id, theme)
+        user = UserDbContext.get_user_by_id(request.user_id)
+        return success_response(data=user.to_dict(), message="Theme preference saved")
+    except Exception as e:
+        return handle_error(e)
+
 @user_bp.route('/delete', methods=['DELETE'])
 @token_required
 def delete_account():

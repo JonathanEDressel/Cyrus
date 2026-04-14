@@ -1,3 +1,8 @@
+function applyTheme(theme: string): void {
+  document.body.classList.remove('theme-dark', 'theme-light');
+  document.body.classList.add(theme === 'light' ? 'theme-light' : 'theme-dark');
+}
+
 (async function () {
   router.register('login', {
     view: 'app/views/login.html',
@@ -97,6 +102,14 @@
     if (!tokenValid) {
       router.navigate('login');
     } else {
+      // Apply saved theme preference
+      try {
+        const user = await UserController.getProfile();
+        applyTheme(user.theme || 'dark');
+      } catch {
+        applyTheme('dark');
+      }
+
       ApiKeyWarning.init();
       UserController.refreshKeyStatus().then(async () => {
         if (ApiKeyState.status === 'valid') {

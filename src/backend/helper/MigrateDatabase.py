@@ -157,6 +157,11 @@ def run_column_migrations():
             conn.execute('ALTER TABLE users ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1')
             conn.commit()
             print("[MIGRATION] Added is_active column to users")
+
+        if not _has_column(conn, 'users', 'theme'):
+            conn.execute("ALTER TABLE users ADD COLUMN theme TEXT NOT NULL DEFAULT 'dark'")
+            conn.commit()
+            print("[MIGRATION] Added theme column to users")
     except Exception as e:
         conn.rollback()
         print(f"[MIGRATION ERROR] Column migration failed: {e}")

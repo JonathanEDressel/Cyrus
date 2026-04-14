@@ -55,3 +55,11 @@ class UserDbContext:
             (1 if enabled else 0, user_id)
         )
         return True
+
+    @staticmethod
+    def update_theme(user_id: int, theme: str) -> bool:
+        execute_non_query(
+            'UPDATE users SET theme = ? WHERE id = ?',
+            (theme, user_id)
+        )
+        return True

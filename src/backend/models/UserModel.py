@@ -9,7 +9,8 @@ class UserModel:
                  last_login: Optional[datetime] = None,
                  notifications_enabled: bool = True,
                  donation_modal_enabled: bool = True,
-                 is_active: bool = True):
+                 is_active: bool = True,
+                 theme: str = 'dark'):
         self.id = id
         self.username = username
         self.password_hash = password_hash
@@ -18,6 +19,7 @@ class UserModel:
         self.notifications_enabled = notifications_enabled
         self.donation_modal_enabled = donation_modal_enabled
         self.is_active = is_active
+        self.theme = theme
     
     @staticmethod
     def from_row(row: dict) -> 'UserModel':
@@ -33,6 +35,7 @@ class UserModel:
             notifications_enabled=bool(row.get('notifications_enabled', 1)),
             donation_modal_enabled=bool(row.get('donation_modal_enabled', 1)),
             is_active=bool(row.get('is_active', 1)),
+            theme=row.get('theme', 'dark'),
         )
     
     def to_dict(self) -> dict:
@@ -51,4 +54,5 @@ class UserModel:
             'notifications_enabled': self.notifications_enabled,
             'donation_modal_enabled': self.donation_modal_enabled,
             'is_active': self.is_active,
+            'theme': self.theme,
         }

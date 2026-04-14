@@ -17,6 +17,7 @@ interface UserModel {
   notifications_enabled: boolean;
   donation_modal_enabled: boolean;
   is_active: boolean;
+  theme: 'dark' | 'light';
   exchange_connections: ExchangeConnection[];
   has_validated_connection: boolean;
 }

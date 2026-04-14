@@ -1,6 +1,6 @@
 .auto-refresh-label {
   font-size: 0.8rem;
-  color: #64748b;
+  color: var(--text-dim);
   font-weight: 400;
 }
 
@@ -19,7 +19,7 @@
 .address-cell {
   font-family: 'Courier New', monospace;
   font-size: 0.85rem;
-  color: #cbd5e1;
+  color: var(--text-tertiary);
   word-break: break-all;
 }
 

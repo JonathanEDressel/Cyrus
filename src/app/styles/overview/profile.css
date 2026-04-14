@@ -1,3 +1,7 @@
+.subsection-title {
+  color: var(--text-primary);
+}
+
 .profile-sections {
   display: flex;
   flex-direction: column;
@@ -18,13 +22,13 @@
 }
 
 .setting-toggle-title {
-  color: #f1f5f9;
+  color: var(--text-primary);
   font-weight: 600;
   font-size: 0.95rem;
 }
 
 .setting-toggle-desc {
-  color: whitesmoke;
+  color: var(--text-secondary);
   font-size: 0.82rem;
 }
 
@@ -47,7 +51,7 @@
 .toggle-slider {
   position: absolute;
   inset: 0;
-  background: #334155;
+  background: var(--border-primary);
   border-radius: 999px;
   transition: background 0.2s;
 }
@@ -59,7 +63,7 @@
   width: 20px;
   left: 3px;
   top: 3px;
-  background: #94a3b8;
+  background: var(--text-muted);
   border-radius: 50%;
   transition: transform 0.2s, background 0.2s;
 }
@@ -70,7 +74,7 @@
 
 .toggle-switch input:checked + .toggle-slider::before {
   transform: translateX(22px);
-  background: #06b6d4;
+  background: var(--accent-cyan);
 }
 
 .profile-section {
@@ -78,18 +82,18 @@
 }
 
 .profile-card {
-  background: #1e293b;
-  border: 1px solid #334155;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
   border-radius: 12px;
   padding: 1.5rem;
 }
 
 .text-muted {
-  color: whitesmoke;
+  color: var(--text-muted);
 }
 
 .form-text {
-  color: whitesmoke;
+  color: var(--text-muted);
 }
 
 .profile-card .form-group {
@@ -99,7 +103,7 @@
 .profile-card .form-label {
   display: block;
   font-weight: 600;
-  color: #94a3b8;
+  color: var(--text-muted);
   margin-bottom: 0.5rem;
   font-size: 0.85rem;
   text-transform: uppercase;
@@ -110,22 +114,22 @@
   width: 100%;
   padding: 0.75rem 1rem;
   font-size: 0.95rem;
-  border: 1px solid #334155;
+  border: 1px solid var(--border-primary);
   border-radius: 8px;
-  background: #0f172a;
-  color: #f1f5f9;
+  background: var(--input-bg);
+  color: var(--text-primary);
   box-sizing: border-box;
   transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 .profile-card .form-control:focus {
   outline: none;
-  border-color: #06b6d4;
+  border-color: var(--accent-cyan);
   box-shadow: 0 0 0 2px rgba(6, 182, 212, 0.15);
 }
 
 .profile-card .form-control::placeholder {
-  color: #475569;
+  color: var(--text-dimmer);
 }
 
 .profile-card .btn {
@@ -142,24 +146,24 @@
 }
 
 .profile-card .btn.btn-primary {
-  background: #06b6d4;
+  background: var(--accent-cyan);
   color: #fff;
 }
 
 .profile-card .btn.btn-primary:hover {
-  background: #0891b2;
+  background: var(--accent-cyan-hover);
   transform: translateY(-1px);
 }
 
 .profile-card .btn.btn-secondary {
-  background: #334155;
-  color: #94a3b8;
+  background: var(--border-primary);
+  color: var(--text-muted);
   margin-left: 0.5rem;
 }
 
 .profile-card .btn.btn-secondary:hover {
-  background: #475569;
-  color: #f1f5f9;
+  background: var(--text-dimmer);
+  color: var(--text-primary);
   transform: translateY(-1px);
 }
 
@@ -179,5 +183,5 @@
 }
 
 .connection-label {
-  color: white;
+  color: var(--text-primary);
 }

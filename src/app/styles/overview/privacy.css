@@ -10,7 +10,7 @@
   border-radius: 12px;
   padding: 1.25rem 1.5rem;
   margin-bottom: 2rem;
-  color: #e2e8f0;
+  color: var(--text-secondary);
   font-size: 0.95rem;
   line-height: 1.65;
 }
@@ -21,7 +21,7 @@
   height: 40px;
   border-radius: 10px;
   background: rgba(6, 182, 212, 0.12);
-  color: #06b6d4;
+  color: var(--accent-cyan);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -29,7 +29,7 @@
 }
 
 .privacy-banner-body strong {
-  color: #06b6d4;
+  color: var(--accent-cyan);
   display: block;
   margin-bottom: 0.35rem;
   font-size: 1rem;
@@ -44,15 +44,15 @@
 
 /* Cards */
 .privacy-card {
-  background: #1e293b;
-  border: 1px solid #334155;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
   border-radius: 12px;
   padding: 1.5rem;
   transition: border-color 0.2s;
 }
 
 .privacy-card:hover {
-  border-color: #475569;
+  border-color: var(--text-dimmer);
 }
 
 .privacy-card-header {
@@ -64,7 +64,7 @@
 }
 
 .privacy-card-icon {
-  color: #06b6d4;
+  color: var(--accent-cyan);
   font-size: 1.1rem;
   width: 20px;
   text-align: center;
@@ -74,13 +74,13 @@
 .privacy-card-title {
   font-size: 1rem;
   font-weight: 700;
-  color: #f1f5f9;
+  color: var(--text-primary);
   margin: 0;
   flex: 1;
 }
 
 .privacy-card-body {
-  color: #94a3b8;
+  color: var(--text-muted);
   font-size: 0.9rem;
   line-height: 1.7;
   margin: 0 0 0.75rem 0;
@@ -95,7 +95,7 @@
   font-family: 'Courier New', monospace;
   font-size: 0.82rem;
   background: rgba(15, 23, 42, 0.7);
-  border: 1px solid #334155;
+  border: 1px solid var(--border-primary);
   border-radius: 4px;
   padding: 0.1em 0.4em;
   color: #67e8f9;
@@ -153,17 +153,17 @@
   align-items: flex-start;
   gap: 0.65rem;
   font-size: 0.875rem;
-  color: #94a3b8;
+  color: var(--text-muted);
   line-height: 1.6;
 }
 
 .privacy-list li strong {
-  color: #cbd5e1;
+  color: var(--text-tertiary);
 }
 
 /* check / arrow / x icons */
 .privacy-list-icon {
-  color: #06b6d4;
+  color: var(--accent-cyan);
   font-size: 0.8rem;
   margin-top: 0.2rem;
   flex-shrink: 0;
@@ -172,7 +172,7 @@
 }
 
 .privacy-list-icon-sm {
-  color: #475569;
+  color: var(--text-dimmer);
   font-size: 0.7rem;
   margin-top: 0.3rem;
   flex-shrink: 0;
@@ -193,7 +193,7 @@
 .privacy-filepath {
   margin: 1rem 0 0 0;
   font-size: 0.82rem;
-  color: #64748b;
+  color: var(--text-dim);
   display: flex;
   align-items: center;
   gap: 0.25rem;

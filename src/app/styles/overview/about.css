@@ -18,7 +18,7 @@
   height: 48px;
   border-radius: 12px;
   background: rgba(99, 102, 241, 0.14);
-  color: #818cf8;
+  color: var(--accent-purple-light);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -28,7 +28,7 @@
 .about-verse-text {
   font-size: 1.2rem;
   font-style: italic;
-  color: #e2e8f0;
+  color: var(--text-secondary);
   margin: 0 0 0.35rem 0;
   line-height: 1.55;
   font-weight: 500;
@@ -36,7 +36,7 @@
 
 .about-verse-ref {
   font-size: 0.85rem;
-  color: #818cf8;
+  color: var(--accent-purple-light);
   font-weight: 600;
   letter-spacing: 0.3px;
 }
@@ -63,20 +63,24 @@
 
 /* Cards */
 .about-card {
-  background: #1e293b;
-  border: 1px solid #334155;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
   border-radius: 12px;
   padding: 1.5rem;
   transition: border-color 0.2s;
 }
 
 .about-card:hover {
-  border-color: #475569;
+  border-color: var(--text-dimmer);
 }
 
 .about-card-featured {
-  background: linear-gradient(135deg, #1e293b 0%, #1a2744 100%);
+  background: linear-gradient(135deg, var(--bg-secondary) 0%, #1a2744 100%);
   border-color: rgba(99, 102, 241, 0.25);
+}
+
+body.theme-light .about-card-featured {
+  background: linear-gradient(135deg, #ffffff 0%, #eef2ff 100%);
 }
 
 .about-card-featured:hover {
@@ -96,7 +100,7 @@
   height: 36px;
   border-radius: 9px;
   background: rgba(99, 102, 241, 0.12);
-  color: #818cf8;
+  color: var(--accent-purple-light);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -106,19 +110,19 @@
 .about-card-title {
   font-size: 1.05rem;
   font-weight: 700;
-  color: #f1f5f9;
+  color: var(--text-primary);
   margin: 0;
 }
 
 .about-card-body {
-  color: #94a3b8;
+  color: var(--text-muted);
   font-size: 0.93rem;
   line-height: 1.7;
   margin: 0;
 }
 
 .about-card-body em {
-  color: #e2e8f0;
+  color: var(--text-secondary);
   font-style: italic;
 }
 
@@ -144,7 +148,7 @@
   height: 32px;
   border-radius: 8px;
   background: rgba(6, 182, 212, 0.1);
-  color: #06b6d4;
+  color: var(--accent-cyan);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -154,14 +158,14 @@
 
 .about-values-list strong {
   display: block;
-  color: #e2e8f0;
+  color: var(--text-secondary);
   font-size: 0.9rem;
   margin-bottom: 0.2rem;
 }
 
 .about-values-list p {
   margin: 0;
-  color: #64748b;
+  color: var(--text-dim);
   font-size: 0.85rem;
   line-height: 1.55;
 }
@@ -181,18 +185,18 @@
 .about-closing-cross {
   flex-shrink: 0;
   font-size: 1.5rem;
-  color: #06b6d4;
+  color: var(--accent-cyan);
   margin-top: 0.15rem;
   opacity: 0.9;
 }
 
 .about-closing p {
   margin: 0;
-  color: #94a3b8;
+  color: var(--text-muted);
   font-size: 0.95rem;
   line-height: 1.7;
 }
 
 .about-closing strong {
-  color: #e2e8f0;
+  color: var(--text-secondary);
 }

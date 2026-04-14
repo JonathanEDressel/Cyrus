@@ -1,6 +1,6 @@
 .auto-refresh-label {
   font-size: 0.8rem;
-  color: #64748b;
+  color: var(--text-dim);
   font-weight: 400;
 }
 
@@ -36,7 +36,7 @@
 .order-id-cell {
   font-family: 'Courier New', monospace;
   font-size: 0.75rem;
-  color: #94a3b8;
+  color: var(--text-muted);
   max-width: 150px;
   overflow: hidden;
   text-overflow: ellipsis;

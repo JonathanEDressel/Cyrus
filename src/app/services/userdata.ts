@@ -51,4 +51,12 @@ class UserData {
       token
     );
   }
+
+  static async updateTheme(theme: string, token: string): Promise<ApiResponse<UserModel>> {
+    return DataAccess.put(
+      `${AppConfig.API_BASE}/user/update-theme`,
+      { theme },
+      token
+    );
+  }
 }

@@ -1,5 +1,62 @@
 @import url('login.css');
 
+/* ── Theme Variables ────────────────────────────────────── */
+:root {
+  --bg-primary: #0f172a;
+  --bg-secondary: #1e293b;
+  --bg-tertiary: #334155;
+  --border-primary: #334155;
+  --border-secondary: #1e293b;
+  --text-primary: #f1f5f9;
+  --text-secondary: #e2e8f0;
+  --text-tertiary: #cbd5e1;
+  --text-muted: #94a3b8;
+  --text-dim: #64748b;
+  --text-dimmer: #475569;
+  --accent-cyan: #06b6d4;
+  --accent-cyan-hover: #0891b2;
+  --accent-cyan-light: #22d3ee;
+  --accent-purple: #6366f1;
+  --accent-purple-light: #818cf8;
+  --accent-purple-dim: #a5b4fc;
+  --scrollbar-track: #0f172a;
+  --scrollbar-thumb: linear-gradient(180deg, #475569, #334155);
+  --scrollbar-thumb-hover: linear-gradient(180deg, #64748b, #475569);
+  --hover-overlay: rgba(255, 255, 255, 0.06);
+  --input-bg: #0f172a;
+  --shadow-heavy: rgba(0, 0, 0, 0.5);
+  --shadow-medium: rgba(0, 0, 0, 0.4);
+  --shadow-light: rgba(0, 0, 0, 0.3);
+}
+
+body.theme-light {
+  --bg-primary: #f1f5f9;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #e2e8f0;
+  --border-primary: #cbd5e1;
+  --border-secondary: #e2e8f0;
+  --text-primary: #0f172a;
+  --text-secondary: #1e293b;
+  --text-tertiary: #334155;
+  --text-muted: #64748b;
+  --text-dim: #94a3b8;
+  --text-dimmer: #cbd5e1;
+  --accent-cyan: #0891b2;
+  --accent-cyan-hover: #0e7490;
+  --accent-cyan-light: #06b6d4;
+  --accent-purple: #4f46e5;
+  --accent-purple-light: #6366f1;
+  --accent-purple-dim: #818cf8;
+  --scrollbar-track: #e2e8f0;
+  --scrollbar-thumb: linear-gradient(180deg, #94a3b8, #cbd5e1);
+  --scrollbar-thumb-hover: linear-gradient(180deg, #64748b, #94a3b8);
+  --hover-overlay: rgba(0, 0, 0, 0.05);
+  --input-bg: #f8fafc;
+  --shadow-heavy: rgba(0, 0, 0, 0.12);
+  --shadow-medium: rgba(0, 0, 0, 0.08);
+  --shadow-light: rgba(0, 0, 0, 0.05);
+}
+
 .d-none { display: none !important; }
 
 /* ── Help Tooltip Component ─────────────────────────────── */
@@ -20,7 +77,7 @@
   border-radius: 50%;
   background: rgba(99, 102, 241, 0.15);
   border: 1px solid rgba(99, 102, 241, 0.35);
-  color: #818cf8;
+  color: var(--accent-purple-light);
   font-size: 0.6rem;
   font-weight: 700;
   cursor: pointer;
@@ -31,8 +88,8 @@
 
 .help-icon:hover {
   background: rgba(99, 102, 241, 0.25);
-  border-color: #6366f1;
-  color: #a5b4fc;
+  border-color: var(--accent-purple);
+  color: var(--accent-purple-dim);
 }
 
 .help-dropdown {
@@ -44,11 +101,11 @@
   min-width: 220px;
   max-width: 300px;
   padding: 0.65rem 0.85rem;
-  background: #1e293b;
-  border: 1px solid #334155;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
   border-radius: 8px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-  color: #cbd5e1;
+  box-shadow: 0 8px 24px var(--shadow-medium);
+  color: var(--text-tertiary);
   font-size: 0.8rem;
   font-weight: 400;
   line-height: 1.5;
@@ -66,9 +123,9 @@
   transform: translateX(-50%) rotate(45deg);
   width: 8px;
   height: 8px;
-  background: #1e293b;
-  border-top: 1px solid #334155;
-  border-left: 1px solid #334155;
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--border-primary);
+  border-left: 1px solid var(--border-primary);
 }
 
 .help-dropdown.open {
@@ -88,20 +145,20 @@
 }
 
 ::-webkit-scrollbar-track {
-  background: #0f172a;
+  background: var(--bg-primary);
   border-radius: 999px;
   margin: 2px;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, #475569, #334155);
+  background: var(--scrollbar-thumb);
   border-radius: 999px;
-  border: 2px solid #0f172a;
+  border: 2px solid var(--bg-primary);
   transition: background 0.25s ease;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, #6366f1, #4f46e5);
+  background: var(--scrollbar-thumb-hover);
 }
 
 ::-webkit-scrollbar-thumb:active {
@@ -109,13 +166,13 @@
 }
 
 ::-webkit-scrollbar-corner {
-  background: #0f172a;
+  background: var(--bg-primary);
 }
 
 /* Firefox scrollbar (experimental) */
 * {
   scrollbar-width: thin;
-  scrollbar-color: #334155 #0f172a;
+  scrollbar-color: var(--border-primary) var(--bg-primary);
 }
 
 .app-sidebar {
@@ -124,8 +181,8 @@
   left: 0;
   bottom: 0;
   width: 220px;
-  background: #0f172a;
-  border-right: 1px solid #1e293b;
+  background: var(--bg-primary);
+  border-right: 1px solid var(--border-secondary);
   z-index: 100;
   overflow-y: none;
 }
@@ -142,7 +199,7 @@
   align-items: center;
   gap: 0.75rem;
   padding-bottom: 0.5rem;
-  border-bottom: 1px solid #1e293b;
+  border-bottom: 1px solid var(--border-secondary);
 }
 
 .header-logo img {
@@ -165,7 +222,7 @@
 .header-brand {
   font-size: 1.25rem;
   font-weight: 700;
-  color: #06b6d4;
+  color: var(--accent-cyan);
   letter-spacing: -0.5px;
 }
 
@@ -178,7 +235,7 @@
 }
 
 .header-nav a {
-  color: #94a3b8;
+  color: var(--text-muted);
   text-decoration: none;
   font-size: 0.9rem;
   font-weight: 500;
@@ -193,8 +250,8 @@
 
 .header-nav a:hover,
 .header-nav a.active {
-  color: #fff;
-  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-primary);
+  background: var(--hover-overlay);
 }
 
 /* Rule Summary */
@@ -210,14 +267,14 @@
 }
 
 .rule-summary i {
-  color: #818cf8;
+  color: var(--accent-purple-light);
   font-size: 1.25rem;
   margin-top: 0.1rem;
   flex-shrink: 0;
 }
 
 .rule-summary-text {
-  color: #e2e8f0;
+  color: var(--text-secondary);
   font-size: 0.95rem;
   line-height: 1.6;
   flex: 1;
@@ -231,9 +288,9 @@
 }
 
 .exchange-selector {
-  background: #1e293b;
-  color: #e2e8f0;
-  border: 1px solid #334155;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-primary);
   border-radius: 8px;
   padding: 0.4rem 0.6rem;
   font-size: 0.85rem;
@@ -250,12 +307,12 @@
 
 .exchange-selector:hover,
 .exchange-selector:focus {
-  border-color: #06b6d4;
+  border-color: var(--accent-cyan);
 }
 
 .exchange-selector option {
-  background: #1e293b;
-  color: #e2e8f0;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
 }
 
 /* Exchange badges used in tables when "All" mode is active */
@@ -267,8 +324,8 @@
   font-weight: 600;
   letter-spacing: 0.3px;
   white-space: nowrap;
-  background: #334155;
-  color: #e2e8f0;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
 }
 
 .exchange-kraken {
@@ -291,9 +348,9 @@
 
 .header-user-btn {
   background: none;
-  border: 1px solid #334155;
+  border: 1px solid var(--border-primary);
   border-radius: 8px;
-  color: #cbd5e1;
+  color: var(--text-tertiary);
   padding: 0.4rem 0.75rem;
   font-size: 0.85rem;
   cursor: pointer;
@@ -301,8 +358,8 @@
 }
 
 .header-user-btn:hover {
-  border-color: #06b6d4;
-  color: #06b6d4;
+  border-color: var(--accent-cyan);
+  color: var(--accent-cyan);
 }
 
 #app-content {
@@ -322,8 +379,8 @@
   right: 0;
   height: 48px;
   z-index: 90;
-  background: #0f172a;
-  border-bottom: 1px solid #1e293b;
+  background: var(--bg-primary);
+  border-bottom: 1px solid var(--border-secondary);
   display: flex;
   flex-direction: row;
   align-items: center;
@@ -334,7 +391,7 @@
 .exchange-panel-label {
   font-size: 0.75rem;
   font-weight: 700;
-  color: whitesmoke;
+  color: var(--text-primary);
   text-transform: uppercase;
   letter-spacing: 0.6px;
 }
@@ -355,7 +412,7 @@
   align-items: center;
   gap: 0.6rem;
   font-size: 0.82rem;
-  color: #94a3b8;
+  color: var(--text-muted);
   opacity: 0;
   transform: translateY(6px);
   transition: opacity 0.4s ease, transform 0.4s ease;
@@ -397,7 +454,7 @@
 
 .affiliate-ticker-label {
   font-weight: 600;
-  color: #cbd5e1;
+  color: var(--text-tertiary);
 }
 
 .affiliate-ticker-sep {
@@ -412,7 +469,7 @@
 
 .affiliate-ticker-link {
   flex-shrink: 0;
-  color: #06b6d4;
+  color: var(--accent-cyan);
   text-decoration: none;
   font-weight: 600;
   font-size: 0.78rem;
@@ -424,7 +481,7 @@
 
 .affiliate-ticker-link:hover {
   background: rgba(6, 182, 212, 0.1);
-  color: #22d3ee;
+  color: var(--accent-cyan-light);
 }
 
 /* API Key Warning Banner */
@@ -518,8 +575,8 @@
 }
 
 .app-footer {
-  background: #0f172a;
-  border-top: 1px solid #1e293b;
+  background: var(--bg-primary);
+  border-top: 1px solid var(--border-secondary);
   padding: 1rem 0;
   position: fixed;
   bottom: 0;
@@ -535,7 +592,7 @@
   align-items: center;
   justify-content: space-between;
   font-size: 0.85rem;
-  color: #64748b;
+  color: var(--text-dim);
 }
 
 .footer-links {
@@ -544,7 +601,7 @@
 }
 
 .footer-links a {
-  color: #64748b;
+  color: var(--text-dim);
   text-decoration: none;
   transition: color 0.2s;
 }
@@ -560,7 +617,7 @@
 }
 
 .footer-links a:hover {
-  color: #06b6d4;
+  color: var(--accent-cyan);
 }
 
 .donation-widget {
@@ -574,7 +631,7 @@
   width: 56px;
   height: 56px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%);
+  background: linear-gradient(135deg, var(--accent-cyan) 0%, var(--accent-cyan-hover) 100%);
   border: none;
   color: #fff;
   font-size: 1.5rem;
@@ -606,10 +663,10 @@
   bottom: 72px;
   right: 0;
   width: 380px;
-  background: #1e293b;
-  border: 1px solid #334155;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
   border-radius: 16px;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 10px 40px var(--shadow-heavy);
   overflow: hidden;
   animation: slideInUp 0.3s ease;
   max-height: 700px;
@@ -628,31 +685,31 @@
 }
 
 .donation-header {
-  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+  background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
   padding: 1rem 1.25rem;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-bottom: 1px solid #334155;
+  border-bottom: 1px solid var(--border-primary);
 }
 
 .donation-header h3 {
   margin: 0;
   font-size: 1.1rem;
   font-weight: 600;
-  color: #f1f5f9;
+  color: var(--text-primary);
   display: flex;
   align-items: center;
 }
 
 .donation-header .me-2 {
-  color: #06b6d4;
+  color: var(--accent-cyan);
 }
 
 .donation-close {
   background: none;
   border: none;
-  color: #94a3b8;
+  color: var(--text-muted);
   font-size: 1.25rem;
   cursor: pointer;
   padding: 0;
@@ -666,8 +723,8 @@
 }
 
 .donation-close:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: #f1f5f9;
+  background: var(--hover-overlay);
+  color: var(--text-primary);
 }
 
 .donation-body {
@@ -677,21 +734,25 @@
 .donation-message {
   margin: 0 0 1rem 0;
   font-size: 0.9rem;
-  color: #cbd5e1;
+  color: var(--text-tertiary);
   line-height: 1.5;
+}
+
+.donation-stripe-label {
+  color: var(--text-secondary);
 }
 
 .donation-option {
   margin-bottom: 1rem;
   padding: 0.75rem;
-  background: #0f172a;
-  border: 1px solid #334155;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-primary);
   border-radius: 10px;
   transition: border-color 0.2s;
 }
 
 .donation-option:hover {
-  border-color: #06b6d4;
+  border-color: var(--accent-cyan);
 }
 
 .donation-option:last-child {
@@ -701,7 +762,7 @@
 .donation-label {
   font-size: 0.85rem;
   font-weight: 600;
-  color: #94a3b8;
+  color: var(--text-muted);
   margin-bottom: 0.5rem;
   display: flex;
   align-items: center;
@@ -711,7 +772,7 @@
 }
 
 .donation-label i {
-  color: #06b6d4;
+  color: var(--accent-cyan);
   font-size: 1rem;
 }
 
@@ -724,7 +785,7 @@
 .donation-address {
   flex: 1;
   font-size: 0.8rem;
-  color: #cbd5e1;
+  color: var(--text-tertiary);
   font-family: 'Courier New', monospace;
   word-break: break-all;
   padding: 0.5rem;
@@ -740,7 +801,7 @@
   background: rgba(6, 182, 212, 0.1);
   border: 1px solid rgba(6, 182, 212, 0.2);
   border-radius: 6px;
-  color: #06b6d4;
+  color: var(--accent-cyan);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -751,7 +812,7 @@
 
 .copy-btn:hover {
   background: rgba(6, 182, 212, 0.2);
-  border-color: #06b6d4;
+  border-color: var(--accent-cyan);
   transform: scale(1.05);
 }
 
@@ -761,7 +822,7 @@
 
 .copy-btn.copied {
   background: rgba(6, 182, 212, 0.3);
-  border-color: #06b6d4;
+  border-color: var(--accent-cyan);
 }
 
 .copy-btn.copied i {
@@ -776,7 +837,7 @@
 
 .donation-link {
   display: inline-block;
-  color: #06b6d4;
+  color: var(--accent-cyan);
   text-decoration: none;
   font-weight: 500;
   padding: 0.5rem 0.75rem;
@@ -811,8 +872,8 @@
 /* ── Giving Type Toggle ──────────────────────────────────── */
 .giving-type-toggle {
   display: flex;
-  background: #0f172a;
-  border: 1px solid #334155;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-primary);
   border-radius: 10px;
   padding: 3px;
   gap: 2px;
@@ -825,7 +886,7 @@
   align-items: center;
   gap: 0.75rem;
   margin: 0.25rem 0;
-  color: #475569;
+  color: var(--text-dimmer);
   font-size: 0.75rem;
   font-weight: 500;
   text-transform: uppercase;
@@ -837,14 +898,14 @@
   content: '';
   flex: 1;
   height: 1px;
-  background: #1e293b;
+  background: var(--border-secondary);
 }
 
 .giving-type-btn {
   flex: 1;
   background: none;
   border: none;
-  color: #94a3b8;
+  color: var(--text-muted);
   font-size: 0.8rem;
   font-weight: 600;
   padding: 0.45rem 0;
@@ -855,12 +916,12 @@
 }
 
 .giving-type-btn:hover {
-  color: #e2e8f0;
+  color: var(--text-secondary);
 }
 
 .giving-type-btn.active {
-  background: #1e293b;
-  color: #06b6d4;
+  background: var(--bg-secondary);
+  color: var(--accent-cyan);
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
 }
 
@@ -877,8 +938,8 @@
 
 /* ── Giving Cards ────────────────────────────────────────── */
 .giving-card {
-  background: #0f172a;
-  border: 1px solid #334155;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-primary);
   border-radius: 12px;
   padding: 1rem 1.1rem;
   display: flex;
@@ -909,29 +970,29 @@
 .giving-card--onetime {
   border-color: rgba(99, 102, 241, 0.35);
 }
-.giving-card--onetime:hover { border-color: #6366f1; }
+.giving-card--onetime:hover { border-color: var(--accent-purple); }
 .giving-card--onetime .giving-card-icon {
   background: rgba(99, 102, 241, 0.15);
-  color: #818cf8;
+  color: var(--accent-purple-light);
 }
 .giving-card--onetime .giving-card-name {
   font-size: 1.15rem;
   font-weight: 700;
-  color: #a5b4fc;
+  color: var(--accent-purple-dim);
 }
 .giving-card--onetime .giving-card-price {
   font-size: 1rem;
   font-weight: 600;
-  color: #e2e8f0;
+  color: var(--text-secondary);
 }
 .giving-card--onetime .giving-card-btn {
   background: rgba(99, 102, 241, 0.15);
   border-color: rgba(99, 102, 241, 0.4);
-  color: #818cf8;
+  color: var(--accent-purple-light);
 }
 .giving-card--onetime .giving-card-btn:hover {
   background: rgba(99, 102, 241, 0.28);
-  border-color: #6366f1;
+  border-color: var(--accent-purple);
 }
 
 /* Helper */
@@ -963,25 +1024,25 @@
 .giving-card--hero {
   border-color: rgba(6, 182, 212, 0.35);
 }
-.giving-card--hero:hover { border-color: #06b6d4; }
+.giving-card--hero:hover { border-color: var(--accent-cyan); }
 .giving-card--hero .giving-card-icon {
   background: rgba(6, 182, 212, 0.12);
-  color: #22d3ee;
+  color: var(--accent-cyan-light);
 }
 .giving-card--hero .giving-card-badge {
   background: rgba(6, 182, 212, 0.12);
-  color: #22d3ee;
+  color: var(--accent-cyan-light);
   border: 1px solid rgba(6, 182, 212, 0.3);
 }
-.giving-card--hero .giving-card-price { color: #22d3ee; }
+.giving-card--hero .giving-card-price { color: var(--accent-cyan-light); }
 .giving-card--hero .giving-card-btn {
   background: rgba(6, 182, 212, 0.12);
   border-color: rgba(6, 182, 212, 0.35);
-  color: #22d3ee;
+  color: var(--accent-cyan-light);
 }
 .giving-card--hero .giving-card-btn:hover {
   background: rgba(6, 182, 212, 0.22);
-  border-color: #06b6d4;
+  border-color: var(--accent-cyan);
 }
 
 /* Conqueror */
@@ -1033,7 +1094,7 @@
 
 .giving-card-desc {
   font-size: 0.82rem;
-  color: #94a3b8;
+  color: var(--text-muted);
   line-height: 1.5;
   margin: 0;
 }

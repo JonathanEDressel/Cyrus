@@ -8,15 +8,15 @@
 .commands-exchange-selector-row label {
   font-size: 0.85rem;
   font-weight: 600;
-  color: #94a3b8;
+  color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
 
 .commands-exchange-select {
-  background: #1e293b;
-  color: #e2e8f0;
-  border: 1px solid #334155;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-primary);
   border-radius: 8px;
   padding: 0.5rem 2rem 0.5rem 0.75rem;
   font-size: 0.9rem;
@@ -32,7 +32,7 @@
 
 .commands-exchange-select:hover,
 .commands-exchange-select:focus {
-  border-color: #06b6d4;
+  border-color: var(--accent-cyan);
 }
 
 .rule-form {
@@ -59,7 +59,7 @@
 .form-group label {
   font-size: 0.8rem;
   font-weight: 600;
-  color: #94a3b8;
+  color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -67,10 +67,10 @@
 .form-group input,
 .form-group select {
   padding: 0.6rem 0.8rem;
-  border: 1px solid #334155;
+  border: 1px solid var(--border-primary);
   border-radius: 8px;
-  background: #1e293b;
-  color: #e2e8f0;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
   font-size: 0.9rem;
   transition: border-color 0.2s;
 }
@@ -78,22 +78,22 @@
 .form-group input:focus,
 .form-group select:focus {
   outline: none;
-  border-color: #6366f1;
+  border-color: var(--accent-purple);
 }
 
 .form-group input::placeholder {
-  color: #475569;
+  color: var(--text-dimmer);
 }
 
 .form-hint {
   font-size: 0.75rem;
-  color: #6366f1;
+  color: var(--accent-purple);
   margin-top: 0.15rem;
 }
 
 .form-hint-inline {
   font-size: 0.75rem;
-  color: #94a3b8;
+  color: var(--text-muted);
   font-weight: 400;
 }
 
@@ -117,12 +117,12 @@
   align-items: center;
   gap: 0.4rem;
   font-size: 0.85rem;
-  color: #e2e8f0;
+  color: var(--text-secondary);
   cursor: pointer;
 }
 
 .radio-label input[type="radio"] {
-  accent-color: #6366f1;
+  accent-color: var(--accent-purple);
   cursor: pointer;
 }
 
@@ -252,13 +252,13 @@
   content: '';
   flex: 1;
   height: 1px;
-  background: #334155;
+  background: var(--border-primary);
 }
 
 .form-divider-text {
   font-size: 0.75rem;
   font-weight: 700;
-  color: #6366f1;
+  color: var(--accent-purple);
   letter-spacing: 2px;
 }
 
@@ -273,7 +273,7 @@
   align-items: center;
   gap: 0.5rem;
   padding: 0.65rem 1.5rem;
-  background: #6366f1;
+  background: var(--accent-purple);
   color: #fff;
   border: none;
   border-radius: 8px;
@@ -294,7 +294,7 @@
 
 .rule-name-cell {
   font-weight: 600;
-  color: #e2e8f0;
+  color: var(--text-secondary);
 }
 
 .trigger-cell {
@@ -315,7 +315,7 @@
 .mono-text {
   font-family: 'Courier New', monospace;
   font-size: 0.8rem;
-  color: #94a3b8;
+  color: var(--text-muted);
 }
 
 .action-cell {
@@ -363,17 +363,17 @@
   justify-content: center;
   width: 32px;
   height: 32px;
-  border: 1px solid #334155;
+  border: 1px solid var(--border-primary);
   border-radius: 6px;
   background: transparent;
-  color: #94a3b8;
+  color: var(--text-muted);
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .btn-icon:hover {
-  background: #334155;
-  color: #e2e8f0;
+  background: var(--border-primary);
+  color: var(--text-secondary);
 }
 
 .btn-icon-danger:hover {
@@ -388,7 +388,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 0.82rem;
-  color: #94a3b8;
+  color: var(--text-muted);
 }
 
 .log-status {
@@ -431,7 +431,7 @@
 
 .cooldown-text {
   font-size: 0.72rem;
-  color: #64748b;
+  color: var(--text-dim);
   font-style: italic;
 }
 
@@ -450,22 +450,22 @@
 .cooldown-field input {
   width: 70px;
   padding: 0.6rem 0.8rem;
-  border: 1px solid #334155;
+  border: 1px solid var(--border-primary);
   border-radius: 8px;
-  background: #1e293b;
-  color: #e2e8f0;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
   font-size: 0.9rem;
   transition: border-color 0.2s;
 }
 
 .cooldown-field input:focus {
   outline: none;
-  border-color: #6366f1;
+  border-color: var(--accent-purple);
 }
 
 .cooldown-label {
   font-size: 0.8rem;
-  color: #94a3b8;
+  color: var(--text-muted);
 }
 
 .d-none {
