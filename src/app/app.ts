@@ -87,6 +87,15 @@ function applyTheme(theme: string): void {
     title: 'Privacy',
   });
 
+  router.register('terms', {
+    view: 'app/views/overview/terms.html',
+    viewModel: '../dist/app/viewmodels/overview/terms.js',
+    style: 'app/styles/overview/terms.css',
+    showChrome: true,
+    showExchangeSelector: false,
+    title: 'Terms',
+  });
+
   router.register('about', {
     view: 'app/views/overview/about.html',
     viewModel: '../dist/app/viewmodels/overview/about.js',

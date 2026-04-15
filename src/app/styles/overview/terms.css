@@ -1,0 +1,8 @@
+.terms-link {
+  color: var(--accent);
+  text-decoration: underline;
+  cursor: pointer;
+}
+.terms-link:hover {
+  opacity: 0.8;
+}
