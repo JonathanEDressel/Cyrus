@@ -523,14 +523,14 @@ class HomeController {
 
     tbody.innerHTML = logs.map((l: any) => {
       const time = l.created_at ? new Date(l.created_at.endsWith('Z') ? l.created_at : l.created_at + 'Z').toLocaleString() : '--';
-      const statusClass = l.status === 'success' ? 'log-success' : 'log-error';
+      const statusClass = l.status === 'success' ? 'status-success' : 'status-error';
 
       return `<tr>
         <td>${this.escapeHtml(time)}</td>
         <td>${this.escapeHtml(l.trigger_event)}</td>
         <td>${this.escapeHtml(l.action_executed)}</td>
         <td class="result-cell">${this.formatActionResult(l.action_result, l.status)}</td>
-        <td><span class="log-status ${statusClass}">${this.escapeHtml(l.status)}</span></td>
+        <td><span class="status-badge ${statusClass}">${this.escapeHtml(l.status)}</span></td>
       </tr>`;
     }).join('');
   }
@@ -557,7 +557,7 @@ class HomeController {
         <td><span class="${sideClass}">${this.escapeHtml(o.side)}</span></td>
         <td>${this.escapeHtml(o.price)}</td>
         <td>${this.escapeHtml(o.volume)}</td>
-        <td><span class="status-badge">${this.escapeHtml(o.status)}</span></td>
+        <td><span class="status-badge status-${this.escapeHtml(o.status).toLowerCase().replace(/[^a-z]/g, '')}">${this.escapeHtml(o.status)}</span></td>
       </tr>`;
     }).join('');
   }

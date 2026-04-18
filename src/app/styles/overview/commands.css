@@ -336,10 +336,10 @@
 .status-badge {
   display: inline-block;
   padding: 0.2em 0.6em;
-  font-size: 0.78rem;
+  font-size: 0.75rem;
   font-weight: 600;
-  border-radius: 6px;
-  text-transform: capitalize;
+  border-radius: 4px;
+  text-transform: uppercase;
 }
 
 .status-active {
@@ -391,23 +391,25 @@
   color: var(--text-muted);
 }
 
-.log-status {
-  display: inline-block;
-  padding: 0.2em 0.6em;
-  font-size: 0.75rem;
-  font-weight: 600;
-  border-radius: 4px;
-  text-transform: uppercase;
-}
-
-.log-success {
+.status-success,
+.status-open {
   background: rgba(34, 197, 94, 0.1);
   color: #22c55e;
 }
 
-.log-error {
+.status-error {
   background: rgba(239, 68, 68, 0.1);
   color: #ef4444;
+}
+
+.status-verified {
+  background: rgba(34, 197, 94, 0.1);
+  color: #22c55e;
+}
+
+.status-unverified {
+  background: rgba(100, 116, 139, 0.15);
+  color: #64748b;
 }
 
 .alert-success {

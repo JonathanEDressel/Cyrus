@@ -1003,14 +1003,14 @@ class CommandsController {
 
     tbody.innerHTML = logs.map((l: any) => {
       const time = l.created_at ? new Date(l.created_at.endsWith('Z') ? l.created_at : l.created_at + 'Z').toLocaleString() : '--';
-      const statusClass = l.status === 'success' ? 'log-success' : 'log-error';
+      const statusClass = l.status === 'success' ? 'status-success' : 'status-error';
 
       return `<tr>
         <td>${this.escapeHtml(time)}</td>
         <td>${this.escapeHtml(l.trigger_event)}</td>
         <td>${this.escapeHtml(l.action_executed)}</td>
         <td class="result-cell">${this.escapeHtml(l.action_result)}</td>
-        <td><span class="log-status ${statusClass}">${this.escapeHtml(l.status)}</span></td>
+        <td><span class="status-badge ${statusClass}">${this.escapeHtml(l.status)}</span></td>
       </tr>`;
     }).join('');
   }

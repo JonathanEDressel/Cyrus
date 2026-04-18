@@ -84,7 +84,7 @@ class OpenOrdersController {
         <td>${this.escapeHtml(o.price)}</td>
         <td>${this.escapeHtml(o.volume)}</td>
         <td>${this.escapeHtml(o.filled)}</td>
-        <td><span class="status-badge">${this.escapeHtml(o.status)}</span></td>
+        <td><span class="status-badge status-${this.escapeHtml(o.status).toLowerCase().replace(/[^a-z]/g, '')}">${this.escapeHtml(o.status)}</span></td>
         <td>${this.escapeHtml(opened)}</td>
       </tr>`;
     }).join('');

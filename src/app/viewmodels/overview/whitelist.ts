@@ -80,7 +80,7 @@ class WhitelistController {
         <td class="address-cell">${this.escapeHtml(a.address)}</td>
         <td class="address-cell">${this.escapeHtml(a.nickname_key)}</td>
         <td>${this.escapeHtml(a.method)}</td>
-        <td>${this.escapeHtml(String(a.verified))}</td>
+        <td><span class="status-badge ${a.verified ? 'status-verified' : 'status-unverified'}">${a.verified ? 'Verified' : 'Unverified'}</span></td>
       </tr>`;
     }).join('');
   }
