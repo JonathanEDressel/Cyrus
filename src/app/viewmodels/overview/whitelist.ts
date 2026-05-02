@@ -28,6 +28,15 @@ class WhitelistController {
     const lastUpdated = ExchangeStore.lastUpdated;
     const isAll = ExchangeStore.isAllMode();
 
+    // Show unsupported notice for single Coinbase connection
+    const unsupportedNotice = document.getElementById('addresses-unsupported-notice');
+    if (unsupportedNotice) {
+      const isCoinbaseSingle = !isAll &&
+        typeof ExchangeStore.activeMode === 'number' &&
+        ExchangeStore.connections.find(c => c.id === ExchangeStore.activeMode)?.exchange_name === 'coinbase';
+      unsupportedNotice.classList.toggle('d-none', !isCoinbaseSingle);
+    }
+
     // Update subtitle
     const subtitle = document.getElementById('page-subtitle');
     if (subtitle) {

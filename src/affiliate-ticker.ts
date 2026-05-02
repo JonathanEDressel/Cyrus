@@ -8,20 +8,20 @@
   }
 
   const ENTRIES: TickerEntry[] = [
-    {
-      icon: 'fa-solid fa-shield-halved',
-      iconColorClass: 'nord',
-      label: 'NordVPN',
-      description: 'Encrypt your connection while trading',
-      link: 'https://go.nordvpn.net/aff_c?offer_id=15&aff_id=143568&url_id=902',
-    },
-    {
-      icon: 'fa-solid fa-key',
-      iconColorClass: 'nord',
-      label: 'NordPass',
-      description: 'Secure your API keys & passwords',
-      link: 'https://go.nordpass.io/aff_c?offer_id=488&aff_id=143568&url_id=9356',
-    },
+    // {
+    //   icon: 'fa-solid fa-shield-halved',
+    //   iconColorClass: 'nord',
+    //   label: 'NordVPN',
+    //   description: 'Encrypt your connection while trading',
+    //   link: 'https://go.nordvpn.net/aff_c?offer_id=15&aff_id=143568&url_id=902',
+    // },
+    // {
+    //   icon: 'fa-solid fa-key',
+    //   iconColorClass: 'nord',
+    //   label: 'NordPass',
+    //   description: 'Secure your API keys & passwords',
+    //   link: 'https://go.nordpass.io/aff_c?offer_id=488&aff_id=143568&url_id=9356',
+    // },
   ];
 
   const INTERVAL_MS = 5000;

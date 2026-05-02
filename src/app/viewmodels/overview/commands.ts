@@ -1,5 +1,22 @@
 (function () {
 
+// /** Stablecoins supported per exchange (raw exchange_name key). */
+// const EXCHANGE_STABLECOINS: Record<string, string[]> = {
+//   kraken:   ['USDT', 'USDC', 'DAI'],
+//   coinbase: ['USDC', 'USDT', 'DAI'],
+// };
+//
+// /** Popular crypto supported per exchange (raw exchange_name key). */
+// const EXCHANGE_CRYPTO: Record<string, string[]> = {
+//   // Kraken uses XBT, not BTC
+//   kraken:   ['XBT', 'ETH', 'XRP', 'SOL', 'ADA', 'DOGE', 'TRX', 'AVAX', 'LINK', 'DOT', 'MATIC', 'LTC', 'UNI', 'ATOM', 'XLM', 'BCH', 'ETC', 'FIL'],
+//   coinbase: ['BTC', 'ETH', 'XRP', 'SOL', 'ADA', 'DOGE', 'AVAX', 'MATIC', 'LINK', 'DOT', 'LTC', 'UNI', 'ATOM', 'ALGO', 'SHIB'],
+// };
+//
+// /** Fallback lists used when the exchange is unknown. */
+// const FALLBACK_STABLECOINS: string[] = ['USDT', 'USDC', 'DAI'];
+// const FALLBACK_CRYPTO: string[]      = ['BTC', 'ETH', 'XRP', 'SOL', 'ADA', 'DOGE', 'AVAX', 'LINK', 'DOT', 'LTC'];
+
 class CommandsController {
   private unsubscribe: (() => void) | null = null;
   private selectedOrder: any = null;
@@ -87,6 +104,24 @@ class CommandsController {
     this.resetDependentFields();
     this.loadExchangeData();
     this.updateSubtitle();
+
+    // Re-populate trigger-type-specific dropdowns that depend on the exchange
+    const triggerType = (document.getElementById('trigger-type') as HTMLSelectElement)?.value;
+    if (triggerType === 'price_threshold') {
+      const priceAssetSelect = document.getElementById('price-trigger-asset') as HTMLSelectElement;
+      if (priceAssetSelect) {
+        priceAssetSelect.innerHTML = '<option value="" disabled selected>Loading coins...</option>';
+        priceAssetSelect.disabled = true;
+      }
+      this.loadPriceAssets();
+    } else if (triggerType === 'balance_threshold') {
+      const triggerAssetSelect = document.getElementById('trigger-asset') as HTMLSelectElement;
+      if (triggerAssetSelect) {
+        triggerAssetSelect.innerHTML = '<option value="" disabled selected>Loading balances...</option>';
+        triggerAssetSelect.disabled = true;
+      }
+      this.loadBalances();
+    }
   }
 
   private updateSubtitle(): void {
@@ -419,6 +454,54 @@ class CommandsController {
     this.updateRuleSummary();
   }
 
+  // /** Returns the raw exchange_name for the currently selected connection (e.g. 'kraken', 'coinbase'). */
+  // private getSelectedExchangeName(): string {
+  //   if (!this.selectedConnectionId) return '';
+  //   const conn = ExchangeStore.connections.find((c) => c.id === this.selectedConnectionId);
+  //   return conn?.exchange_name ?? '';
+  // }
+
+  // private appendCommonAssets(
+  //   select: HTMLSelectElement,
+  //   ownedSet: Set<string>,
+  //   excludeSet: Set<string> = new Set(),
+  // ): void {
+  //   const exchangeName = this.getSelectedExchangeName();
+  //   const stableList = EXCHANGE_STABLECOINS[exchangeName] ?? FALLBACK_STABLECOINS;
+  //   const cryptoList  = EXCHANGE_CRYPTO[exchangeName]     ?? FALLBACK_CRYPTO;
+  //
+  //   const stableOptions = stableList.filter(
+  //     (c) => !ownedSet.has(c) && !excludeSet.has(c),
+  //   );
+  //   const cryptoOptions = cryptoList.filter(
+  //     (c) => !ownedSet.has(c) && !excludeSet.has(c),
+  //   );
+  //
+  //   if (stableOptions.length > 0) {
+  //     const group = document.createElement('optgroup');
+  //     group.label = 'Stablecoins';
+  //     for (const coin of stableOptions) {
+  //       const opt = document.createElement('option');
+  //       opt.value = coin;
+  //       opt.textContent = coin;
+  //       group.appendChild(opt);
+  //     }
+  //     select.appendChild(group);
+  //   }
+  //
+  //   if (cryptoOptions.length > 0) {
+  //     const group = document.createElement('optgroup');
+  //     group.label = 'Popular Coins';
+  //     for (const coin of cryptoOptions) {
+  //       const opt = document.createElement('option');
+  //       opt.value = coin;
+  //       opt.textContent = coin;
+  //       group.appendChild(opt);
+  //     }
+  //     select.appendChild(group);
+  //   }
+  // }
+
   private populateConvertDropdowns(): void {
     const fromSelect = document.getElementById('convert-from-asset') as HTMLSelectElement;
     const toSelect = document.getElementById('convert-to-asset') as HTMLSelectElement;
@@ -458,6 +541,23 @@ class CommandsController {
       opt.textContent = asset;
       toSelect.appendChild(opt);
     }
+
+    // const ownedAssets = Object.keys(this.balances);
+    // const holdingTargets = ownedAssets.filter((a) => a !== triggerAsset).sort((a, b) => a.localeCompare(b));
+    // if (holdingTargets.length > 0) {
+    //   const holdingsGroup = document.createElement('optgroup');
+    //   holdingsGroup.label = 'Your Holdings';
+    //   for (const asset of holdingTargets) {
+    //     const opt = document.createElement('option');
+    //     opt.value = asset;
+    //     opt.textContent = asset;
+    //     holdingsGroup.appendChild(opt);
+    //   }
+    //   toSelect.appendChild(holdingsGroup);
+    // }
+    // const ownedSet = new Set(ownedAssets);
+    // const excludeSet = triggerAsset ? new Set([triggerAsset]) : new Set<string>();
+    // this.appendCommonAssets(toSelect, ownedSet, excludeSet);
   }
 
   private onConvertAmountModeChanged(): void {
@@ -612,6 +712,21 @@ class CommandsController {
         triggerAssetSelect.appendChild(opt);
       }
 
+      // const ownedAssets = Object.keys(this.balances);
+      // if (ownedAssets.length > 0) {
+      //   const holdingsGroup = document.createElement('optgroup');
+      //   holdingsGroup.label = 'Your Holdings';
+      //   for (const [asset, amount] of Object.entries(this.balances).sort(([a], [b]) => a.localeCompare(b))) {
+      //     const opt = document.createElement('option');
+      //     opt.value = asset;
+      //     opt.textContent = `${asset} (Balance: ${parseFloat(amount).toFixed(8)})`;
+      //     holdingsGroup.appendChild(opt);
+      //   }
+      //   triggerAssetSelect.appendChild(holdingsGroup);
+      // }
+      // const ownedSet = new Set(ownedAssets);
+      // this.appendCommonAssets(triggerAssetSelect, ownedSet);
+
       thresholdInput.disabled = false;
     } catch {
       triggerAssetSelect.innerHTML = '<option value="" disabled selected>Failed to load balances</option>';
@@ -643,6 +758,21 @@ class CommandsController {
         opt.textContent = `${asset} (Balance: ${parseFloat(amount).toFixed(8)})`;
         assetSelect.appendChild(opt);
       }
+
+      // const ownedAssets = Object.keys(this.balances);
+      // if (ownedAssets.length > 0) {
+      //   const holdingsGroup = document.createElement('optgroup');
+      //   holdingsGroup.label = 'Your Holdings';
+      //   for (const [asset, amount] of Object.entries(this.balances).sort(([a], [b]) => a.localeCompare(b))) {
+      //     const opt = document.createElement('option');
+      //     opt.value = asset;
+      //     opt.textContent = `${asset} (Balance: ${parseFloat(amount).toFixed(8)})`;
+      //     holdingsGroup.appendChild(opt);
+      //   }
+      //   assetSelect.appendChild(holdingsGroup);
+      // }
+      // const ownedSet = new Set(ownedAssets);
+      // this.appendCommonAssets(assetSelect, ownedSet);
 
       thresholdInput.disabled = false;
     } catch {
@@ -688,6 +818,23 @@ class CommandsController {
       toSelect.appendChild(opt);
     }
     toSelect.disabled = false;
+
+    // const ownedAssets = Object.keys(this.balances);
+    // const ownedSet = new Set(ownedAssets);
+    // const excludeSet = new Set([asset]);
+    // const holdingTargets = ownedAssets.filter((a) => a !== asset).sort((a, b) => a.localeCompare(b));
+    // if (holdingTargets.length > 0) {
+    //   const holdingsGroup = document.createElement('optgroup');
+    //   holdingsGroup.label = 'Your Holdings';
+    //   for (const target of holdingTargets) {
+    //     const opt = document.createElement('option');
+    //     opt.value = target;
+    //     opt.textContent = target;
+    //     holdingsGroup.appendChild(opt);
+    //   }
+    //   toSelect.appendChild(holdingsGroup);
+    // }
+    // this.appendCommonAssets(toSelect, ownedSet, excludeSet);
 
     this.updatePriceAmountHint();
     this.updateRuleSummary();
@@ -1516,6 +1663,11 @@ class CommandsController {
 
     let summary = '';
 
+    const exchangeName = this.selectedConnectionId
+      ? ExchangeStore.getExchangeName(this.selectedConnectionId)
+      : null;
+    const exchangePrefix = exchangeName ? `${exchangeName} ` : '';
+
     if (triggerType === 'price_threshold') {
       const asset = (document.getElementById('price-trigger-asset') as HTMLSelectElement)?.value;
       const triggerPrice = (document.getElementById('price-trigger-threshold') as HTMLInputElement)?.value;
@@ -1542,7 +1694,7 @@ class CommandsController {
       const maxDisplay = unlimited ? 'unlimited times' : `${maxExec || '___'} times`;
       const cooldownDisplay = this.formatCooldown(totalCooldown);
 
-      summary = `When ${asset}/${quote} hits ${parseFloat(triggerPrice).toFixed(8).replace(/\.?0+$/, '')}, ${amountDisplay} to ${target}, then wait ${cooldownDisplay} between runs, up to ${maxDisplay}`;
+      summary = `${exchangePrefix}When ${asset}/${quote} hits ${parseFloat(triggerPrice).toFixed(8).replace(/\.?0+$/, '')}, ${amountDisplay} to ${target}, then wait ${cooldownDisplay} between runs, up to ${maxDisplay}`;
     } else if (triggerType === 'balance_threshold') {
       const triggerAsset = (document.getElementById('trigger-asset') as HTMLSelectElement)?.value;
       const threshold = (document.getElementById('trigger-threshold') as HTMLInputElement)?.value;
@@ -1564,9 +1716,9 @@ class CommandsController {
         const convertAmountDisplay = (convertAmountVal && parseFloat(convertAmountVal) > 0)
           ? `${parseFloat(convertAmountVal).toFixed(8).replace(/\.?0+$/, '')} ${assetDisplay}`
           : `full ${assetDisplay} balance`;
-        summary = `When ${assetDisplay} balance reaches ${parseFloat(threshold).toFixed(8).replace(/\.?0+$/, '')}, wait ${cooldownDisplay}, then convert ${convertAmountDisplay} to ${convertTo}`;
+        summary = `${exchangePrefix}When ${assetDisplay} balance reaches ${parseFloat(threshold).toFixed(8).replace(/\.?0+$/, '')}, wait ${cooldownDisplay}, then convert ${convertAmountDisplay} to ${convertTo}`;
       } else {
-        summary = `When ${assetDisplay} balance reaches ${parseFloat(threshold).toFixed(8).replace(/\.?0+$/, '')}, wait ${cooldownDisplay}, then withdraw full balance to ${addressKey}`;
+        summary = `${exchangePrefix}When ${assetDisplay} balance reaches ${parseFloat(threshold).toFixed(8).replace(/\.?0+$/, '')}, wait ${cooldownDisplay}, then withdraw full balance to ${addressKey}`;
       }
     } else {
       // order_filled
@@ -1584,13 +1736,13 @@ class CommandsController {
       const assetDisplay = actionAsset;
 
       if (amountMode === 'filled') {
-        summary = `When order ${orderIdShort} fills, withdraw filled amount of ${assetDisplay} to ${addressKey}`;
+        summary = `${exchangePrefix}When order ${orderIdShort} fills, withdraw filled amount of ${assetDisplay} to ${addressKey}`;
       } else {
         let amountDisplay = '___';
         if (amount && parseFloat(amount) > 0) {
           amountDisplay = parseFloat(amount).toFixed(8).replace(/\.?0+$/, '');
         }
-        summary = `When order ${orderIdShort} fills, withdraw ${amountDisplay} ${assetDisplay} to ${addressKey}`;
+        summary = `${exchangePrefix}When order ${orderIdShort} fills, withdraw ${amountDisplay} ${assetDisplay} to ${addressKey}`;
       }
     }
 
