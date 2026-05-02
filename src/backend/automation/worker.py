@@ -129,8 +129,10 @@ class AutomationWorker:
                     if not snapshot:
                         continue
 
-                    # Check if order was actually filled via closed orders
-                    closed_orders = get_closed_orders(exchange)
+                    # Check if order was actually filled via closed orders.
+                    # Pass the symbol so exchanges like Binance that require it work correctly.
+                    pair = snapshot.get('pair') or None
+                    closed_orders = get_closed_orders(exchange, symbol=pair)
                     closed_order = next((o for o in closed_orders if o['id'] == order_id), None)
 
                     if closed_order and closed_order.get('status') == 'closed':

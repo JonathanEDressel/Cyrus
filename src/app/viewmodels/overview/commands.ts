@@ -29,6 +29,8 @@ class CommandsController {
   private selectedConnectionId: number | null = null;
   private localOpenOrders: any[] = [];
   private localWithdrawalAddresses: any[] = [];
+  private allRules: any[] = [];
+  private allLogs: any[] = [];
 
   constructor() {
     this.init();
@@ -104,6 +106,8 @@ class CommandsController {
     this.resetDependentFields();
     this.loadExchangeData();
     this.updateSubtitle();
+    this.applyRulesFilter();
+    this.applyLogsFilter();
 
     // Re-populate trigger-type-specific dropdowns that depend on the exchange
     const triggerType = (document.getElementById('trigger-type') as HTMLSelectElement)?.value;
@@ -134,6 +138,11 @@ class CommandsController {
 
   private async loadExchangeData(): Promise<void> {
     if (!this.selectedConnectionId) return;
+    const orderSelect = document.getElementById('trigger-order-id') as HTMLSelectElement;
+    if (orderSelect) {
+      orderSelect.innerHTML = '<option value="" disabled selected>Loading orders...</option>';
+      orderSelect.disabled = true;
+    }
     try {
       this.localOpenOrders = await ExchangeController.getOpenOrders(this.selectedConnectionId);
     } catch {
@@ -290,8 +299,11 @@ class CommandsController {
       opt.selected = true;
       opt.textContent = 'No open orders available';
       select.appendChild(opt);
+      select.disabled = true;
       return;
     }
+
+    select.disabled = false;
 
     const placeholder = document.createElement('option');
     placeholder.value = '';
@@ -385,6 +397,21 @@ class CommandsController {
   }
 
   private populateAddressDropdown(): void {
+    const notice = document.getElementById('withdraw-unsupported-notice');
+    const conn = ExchangeStore.connections.find(c => c.id === this.selectedConnectionId);
+    const noAddressExchanges = ['coinbase', 'binance'];
+    const noAddressSupport = noAddressExchanges.includes(conn?.exchange_name ?? '');
+    if (notice) {
+      if (noAddressSupport && conn) {
+        const exchangeLabels: Record<string, string> = { coinbase: 'Coinbase Advanced', binance: 'Binance' };
+        const name = exchangeLabels[conn.exchange_name] ?? conn.exchange_name;
+        notice.textContent = `Whitelisted withdrawal addresses are not supported for ${name}. Only "Convert Crypto" is available for this exchange.`;
+        notice.classList.remove('d-none');
+      } else {
+        notice.classList.add('d-none');
+      }
+    }
+
     const select = document.getElementById('action-address-key') as HTMLSelectElement;
     select.innerHTML = '';
     select.disabled = false;
@@ -429,6 +456,7 @@ class CommandsController {
 
     if (triggerType === 'price_threshold') {
       withdrawFields?.classList.add('d-none');
+      document.getElementById('withdraw-unsupported-notice')?.classList.add('d-none');
       convertFields?.classList.add('d-none');
       amountModeSection?.classList.add('d-none');
       convertAmountSection?.classList.add('d-none');
@@ -438,6 +466,7 @@ class CommandsController {
 
     if (actionType === 'convert_crypto' && triggerType === 'balance_threshold') {
       withdrawFields?.classList.add('d-none');
+      document.getElementById('withdraw-unsupported-notice')?.classList.add('d-none');
       convertFields?.classList.remove('d-none');
       amountModeSection?.classList.add('d-none');
       convertAmountSection?.classList.remove('d-none');
@@ -523,7 +552,7 @@ class CommandsController {
       fromSelect.disabled = true;
     }
 
-    // To asset: all balance assets except the trigger asset
+    // To asset: all balance assets except the trigger asset, supplemented with common defaults
     toSelect.innerHTML = '';
     toSelect.disabled = false;
 
@@ -534,8 +563,16 @@ class CommandsController {
     placeholder.textContent = 'Select target asset...';
     toSelect.appendChild(placeholder);
 
-    for (const asset of Object.keys(this.balances).sort((a, b) => a.localeCompare(b))) {
-      if (asset === triggerAsset) continue;
+    const defaultAssets = [
+      'USDT', 'USDC', 'BUSD', 'DAI', 'TUSD', 'FDUSD',
+      'BTC', 'ETH', 'BNB', 'SOL', 'XRP', 'ADA', 'DOGE',
+      'AVAX', 'DOT', 'MATIC', 'LINK', 'ATOM', 'LTC', 'UNI',
+      'SHIB', 'TRX', 'ALGO', 'EUR', 'USD',
+    ];
+    const allTargets = new Set<string>([...defaultAssets, ...Object.keys(this.balances)]);
+    if (triggerAsset) allTargets.delete(triggerAsset);
+
+    for (const asset of Array.from(allTargets).sort((a, b) => a.localeCompare(b))) {
       const opt = document.createElement('option');
       opt.value = asset;
       opt.textContent = asset;
@@ -807,7 +844,12 @@ class CommandsController {
       return;
     }
 
-    const preferredTargets = ['USD', 'USDT', 'USDC', 'EUR', 'BTC', 'ETH'];
+    const preferredTargets = [
+      'USDT', 'USDC', 'BUSD', 'DAI', 'TUSD', 'FDUSD',
+      'BTC', 'ETH', 'BNB', 'SOL', 'XRP', 'ADA', 'DOGE',
+      'AVAX', 'DOT', 'MATIC', 'LINK', 'ATOM', 'LTC', 'UNI',
+      'SHIB', 'TRX', 'ALGO', 'EUR', 'USD',
+    ];
     const allTargets = new Set<string>([...preferredTargets, ...Object.keys(this.balances)]);
     allTargets.delete(asset);
 
@@ -1297,15 +1339,37 @@ class CommandsController {
   }
 
   private async loadRules(): Promise<void> {
+    const tbody = document.getElementById('rules-tbody');
+    if (tbody) tbody.innerHTML = '<tr class="empty-row"><td colspan="6">Loading rules...</td></tr>';
     try {
       const rules = await AutomationController.getRules();
-      this.ruleOrderIds = new Set(rules.map((r: any) => r.trigger_order_id).filter(Boolean));
-      this.renderRules(rules);
-      this.updateRulesCount(rules.length);
+      this.allRules = rules;
+      this.applyRulesFilter();
       this.populateOrderDropdown();
     } catch (error: any) {
       this.showError(error.message || 'Failed to load rules');
     }
+  }
+
+  private applyRulesFilter(): void {
+    const filtered = this.selectedConnectionId !== null
+      ? this.allRules.filter((r: any) => r.trigger_exchange_id === this.selectedConnectionId)
+      : this.allRules;
+    this.ruleOrderIds = new Set(filtered.map((r: any) => r.trigger_order_id).filter(Boolean));
+    this.renderRules(filtered);
+    this.updateRulesCount(filtered.length);
+  }
+
+  private applyLogsFilter(): void {
+    const filteredRuleIds = new Set(
+      this.allRules
+        .filter((r: any) => r.trigger_exchange_id === this.selectedConnectionId)
+        .map((r: any) => r.id)
+    );
+    const filtered = this.selectedConnectionId !== null
+      ? this.allLogs.filter((l: any) => filteredRuleIds.has(l.rule_id))
+      : this.allLogs;
+    this.renderLogs(filtered);
   }
 
   private renderRules(rules: any[]): void {
@@ -1443,9 +1507,12 @@ class CommandsController {
   }
 
   private async loadLogs(): Promise<void> {
+    const tbody = document.getElementById('logs-tbody');
+    if (tbody) tbody.innerHTML = '<tr class="empty-row"><td colspan="5">Loading logs...</td></tr>';
     try {
       const logs = await AutomationController.getLogs(30);
-      this.renderLogs(logs);
+      this.allLogs = logs;
+      this.applyLogsFilter();
     } catch (error: any) {
     }
   }

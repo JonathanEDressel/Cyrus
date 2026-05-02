@@ -28,13 +28,24 @@ class WhitelistController {
     const lastUpdated = ExchangeStore.lastUpdated;
     const isAll = ExchangeStore.isAllMode();
 
-    // Show unsupported notice for single Coinbase connection
+    // Show unsupported notice for exchanges that don't expose a withdrawal address API
     const unsupportedNotice = document.getElementById('addresses-unsupported-notice');
     if (unsupportedNotice) {
-      const isCoinbaseSingle = !isAll &&
-        typeof ExchangeStore.activeMode === 'number' &&
-        ExchangeStore.connections.find(c => c.id === ExchangeStore.activeMode)?.exchange_name === 'coinbase';
-      unsupportedNotice.classList.toggle('d-none', !isCoinbaseSingle);
+      const conn = !isAll && typeof ExchangeStore.activeMode === 'number'
+        ? ExchangeStore.connections.find(c => c.id === ExchangeStore.activeMode)
+        : undefined;
+      const noAddressExchanges = ['coinbase', 'binance'];
+      const isUnsupported = !!conn && noAddressExchanges.includes(conn.exchange_name);
+      if (isUnsupported && conn) {
+        const exchangeInfo: Record<string, { name: string; reason: string }> = {
+          coinbase: { name: 'Coinbase Advanced', reason: 'Coinbase does not expose an address book API for CDP API keys.' },
+          binance:  { name: 'Binance',           reason: 'Binance does not expose an address whitelist API via CCXT.' },
+        };
+        const info = exchangeInfo[conn.exchange_name]
+          ?? { name: conn.exchange_name, reason: 'This exchange does not expose a withdrawal address API.' };
+        unsupportedNotice.textContent = `Whitelisted withdrawal addresses are not supported for ${info.name}. ${info.reason}`;
+      }
+      unsupportedNotice.classList.toggle('d-none', !isUnsupported);
     }
 
     // Update subtitle

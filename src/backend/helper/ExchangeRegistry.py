@@ -35,14 +35,16 @@ SUPPORTED_EXCHANGES: dict[str, dict] = {
         'api_key_url': 'https://www.coinbase.com/settings/api',
         'guide_url': 'https://docs.cdp.coinbase.com/exchange/introduction/rest-quickstart',
     },
-    # 'binance': {
-    #     'name': 'Binance',
-    #     'ccxt_id': 'binance',
-    #     'requires_passphrase': False,
-    #     'has_withdrawal_addresses': False,
-    #     'website': 'https://www.binance.com',
-    #     'api_key_url': 'https://www.binance.com/en/my/settings/api-management',
-    # },
+    'binance': {
+        'name': 'Binance',
+        'ccxt_id': 'binance',
+        'requires_passphrase': False,
+        'has_withdrawal_addresses': False,
+        'has_sandbox': False,
+        'website': 'https://www.binance.com',
+        'api_key_url': 'https://www.binance.com/en/my/settings/api-management',
+        'guide_url': 'https://www.binance.com/en/support/faq/how-to-create-api-keys-on-binance-360002502072',
+    },
 }
 
 # Minimum withdrawal amounts per exchange per asset (with a 10% safety cushion).
@@ -72,6 +74,15 @@ WITHDRAWAL_MINIMUMS: dict[str, dict[str, float]] = {
         'MATIC': 0.1,      'LINK': 0.01,      'UNI': 0.01,
         'USDC': 0.01,      'USDT': 0.01,      'DAI': 0.1,
         'DOT': 0.1,        'ATOM': 0.01,      'ALGO': 0.1,
+    },
+    'binance': {
+        'BTC': 0.00050,    'ETH': 0.0010,     'BNB': 0.010,
+        'SOL': 0.010,      'XRP': 0.10,       'ADA': 2.0,
+        'DOGE': 10.0,      'AVAX': 0.010,     'DOT': 0.10,
+        'MATIC': 0.10,     'LINK': 0.010,     'ATOM': 0.010,
+        'LTC': 0.0010,     'UNI': 0.010,      'SHIB': 100000,
+        'TRX': 1.0,        'ALGO': 1.0,       'USDT': 1.0,
+        'USDC': 1.0,       'DAI': 10.0,
     },
 }
 

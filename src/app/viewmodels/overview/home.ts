@@ -26,7 +26,10 @@ class HomeController {
     this.attachEventListeners();
     this.loadDashboardData();
 
-    this.unsubscribe = ExchangeStore.onUpdate(() => this.renderFromStore());
+    this.unsubscribe = ExchangeStore.onUpdate(() => {
+      this.renderFromStore();
+      this.loadCommandsAndLogs();
+    });
 
     this.tickerTimer = setInterval(() => this.refreshAllTickers(), 5_000);
     this.chartTimer = setInterval(() => this.refreshAllChartData(), 60_000);
@@ -103,8 +106,7 @@ class HomeController {
     this.setTableEmpty('positions-tbody', 6, 'No open positions');
 
     this.renderFromStore();
-    this.loadCommands();
-    this.loadLogs();
+    this.loadCommandsAndLogs();
     this.loadWatchlist();
   }
 
@@ -504,6 +506,34 @@ class HomeController {
     }
   }
 
+  private async loadCommandsAndLogs(): Promise<void> {
+    try {
+      const [rules, logs] = await Promise.all([
+        AutomationController.getRules(),
+        AutomationController.getLogs(30),
+      ]);
+
+      const isAll = ExchangeStore.isAllMode();
+      const activeId = ExchangeStore.activeMode;
+
+      const filteredRules = isAll
+        ? rules
+        : rules.filter((r: any) => r.trigger_exchange_id === activeId);
+
+      const filteredRuleIds = new Set(filteredRules.map((r: any) => r.id));
+
+      const filteredLogs = isAll
+        ? logs
+        : logs.filter((l: any) => filteredRuleIds.has(l.rule_id));
+
+      this.renderCommands(filteredRules);
+      this.setCardValue('custom-commands-count', filteredRules.length.toString());
+      this.renderLogs(filteredLogs);
+    } catch {
+      this.setTableEmpty('commands-tbody', 4, 'Failed to load commands');
+    }
+  }
+
   private async loadLogs(): Promise<void> {
     try {
       const logs = await AutomationController.getLogs(30);
@@ -563,13 +593,7 @@ class HomeController {
   }
 
   private async loadCommands(): Promise<void> {
-    try {
-      const rules = await AutomationController.getRules();
-      this.renderCommands(rules);
-      this.setCardValue('custom-commands-count', rules.length.toString());
-    } catch {
-      this.setTableEmpty('commands-tbody', 4, 'Failed to load commands');
-    }
+    return this.loadCommandsAndLogs();
   }
 
   private renderCommands(rules: any[]): void {

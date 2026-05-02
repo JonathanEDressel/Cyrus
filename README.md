@@ -2,6 +2,26 @@
 
 A desktop application for automating and monitoring cryptocurrency trading across multiple exchanges. Built with Electron, TypeScript, Python Flask, and SQLite.
 
+## Supported Exchanges
+
+Cyrus integrates with the following exchanges via [CCXT](https://github.com/ccxt/ccxt). Each exchange has different API capabilities, which determines which automation actions are available.
+
+| Feature | Kraken | Coinbase Advanced | Binance |
+|---|:---:|:---:|:---:|
+| View open orders | ✅ | ✅ | ✅ |
+| View account balances | ✅ | ✅ | ✅ |
+| Trigger: Order filled | ✅ | ✅ | ✅ |
+| Trigger: Balance threshold | ✅ | ✅ | ✅ |
+| Action: Withdraw to address | ✅ | ❌ | ❌ |
+| Action: Convert crypto | ✅ | ✅ | ✅ |
+| Whitelisted withdrawal addresses | ✅ | ❌ | ❌ |
+
+> **Coinbase Advanced (Beta):** The Coinbase CDP API does not expose a withdrawal address book or crypto withdrawal endpoint via CCXT. Withdraw actions and whitelisted addresses are unavailable.
+>
+> **Binance:** Binance does not expose a withdrawal address whitelist API via CCXT. Withdraw actions and whitelisted addresses are unavailable.
+
+---
+
 ## Features
 
 - **User Authentication** - Secure login and account management with JWT tokens
