@@ -2053,6 +2053,7 @@ class CommandsController {
         addrSelect.disabled = false;
         const placeholder = document.createElement('option');
         placeholder.value = ''; placeholder.disabled = true;
+        if (!rule.action_address_key) placeholder.selected = true;
         placeholder.textContent = 'Select an address...';
         addrSelect.appendChild(placeholder);
         const sorted = [...addresses].sort((a: any, b: any) => a.nickname_key.localeCompare(b.nickname_key));
@@ -2060,9 +2061,11 @@ class CommandsController {
           const opt = document.createElement('option');
           opt.value = addr.nickname_key;
           opt.textContent = `${addr.nickname_key} (${addr.asset} - ${addr.method})`;
+          if (rule.action_address_key && addr.nickname_key === rule.action_address_key) {
+            opt.selected = true;
+          }
           addrSelect.appendChild(opt);
         }
-        if (rule.action_address_key) addrSelect.value = rule.action_address_key;
       }
 
       // order_filled: amount mode
