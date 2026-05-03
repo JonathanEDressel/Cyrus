@@ -280,6 +280,9 @@ class CommandsController {
         this.toggleRule(ruleId);
       } else if (action === 'delete') {
         this.deleteRule(ruleId);
+      } else if (action === 'edit') {
+        const rule = this.allRules.find((r: any) => r.id === ruleId);
+        if (rule) this.openEditModal(rule);
       }
     });
 
@@ -329,6 +332,47 @@ class CommandsController {
       const related = (e as MouseEvent).relatedTarget as HTMLElement | null;
       if (!related?.closest('.flow-node-icon[data-tooltip-json]')) {
         document.getElementById('flow-tooltip')?.classList.add('d-none');
+      }
+    });
+
+    // Edit rule modal
+    document.getElementById('edit-rule-modal-close')?.addEventListener('click', () => this.closeEditModal());
+    document.getElementById('edit-rule-cancel')?.addEventListener('click', () => this.closeEditModal());
+    document.getElementById('edit-rule-save')?.addEventListener('click', () => this.saveEditModal());
+
+    document.getElementById('edit-rule-overlay')?.addEventListener('click', (e) => {
+      if ((e.target as HTMLElement).id === 'edit-rule-overlay') this.closeEditModal();
+    });
+
+    document.getElementById('edit-unlimited')?.addEventListener('change', () => {
+      const checked = (document.getElementById('edit-unlimited') as HTMLInputElement).checked;
+      const maxInput = document.getElementById('edit-max-executions') as HTMLInputElement;
+      maxInput.disabled = checked;
+      if (checked) maxInput.value = '';
+    });
+
+    document.querySelectorAll('input[name="edit-amount-mode"]').forEach(r => {
+      r.addEventListener('change', () => {
+        const mode = (document.querySelector('input[name="edit-amount-mode"]:checked') as HTMLInputElement)?.value;
+        const amtInput = document.getElementById('edit-action-amount') as HTMLInputElement;
+        amtInput.disabled = (mode === 'filled');
+        if (mode === 'filled') amtInput.value = '';
+      });
+    });
+
+    document.querySelectorAll('input[name="edit-price-amount-mode"]').forEach(r => {
+      r.addEventListener('change', () => {
+        const mode = (document.querySelector('input[name="edit-price-amount-mode"]:checked') as HTMLInputElement)?.value;
+        const amtInput = document.getElementById('edit-price-amount-value') as HTMLInputElement;
+        amtInput.disabled = (mode === 'all');
+        if (mode === 'all') amtInput.value = '';
+      });
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        const overlay = document.getElementById('edit-rule-overlay');
+        if (overlay && !overlay.classList.contains('d-none')) this.closeEditModal();
       }
     });
   }
@@ -1450,12 +1494,15 @@ class CommandsController {
       }
 
       return `<tr>
-        <td class="rule-name-cell">${this.escapeHtml(r.rule_name)}</td>
+        <td class="rule-name-cell editable" data-action="edit" data-rule-id="${r.id}">${this.escapeHtml(r.rule_name)}</td>
         <td class="trigger-cell">${triggerText}</td>
         <td class="action-cell">${actionText}</td>
         <td><span class="status-badge ${statusClass}">${statusText}</span></td>
         <td>${this.escapeHtml(triggered)}</td>
         <td class="controls-cell">
+          <button class="btn-icon" data-action="edit" data-rule-id="${r.id}" title="Edit Rule">
+            <i class="fa-solid fa-pencil"></i>
+          </button>
           <button class="btn-icon" data-action="toggle" data-rule-id="${r.id}" title="${toggleTitle}">
             <i class="fa-solid ${toggleIcon}"></i>
           </button>
@@ -1927,6 +1974,245 @@ class CommandsController {
   }
 
   // ──────────────────────────────────────────────────────────────────────────
+
+  // ─── Edit Rule Modal ──────────────────────────────────────────────────
+
+  private openEditModal(rule: any): void {
+    // Populate hidden id
+    (document.getElementById('edit-rule-id') as HTMLInputElement).value = String(rule.id);
+
+    // Rule name
+    (document.getElementById('edit-rule-name') as HTMLInputElement).value = rule.rule_name || '';
+
+    // Execution limit
+    const unlimitedCb = document.getElementById('edit-unlimited') as HTMLInputElement;
+    const maxExecInput = document.getElementById('edit-max-executions') as HTMLInputElement;
+    if (rule.max_executions == null) {
+      unlimitedCb.checked = true;
+      maxExecInput.disabled = true;
+      maxExecInput.value = '';
+    } else {
+      unlimitedCb.checked = false;
+      maxExecInput.disabled = false;
+      maxExecInput.value = String(rule.max_executions);
+    }
+
+    // Hide all conditional rows first
+    ['edit-threshold-row', 'edit-quote-row', 'edit-price-amount-row', 'edit-cooldown-row',
+     'edit-address-row', 'edit-order-amount-row', 'edit-convert-row'].forEach(id => {
+      document.getElementById(id)?.classList.add('d-none');
+    });
+
+    // Trigger-type-specific fields
+    if (rule.trigger_type === 'balance_threshold' || rule.trigger_type === 'price_threshold') {
+      // Threshold
+      const threshRow = document.getElementById('edit-threshold-row');
+      const threshLabel = document.getElementById('edit-threshold-label');
+      const threshInput = document.getElementById('edit-trigger-threshold') as HTMLInputElement;
+      threshRow?.classList.remove('d-none');
+      threshLabel!.textContent = rule.trigger_type === 'price_threshold' ? 'Trigger Price' : 'Threshold Amount';
+      threshInput.value = rule.trigger_threshold || '';
+
+      // Cooldown
+      document.getElementById('edit-cooldown-row')?.classList.remove('d-none');
+      const cooldownMins = Number(rule.cooldown_minutes || 1440);
+      (document.getElementById('edit-cooldown-hours') as HTMLInputElement).value = String(Math.floor(cooldownMins / 60));
+      (document.getElementById('edit-cooldown-minutes') as HTMLInputElement).value = String(cooldownMins % 60);
+    }
+
+    if (rule.trigger_type === 'price_threshold') {
+      // Quote currency
+      document.getElementById('edit-quote-row')?.classList.remove('d-none');
+      const quoteSelect = document.getElementById('edit-price-quote-asset') as HTMLSelectElement;
+      quoteSelect.value = rule.trigger_price_quote_asset || 'USDT';
+
+      // Amount mode
+      document.getElementById('edit-price-amount-row')?.classList.remove('d-none');
+      const mode = rule.action_amount_mode || 'all';
+      const modeRadio = document.querySelector(`input[name="edit-price-amount-mode"][value="${mode}"]`) as HTMLInputElement | null;
+      if (modeRadio) modeRadio.checked = true;
+      const priceAmtInput = document.getElementById('edit-price-amount-value') as HTMLInputElement;
+      priceAmtInput.disabled = (mode === 'all');
+      priceAmtInput.value = (mode !== 'all' && rule.action_amount) ? String(rule.action_amount) : '';
+    }
+
+    // Action-type-specific fields
+    if (rule.action_type === 'withdraw_crypto') {
+      // Address key
+      document.getElementById('edit-address-row')?.classList.remove('d-none');
+      const addrSelect = document.getElementById('edit-action-address-key') as HTMLSelectElement;
+      addrSelect.innerHTML = '';
+      const addresses = this.localWithdrawalAddresses;
+      if (addresses.length === 0) {
+        const opt = document.createElement('option');
+        opt.value = ''; opt.disabled = true; opt.selected = true;
+        opt.textContent = 'No withdrawal addresses available';
+        addrSelect.appendChild(opt);
+        addrSelect.disabled = true;
+      } else {
+        addrSelect.disabled = false;
+        const placeholder = document.createElement('option');
+        placeholder.value = ''; placeholder.disabled = true;
+        placeholder.textContent = 'Select an address...';
+        addrSelect.appendChild(placeholder);
+        const sorted = [...addresses].sort((a: any, b: any) => a.nickname_key.localeCompare(b.nickname_key));
+        for (const addr of sorted) {
+          const opt = document.createElement('option');
+          opt.value = addr.nickname_key;
+          opt.textContent = `${addr.nickname_key} (${addr.asset} - ${addr.method})`;
+          addrSelect.appendChild(opt);
+        }
+        if (rule.action_address_key) addrSelect.value = rule.action_address_key;
+      }
+
+      // order_filled: amount mode
+      if (rule.trigger_type === 'order_filled') {
+        document.getElementById('edit-order-amount-row')?.classList.remove('d-none');
+        const useFilled = Boolean(rule.use_filled_amount);
+        const modeRadio = document.querySelector(
+          `input[name="edit-amount-mode"][value="${useFilled ? 'filled' : 'fixed'}"]`
+        ) as HTMLInputElement | null;
+        if (modeRadio) modeRadio.checked = true;
+        const amtInput = document.getElementById('edit-action-amount') as HTMLInputElement;
+        amtInput.disabled = useFilled;
+        amtInput.value = (!useFilled && rule.action_amount) ? String(rule.action_amount) : '';
+      }
+    }
+
+    if (rule.action_type === 'convert_crypto' && rule.trigger_type === 'balance_threshold') {
+      document.getElementById('edit-convert-row')?.classList.remove('d-none');
+      (document.getElementById('edit-convert-to-asset') as HTMLInputElement).value = rule.convert_to_asset || '';
+      (document.getElementById('edit-convert-amount') as HTMLInputElement).value = rule.action_amount || '';
+    }
+
+    // Subtitle
+    const triggerLabel: Record<string, string> = {
+      order_filled: 'Order Filled',
+      balance_threshold: 'Balance Threshold',
+      price_threshold: 'Price Threshold'
+    };
+    const actionLabel: Record<string, string> = {
+      withdraw_crypto: 'Withdraw',
+      convert_crypto: 'Convert'
+    };
+    const subtitle = document.getElementById('edit-rule-modal-subtitle');
+    if (subtitle) {
+      subtitle.textContent = `${triggerLabel[rule.trigger_type] || rule.trigger_type} → ${actionLabel[rule.action_type] || rule.action_type}`;
+    }
+
+    // Clear error, show modal
+    const errEl = document.getElementById('edit-rule-error');
+    if (errEl) { errEl.textContent = ''; errEl.classList.add('d-none'); }
+    document.getElementById('edit-rule-overlay')?.classList.remove('d-none');
+    (document.getElementById('edit-rule-name') as HTMLInputElement).focus();
+  }
+
+  private closeEditModal(): void {
+    document.getElementById('edit-rule-overlay')?.classList.add('d-none');
+    const errEl = document.getElementById('edit-rule-error');
+    if (errEl) { errEl.textContent = ''; errEl.classList.add('d-none'); }
+  }
+
+  private async saveEditModal(): Promise<void> {
+    const ruleId = parseInt((document.getElementById('edit-rule-id') as HTMLInputElement).value || '0', 10);
+    if (!ruleId) return;
+
+    const rule = this.allRules.find((r: any) => r.id === ruleId);
+    if (!rule) return;
+
+    const showModalError = (msg: string) => {
+      const errEl = document.getElementById('edit-rule-error');
+      if (errEl) { errEl.textContent = msg; errEl.classList.remove('d-none'); }
+    };
+
+    // Validate + build payload
+    const payload: Record<string, any> = {};
+
+    const ruleName = (document.getElementById('edit-rule-name') as HTMLInputElement).value.trim();
+    if (!ruleName) { showModalError('Rule name cannot be empty.'); return; }
+    payload.rule_name = ruleName;
+
+    const isUnlimited = (document.getElementById('edit-unlimited') as HTMLInputElement).checked;
+    if (isUnlimited) {
+      payload.max_executions = null;
+    } else {
+      const maxVal = (document.getElementById('edit-max-executions') as HTMLInputElement).value.trim();
+      if (!maxVal) { showModalError('Enter a max execution count or check Unlimited.'); return; }
+      const maxNum = parseInt(maxVal, 10);
+      if (isNaN(maxNum) || maxNum < 1) { showModalError('Max executions must be at least 1.'); return; }
+      payload.max_executions = maxNum;
+    }
+
+    if (rule.trigger_type === 'balance_threshold' || rule.trigger_type === 'price_threshold') {
+      const thresh = (document.getElementById('edit-trigger-threshold') as HTMLInputElement).value.trim();
+      if (!thresh) { showModalError('Threshold cannot be empty.'); return; }
+      const threshNum = parseFloat(thresh);
+      if (isNaN(threshNum) || threshNum <= 0) { showModalError('Threshold must be a positive number.'); return; }
+      payload.trigger_threshold = thresh;
+
+      const hours = parseInt((document.getElementById('edit-cooldown-hours') as HTMLInputElement).value || '0', 10) || 0;
+      const mins  = parseInt((document.getElementById('edit-cooldown-minutes') as HTMLInputElement).value || '0', 10) || 0;
+      const totalMins = hours * 60 + mins;
+      if (totalMins < 1) { showModalError('Cooldown must be at least 1 minute.'); return; }
+      payload.cooldown_minutes = totalMins;
+    }
+
+    if (rule.trigger_type === 'price_threshold') {
+      payload.trigger_price_quote_asset = (document.getElementById('edit-price-quote-asset') as HTMLSelectElement).value;
+      const priceMode = (document.querySelector('input[name="edit-price-amount-mode"]:checked') as HTMLInputElement)?.value || 'all';
+      payload.action_amount_mode = priceMode;
+      if (priceMode !== 'all') {
+        const priceAmt = (document.getElementById('edit-price-amount-value') as HTMLInputElement).value.trim();
+        if (!priceAmt) { showModalError('Amount is required for percent/fixed mode.'); return; }
+        const priceAmtNum = parseFloat(priceAmt);
+        if (isNaN(priceAmtNum) || priceAmtNum <= 0) { showModalError('Amount must be a positive number.'); return; }
+        if (priceMode === 'percent' && priceAmtNum > 100) { showModalError('Percent must be between 1 and 100.'); return; }
+        payload.action_amount = priceAmt;
+      } else {
+        payload.action_amount = '';
+      }
+    }
+
+    if (rule.action_type === 'withdraw_crypto') {
+      const addrSelect = document.getElementById('edit-action-address-key') as HTMLSelectElement;
+      if (addrSelect.value) payload.action_address_key = addrSelect.value;
+
+      if (rule.trigger_type === 'order_filled') {
+        const amtMode = (document.querySelector('input[name="edit-amount-mode"]:checked') as HTMLInputElement)?.value || 'fixed';
+        payload.use_filled_amount = (amtMode === 'filled');
+        if (amtMode === 'fixed') {
+          const amt = (document.getElementById('edit-action-amount') as HTMLInputElement).value.trim();
+          if (!amt) { showModalError('Amount is required for fixed amount mode.'); return; }
+          const amtNum = parseFloat(amt);
+          if (isNaN(amtNum) || amtNum <= 0) { showModalError('Amount must be a positive number.'); return; }
+          payload.action_amount = amt;
+        }
+      }
+    }
+
+    if (rule.action_type === 'convert_crypto' && rule.trigger_type === 'balance_threshold') {
+      const target = (document.getElementById('edit-convert-to-asset') as HTMLInputElement).value.trim().toUpperCase();
+      if (!target) { showModalError('Target asset cannot be empty.'); return; }
+      if (target === (rule.action_asset || '').toUpperCase()) { showModalError('Source and target assets must be different.'); return; }
+      payload.convert_to_asset = target;
+      const convertAmt = (document.getElementById('edit-convert-amount') as HTMLInputElement).value.trim();
+      payload.action_amount = convertAmt;
+    }
+
+    const saveBtn = document.getElementById('edit-rule-save') as HTMLButtonElement;
+    saveBtn.disabled = true;
+    saveBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
+    try {
+      await AutomationController.updateRule(ruleId, payload);
+      this.closeEditModal();
+      await this.loadRules();
+    } catch (error: any) {
+      showModalError(error.message || 'Failed to save rule.');
+    } finally {
+      saveBtn.disabled = false;
+      saveBtn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Save Changes';
+    }
+  }
 
   private escapeHtml(str: string): string {
     const div = document.createElement('div');

@@ -84,6 +84,25 @@ class AutomationDbContext:
         return True
 
     @staticmethod
+    def update_rule(rule_id: int, user_id: int, **kwargs) -> bool:
+        allowed_columns = {
+            'rule_name', 'trigger_threshold', 'cooldown_minutes',
+            'action_address_key', 'action_amount', 'use_filled_amount',
+            'convert_to_asset', 'trigger_price_quote_asset',
+            'action_amount_mode', 'max_executions'
+        }
+        updates = {k: v for k, v in kwargs.items() if k in allowed_columns}
+        if not updates:
+            return False
+        set_clause = ', '.join(f'{k} = ?' for k in updates.keys())
+        values = list(updates.values()) + [rule_id, user_id]
+        execute_non_query(
+            f'UPDATE automation_rules SET {set_clause} WHERE id = ? AND user_id = ?',
+            tuple(values)
+        )
+        return True
+
+    @staticmethod
     def mark_rule_triggered(rule_id: int) -> None:
         execute_non_query(
             '''UPDATE automation_rules 

@@ -324,3 +324,132 @@
     </div>
   </div>
 </div>
+
+<!-- Edit Rule Modal -->
+<div class="edit-rule-overlay d-none" id="edit-rule-overlay">
+  <div class="edit-rule-modal" id="edit-rule-modal">
+    <div class="edit-rule-modal-header">
+      <div>
+        <h3>Edit Rule</h3>
+        <span class="edit-rule-modal-subtitle" id="edit-rule-modal-subtitle"></span>
+      </div>
+      <button class="edit-rule-modal-close" id="edit-rule-modal-close" title="Close">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+    </div>
+
+    <div class="edit-rule-modal-body">
+      <input type="hidden" id="edit-rule-id">
+
+      <!-- Always: Rule Name -->
+      <div class="edit-rule-field-group">
+        <label class="edit-rule-label" for="edit-rule-name">Rule Name</label>
+        <input type="text" id="edit-rule-name" class="edit-rule-input" placeholder="e.g. Auto-withdraw BTC" required>
+      </div>
+
+      <!-- Always: Execution Limit -->
+      <div class="edit-rule-field-group">
+        <label class="edit-rule-label">Execution Limit</label>
+        <label class="radio-label" style="margin-bottom: 6px;">
+          <input type="checkbox" id="edit-unlimited">
+          <span>Unlimited executions</span>
+        </label>
+        <input type="number" id="edit-max-executions" class="edit-rule-input" min="1" step="1" placeholder="e.g. 5">
+        <span class="form-hint">Rule auto-pauses after reaching max successful executions</span>
+      </div>
+
+      <!-- balance/price: Threshold -->
+      <div class="edit-rule-field-group d-none" id="edit-threshold-row">
+        <label class="edit-rule-label" id="edit-threshold-label" for="edit-trigger-threshold">Threshold Amount</label>
+        <input type="number" id="edit-trigger-threshold" class="edit-rule-input" step="any" min="0" placeholder="e.g. 0.001">
+      </div>
+
+      <!-- price: Quote Currency -->
+      <div class="edit-rule-field-group d-none" id="edit-quote-row">
+        <label class="edit-rule-label" for="edit-price-quote-asset">Price Quote Currency</label>
+        <select id="edit-price-quote-asset" class="edit-rule-input">
+          <option value="USD">USD</option>
+          <option value="USDT">USDT</option>
+          <option value="USDC">USDC</option>
+        </select>
+      </div>
+
+      <!-- price: Sell Amount Mode -->
+      <div class="edit-rule-field-group d-none" id="edit-price-amount-row">
+        <label class="edit-rule-label">Sell Amount Mode</label>
+        <div class="amount-mode-group" style="margin-bottom: 0.5rem;">
+          <label class="radio-label">
+            <input type="radio" name="edit-price-amount-mode" value="all">
+            <span>Sell All</span>
+          </label>
+          <label class="radio-label">
+            <input type="radio" name="edit-price-amount-mode" value="percent">
+            <span>Percent</span>
+          </label>
+          <label class="radio-label">
+            <input type="radio" name="edit-price-amount-mode" value="fixed">
+            <span>Fixed Amount</span>
+          </label>
+        </div>
+        <input type="number" id="edit-price-amount-value" class="edit-rule-input" step="any" min="0" placeholder="Only used for percent/fixed" disabled>
+      </div>
+
+      <!-- balance/price: Cooldown -->
+      <div class="edit-rule-field-group d-none" id="edit-cooldown-row">
+        <label class="edit-rule-label">Cooldown Period</label>
+        <div class="cooldown-inputs">
+          <div class="cooldown-field">
+            <input type="number" id="edit-cooldown-hours" class="edit-rule-input" min="0" step="1" placeholder="0">
+            <span class="cooldown-label">hours</span>
+          </div>
+          <div class="cooldown-field">
+            <input type="number" id="edit-cooldown-minutes" class="edit-rule-input" min="0" max="59" step="1" placeholder="0">
+            <span class="cooldown-label">minutes</span>
+          </div>
+        </div>
+        <span class="form-hint">Minimum 1 minute between executions</span>
+      </div>
+
+      <!-- withdraw: Address Key -->
+      <div class="edit-rule-field-group d-none" id="edit-address-row">
+        <label class="edit-rule-label" for="edit-action-address-key">Withdrawal Address Key</label>
+        <select id="edit-action-address-key" class="edit-rule-input">
+          <option value="" disabled selected>Loading addresses...</option>
+        </select>
+      </div>
+
+      <!-- order_filled + withdraw: Amount Mode + Amount -->
+      <div class="edit-rule-field-group d-none" id="edit-order-amount-row">
+        <label class="edit-rule-label">Amount Mode</label>
+        <div class="amount-mode-group" style="margin-bottom: 0.5rem;">
+          <label class="radio-label">
+            <input type="radio" name="edit-amount-mode" value="fixed">
+            <span>Fixed Amount</span>
+          </label>
+          <label class="radio-label">
+            <input type="radio" name="edit-amount-mode" value="filled">
+            <span>Use Filled Amount</span>
+          </label>
+        </div>
+        <input type="number" id="edit-action-amount" class="edit-rule-input" step="any" min="0" placeholder="e.g. 0.01">
+      </div>
+
+      <!-- balance + convert: Target Asset + Amount -->
+      <div class="edit-rule-field-group d-none" id="edit-convert-row">
+        <label class="edit-rule-label" for="edit-convert-to-asset">Convert To Asset</label>
+        <input type="text" id="edit-convert-to-asset" class="edit-rule-input" placeholder="e.g. FIDD" style="text-transform: uppercase;">
+        <label class="edit-rule-label" for="edit-convert-amount" style="margin-top: 0.6rem;">Amount <span class="form-hint-inline">(leave empty for full balance)</span></label>
+        <input type="number" id="edit-convert-amount" class="edit-rule-input" step="any" min="0" placeholder="Full balance">
+      </div>
+
+      <div class="alert alert-warning d-none" id="edit-rule-error"></div>
+    </div>
+
+    <div class="edit-rule-modal-footer">
+      <button class="btn-secondary" id="edit-rule-cancel">Cancel</button>
+      <button class="btn-primary" id="edit-rule-save">
+        <i class="fa-solid fa-floppy-disk"></i> Save Changes
+      </button>
+    </div>
+  </div>
+</div>

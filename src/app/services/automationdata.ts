@@ -14,6 +14,14 @@ class AutomationData {
     );
   }
 
+  static async updateRule(token: string, ruleId: number, rule: any): Promise<ApiResponse<any>> {
+    return DataAccess.put<any>(
+      `${AppConfig.API_BASE}/automation/rules/${ruleId}`,
+      rule,
+      token
+    );
+  }
+
   static async toggleRule(token: string, ruleId: number): Promise<ApiResponse<any>> {
     return DataAccess.put<any>(
       `${AppConfig.API_BASE}/automation/rules/${ruleId}/toggle`,

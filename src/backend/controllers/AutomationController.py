@@ -230,6 +230,149 @@ def get_rule(rule_id):
         return handle_error(e)
 
 
+@automation_bp.route('/rules/<int:rule_id>', methods=['PUT'])
+@token_required
+@active_required
+def update_rule(rule_id):
+    try:
+        rule = AutomationDbContext.get_rule_by_id(rule_id, request.user_id)
+        if not rule:
+            return not_found("Rule not found")
+
+        data = request.get_json()
+        if not data:
+            return bad_request("No data provided")
+
+        updates = {}
+
+        # Always editable: rule name
+        if 'rule_name' in data:
+            rule_name = str(data['rule_name']).strip()
+            if not rule_name:
+                return bad_request("Rule name cannot be empty")
+            updates['rule_name'] = rule_name
+
+        # Always editable: max_executions
+        if 'max_executions' in data:
+            max_exec = data['max_executions']
+            if max_exec in (None, '', 'null'):
+                updates['max_executions'] = None
+            else:
+                try:
+                    max_exec = int(max_exec)
+                    if max_exec < 1:
+                        return bad_request("Max executions must be at least 1")
+                    updates['max_executions'] = max_exec
+                except (ValueError, TypeError):
+                    return bad_request("Max executions must be a valid number")
+
+        # Threshold + cooldown (balance_threshold / price_threshold)
+        if rule.trigger_type in ('balance_threshold', 'price_threshold'):
+            if 'trigger_threshold' in data:
+                try:
+                    threshold_val = float(data['trigger_threshold'])
+                    if threshold_val <= 0:
+                        return bad_request("Threshold must be a positive number")
+                    updates['trigger_threshold'] = str(threshold_val)
+                except (ValueError, TypeError):
+                    return bad_request("Threshold must be a valid number")
+
+            if 'cooldown_minutes' in data:
+                try:
+                    cooldown = int(data['cooldown_minutes'])
+                    if cooldown < 1:
+                        return bad_request("Cooldown must be at least 1 minute")
+                    updates['cooldown_minutes'] = cooldown
+                except (ValueError, TypeError):
+                    return bad_request("Cooldown must be a valid number")
+
+        # Price threshold specific
+        if rule.trigger_type == 'price_threshold':
+            if 'trigger_price_quote_asset' in data:
+                quote = str(data['trigger_price_quote_asset']).strip().upper()
+                if quote not in ('USD', 'USDT', 'USDC'):
+                    return bad_request("Invalid quote asset")
+                updates['trigger_price_quote_asset'] = quote
+
+            if 'action_amount_mode' in data:
+                mode = str(data['action_amount_mode']).strip().lower()
+                if mode not in ('all', 'percent', 'fixed'):
+                    return bad_request("Invalid amount mode")
+                updates['action_amount_mode'] = mode
+
+            if 'action_amount' in data:
+                mode = updates.get('action_amount_mode', rule.action_amount_mode or 'all')
+                if mode == 'all':
+                    updates['action_amount'] = ''
+                else:
+                    try:
+                        amt = float(data['action_amount'])
+                        if amt <= 0:
+                            return bad_request("Amount must be positive")
+                        if mode == 'percent' and amt > 100:
+                            return bad_request("Percent must be between 1 and 100")
+                        updates['action_amount'] = str(amt)
+                    except (ValueError, TypeError):
+                        return bad_request("Amount must be a valid number")
+
+        # Withdraw address (both order_filled and balance_threshold with withdraw action)
+        if rule.action_type == 'withdraw_crypto':
+            if 'action_address_key' in data:
+                addr = str(data['action_address_key']).strip()
+                if not addr:
+                    return bad_request("Withdrawal address key cannot be empty")
+                updates['action_address_key'] = addr
+
+            # order_filled: fixed amount or use_filled_amount
+            if rule.trigger_type == 'order_filled':
+                if 'use_filled_amount' in data:
+                    updates['use_filled_amount'] = bool(data['use_filled_amount'])
+
+                if 'action_amount' in data:
+                    use_filled = updates.get('use_filled_amount', rule.use_filled_amount)
+                    if not use_filled:
+                        try:
+                            amt = float(data['action_amount'])
+                            if amt <= 0:
+                                return bad_request("Amount must be positive")
+                            updates['action_amount'] = str(amt)
+                        except (ValueError, TypeError):
+                            return bad_request("Amount must be a valid number")
+
+        # Convert action (balance_threshold)
+        if rule.action_type == 'convert_crypto' and rule.trigger_type == 'balance_threshold':
+            if 'convert_to_asset' in data:
+                target = str(data['convert_to_asset']).strip().upper()
+                if not target:
+                    return bad_request("Target asset cannot be empty")
+                if target == (rule.action_asset or '').upper():
+                    return bad_request("Source and target assets must be different")
+                updates['convert_to_asset'] = target
+
+            if 'action_amount' in data:
+                amt_str = str(data['action_amount']).strip()
+                if amt_str:
+                    try:
+                        amt = float(amt_str)
+                        if amt <= 0:
+                            return bad_request("Convert amount must be positive")
+                        updates['action_amount'] = str(amt)
+                    except (ValueError, TypeError):
+                        return bad_request("Convert amount must be a valid number")
+                else:
+                    updates['action_amount'] = ''
+
+        if not updates:
+            return bad_request("No valid fields to update")
+
+        AutomationDbContext.update_rule(rule_id, request.user_id, **updates)
+        updated_rule = AutomationDbContext.get_rule_by_id(rule_id, request.user_id)
+        return success_response(data=updated_rule.to_dict(), message="Rule updated")
+
+    except Exception as e:
+        return handle_error(e)
+
+
 @automation_bp.route('/rules/<int:rule_id>/toggle', methods=['PUT'])
 @token_required
 @active_required

@@ -13,6 +13,13 @@ class AutomationController {
     return response.data;
   }
 
+  static async updateRule(ruleId: number, rule: any): Promise<any> {
+    const token = AuthController.getToken();
+    if (!token) throw new Error('Not authenticated');
+    const response = await AutomationData.updateRule(token, ruleId, rule);
+    return response.data;
+  }
+
   static async toggleRule(ruleId: number): Promise<void> {
     const token = AuthController.getToken();
     if (!token) throw new Error('Not authenticated');
