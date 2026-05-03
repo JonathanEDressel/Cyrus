@@ -1977,7 +1977,7 @@ class CommandsController {
 
   // ─── Edit Rule Modal ──────────────────────────────────────────────────
 
-  private openEditModal(rule: any): void {
+  private async openEditModal(rule: any): Promise<void> {
     // Populate hidden id
     (document.getElementById('edit-rule-id') as HTMLInputElement).value = String(rule.id);
 
@@ -2036,36 +2036,94 @@ class CommandsController {
       priceAmtInput.value = (mode !== 'all' && rule.action_amount) ? String(rule.action_amount) : '';
     }
 
+    // Subtitle (set before action-type branching so withdraw rules get it too)
+    const triggerLabel: Record<string, string> = {
+      order_filled: 'Order Filled',
+      balance_threshold: 'Balance Threshold',
+      price_threshold: 'Price Threshold'
+    };
+    const actionLabel: Record<string, string> = {
+      withdraw_crypto: 'Withdraw',
+      convert_crypto: 'Convert'
+    };
+    const subtitle = document.getElementById('edit-rule-modal-subtitle');
+    if (subtitle) {
+      subtitle.textContent = `${triggerLabel[rule.trigger_type] || rule.trigger_type} → ${actionLabel[rule.action_type] || rule.action_type}`;
+    }
+
     // Action-type-specific fields
     if (rule.action_type === 'withdraw_crypto') {
-      // Address key
+      // Address key — show row immediately with loading state, fetch addresses async
       document.getElementById('edit-address-row')?.classList.remove('d-none');
       const addrSelect = document.getElementById('edit-action-address-key') as HTMLSelectElement;
-      addrSelect.innerHTML = '';
-      const addresses = this.localWithdrawalAddresses;
-      if (addresses.length === 0) {
-        const opt = document.createElement('option');
-        opt.value = ''; opt.disabled = true; opt.selected = true;
-        opt.textContent = 'No withdrawal addresses available';
-        addrSelect.appendChild(opt);
-        addrSelect.disabled = true;
-      } else {
-        addrSelect.disabled = false;
-        const placeholder = document.createElement('option');
-        placeholder.value = ''; placeholder.disabled = true;
-        if (!rule.action_address_key) placeholder.selected = true;
-        placeholder.textContent = 'Select an address...';
-        addrSelect.appendChild(placeholder);
-        const sorted = [...addresses].sort((a: any, b: any) => a.nickname_key.localeCompare(b.nickname_key));
-        for (const addr of sorted) {
+      addrSelect.innerHTML = '<option value="" disabled selected>Loading addresses...</option>';
+      addrSelect.disabled = true;
+
+      // Show modal now so the user sees it while addresses load
+      document.getElementById('edit-rule-error')?.classList.add('d-none');
+      document.getElementById('edit-rule-overlay')?.classList.remove('d-none');
+      (document.getElementById('edit-rule-name') as HTMLInputElement).focus();
+
+      try {
+        const connectionId = rule.action_exchange_id || this.selectedConnectionId;
+        const addresses: any[] = connectionId
+          ? await ExchangeController.getWithdrawalAddresses(connectionId)
+          : [];
+
+        addrSelect.innerHTML = '';
+        if (addresses.length === 0) {
           const opt = document.createElement('option');
-          opt.value = addr.nickname_key;
-          opt.textContent = `${addr.nickname_key} (${addr.asset} - ${addr.method})`;
-          if (rule.action_address_key && addr.nickname_key === rule.action_address_key) {
-            opt.selected = true;
-          }
+          opt.value = ''; opt.disabled = true; opt.selected = true;
+          opt.textContent = 'No withdrawal addresses available';
           addrSelect.appendChild(opt);
+          addrSelect.disabled = true;
+        } else {
+          addrSelect.disabled = false;
+          const placeholder = document.createElement('option');
+          placeholder.value = ''; placeholder.disabled = true; placeholder.selected = true;
+          placeholder.textContent = 'Select an address...';
+          addrSelect.appendChild(placeholder);
+          const sorted = [...addresses].sort((a: any, b: any) => a.nickname_key.localeCompare(b.nickname_key));
+          for (const addr of sorted) {
+            const opt = document.createElement('option');
+            opt.value = addr.nickname_key;
+            opt.textContent = `${addr.nickname_key} (${addr.asset} - ${addr.method})`;
+            addrSelect.appendChild(opt);
+          }
+          if (rule.action_address_key) {
+            const target = String(rule.action_address_key).trim();
+            console.log('[EditModal] Matching address. rule.action_address_key:', JSON.stringify(rule.action_address_key));
+            console.log('[EditModal] Available option values:', Array.from(addrSelect.options).map(o => JSON.stringify(o.value)));
+            let matched = false;
+            for (let i = 0; i < addrSelect.options.length; i++) {
+              if (addrSelect.options[i].value === target) {
+                addrSelect.selectedIndex = i;
+                matched = true;
+                console.log('[EditModal] Exact match at index', i);
+                break;
+              }
+            }
+            if (!matched) {
+              // Case-insensitive fallback
+              const targetLower = target.toLowerCase();
+              for (let i = 0; i < addrSelect.options.length; i++) {
+                if (addrSelect.options[i].value.trim().toLowerCase() === targetLower) {
+                  addrSelect.selectedIndex = i;
+                  console.log('[EditModal] Case-insensitive match at index', i);
+                  break;
+                }
+              }
+              if (addrSelect.selectedIndex <= 0) {
+                console.warn('[EditModal] No match found. target:', JSON.stringify(target));
+              }
+            }
+          } else {
+            console.warn('[EditModal] rule.action_address_key is falsy:', rule.action_address_key);
+          }
         }
+      } catch {
+        addrSelect.innerHTML = '<option value="" disabled selected>Failed to load addresses</option>';
+        addrSelect.disabled = true;
       }
 
       // order_filled: amount mode
@@ -2080,27 +2138,15 @@ class CommandsController {
         amtInput.disabled = useFilled;
         amtInput.value = (!useFilled && rule.action_amount) ? String(rule.action_amount) : '';
       }
+
+      // Return early — modal already shown above
+      return;
     }
 
     if (rule.action_type === 'convert_crypto' && rule.trigger_type === 'balance_threshold') {
       document.getElementById('edit-convert-row')?.classList.remove('d-none');
       (document.getElementById('edit-convert-to-asset') as HTMLInputElement).value = rule.convert_to_asset || '';
       (document.getElementById('edit-convert-amount') as HTMLInputElement).value = rule.action_amount || '';
-    }
-
-    // Subtitle
-    const triggerLabel: Record<string, string> = {
-      order_filled: 'Order Filled',
-      balance_threshold: 'Balance Threshold',
-      price_threshold: 'Price Threshold'
-    };
-    const actionLabel: Record<string, string> = {
-      withdraw_crypto: 'Withdraw',
-      convert_crypto: 'Convert'
-    };
-    const subtitle = document.getElementById('edit-rule-modal-subtitle');
-    if (subtitle) {
-      subtitle.textContent = `${triggerLabel[rule.trigger_type] || rule.trigger_type} → ${actionLabel[rule.action_type] || rule.action_type}`;
     }
 
     // Clear error, show modal
