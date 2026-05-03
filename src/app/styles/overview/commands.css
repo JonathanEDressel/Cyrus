@@ -473,3 +473,363 @@
 .d-none {
   display: none !important;
 }
+
+/* ─── Rule Flow: Tab Strip ──────────────────────────────────────── */
+
+.rules-tab-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.rules-tab-strip {
+  display: flex;
+  gap: 0.2rem;
+  background: var(--bg-tertiary, #1e293b);
+  padding: 0.25rem;
+  border-radius: 8px;
+}
+
+.rules-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.9rem;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+  white-space: nowrap;
+}
+
+.rules-tab-btn.active {
+  background: var(--accent-purple);
+  color: #fff;
+}
+
+.rules-tab-btn:hover:not(.active) {
+  background: var(--border-primary);
+  color: var(--text-secondary);
+}
+
+/* ─── Rule Flow: Chart Container ────────────────────────────────── */
+
+#rules-flow-view {
+  padding: 0.25rem 0;
+}
+
+#rules-flow-chart {
+  display: flex;
+  flex-direction: column;
+  gap: 1.75rem;
+  padding: 0.5rem 0 1rem;
+}
+
+/* ─── Rule Flow: Group (connected component) ────────────────────── */
+
+.flow-group {
+  position: relative;
+}
+
+.flow-group-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  margin-bottom: 0.6rem;
+}
+
+.flow-columns {
+  display: flex;
+  gap: 3rem;
+  align-items: flex-start;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  padding-bottom: 0.5rem;
+  position: relative;
+}
+
+.flow-column {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  flex-shrink: 0;
+}
+
+/* ─── Rule Flow: Rule Card ──────────────────────────────────────── */
+
+.flow-rule-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
+  border-radius: 10px;
+  padding: 0.7rem 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  position: relative;
+  min-width: 210px;
+  max-width: 280px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  cursor: default;
+}
+
+.flow-rule-card:hover {
+  border-color: var(--accent-purple);
+  box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.2);
+}
+
+.flow-rule-card.paused {
+  opacity: 0.52;
+}
+
+.flow-rule-card.paused::after {
+  content: 'PAUSED';
+  position: absolute;
+  top: -9px;
+  right: 8px;
+  background: #64748b;
+  color: #fff;
+  font-size: 0.58rem;
+  font-weight: 700;
+  padding: 0.1rem 0.45rem;
+  border-radius: 4px;
+  letter-spacing: 0.6px;
+}
+
+/* ─── Rule Flow: Node Sections (trigger / action) ───────────────── */
+
+.flow-node-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.28rem;
+}
+
+.flow-node-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.95rem;
+  cursor: default;
+  flex-shrink: 0;
+  transition: transform 0.15s;
+}
+
+.flow-node-icon:hover {
+  transform: scale(1.1);
+}
+
+.flow-icon-balance {
+  background: rgba(251, 191, 36, 0.12);
+  color: #fbbf24;
+}
+
+.flow-icon-price {
+  background: rgba(56, 189, 248, 0.12);
+  color: #38bdf8;
+}
+
+.flow-icon-order {
+  background: rgba(251, 191, 36, 0.12);
+  color: #fbbf24;
+}
+
+.flow-icon-convert {
+  background: rgba(99, 102, 241, 0.12);
+  color: #818cf8;
+}
+
+.flow-icon-withdraw {
+  background: rgba(34, 197, 94, 0.12);
+  color: #22c55e;
+}
+
+.flow-node-label {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  text-align: center;
+  max-width: 72px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.2;
+}
+
+.flow-node-divider {
+  width: 1px;
+  height: 36px;
+  background: var(--border-primary);
+  flex-shrink: 0;
+}
+
+.flow-node-arrow {
+  font-size: 0.78rem;
+  color: var(--text-dimmer, #475569);
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.flow-card-name {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.flow-card-meta {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.flow-card-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  flex: 1;
+  min-width: 0;
+}
+
+/* ─── Rule Flow: SVG Arrow Overlay ─────────────────────────────── */
+
+.flow-svg-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+  z-index: 0;
+}
+
+.flow-svg-overlay .flow-arrow-path {
+  stroke: var(--accent-purple, #6366f1);
+  stroke-width: 1.5;
+  fill: none;
+  stroke-dasharray: 6 3;
+  opacity: 0.55;
+}
+
+.flow-svg-overlay .flow-arrow-label {
+  font-size: 9px;
+  fill: var(--text-muted, #94a3b8);
+  font-family: inherit;
+  font-weight: 600;
+}
+
+.flow-svg-overlay .flow-arrowhead {
+  fill: var(--accent-purple, #6366f1);
+  opacity: 0.55;
+}
+
+/* ─── Rule Flow: Floating Tooltip ───────────────────────────────── */
+
+.flow-tooltip {
+  position: fixed;
+  z-index: 9999;
+  background: var(--bg-primary, #0f172a);
+  border: 1px solid var(--border-primary, #1e293b);
+  border-radius: 8px;
+  padding: 0.6rem 0.85rem;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  pointer-events: none;
+  max-width: 230px;
+  line-height: 1.5;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
+}
+
+.flow-tooltip-title {
+  font-weight: 700;
+  color: var(--text-primary, #f1f5f9);
+  margin-bottom: 0.3rem;
+  display: block;
+  font-size: 0.82rem;
+}
+
+.flow-tooltip-row {
+  display: flex;
+  gap: 0.4rem;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+
+.flow-tooltip-key {
+  color: var(--text-muted);
+  min-width: 64px;
+  font-size: 0.73rem;
+  flex-shrink: 0;
+}
+
+.flow-tooltip-val {
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+/* ─── Rule Flow: Empty State ────────────────────────────────────── */
+
+.flow-empty {
+  text-align: center;
+  padding: 2.5rem 1rem;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.flow-empty i {
+  display: block;
+  font-size: 2rem;
+  margin-bottom: 0.6rem;
+  opacity: 0.4;
+}
+
+/* ─── Rule Flow: Legend ─────────────────────────────────────────── */
+
+.flow-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1.25rem;
+  padding: 0.7rem 0.25rem;
+  border-top: 1px solid var(--border-primary);
+  margin-top: 0.5rem;
+}
+
+.flow-legend-title {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+.flow-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.76rem;
+  color: var(--text-muted);
+}
+
+.flow-legend-item .flow-legend-icon-trigger { color: #fbbf24; }
+.flow-legend-item .flow-legend-icon-price   { color: #38bdf8; }
+.flow-legend-item .flow-legend-icon-order   { color: #fbbf24; }
+.flow-legend-item .flow-legend-icon-convert { color: #818cf8; }
+.flow-legend-item .flow-legend-icon-withdraw{ color: #22c55e; }
+.flow-legend-item .flow-legend-icon-paused  { color: #64748b; }

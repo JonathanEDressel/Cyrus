@@ -250,10 +250,20 @@
 
   <!-- Active Rules -->
   <div class="overview-section">
-    <div class="section-header">
+    <div class="section-header rules-tab-header">
       <h2 class="section-title" id="rules-count-title">Active Rules</h2>
+      <div class="rules-tab-strip" id="rules-tab-strip">
+        <button class="rules-tab-btn active" data-tab="table" title="Active Rules Table">
+          <i class="fa-solid fa-table-list"></i> Active Rules
+        </button>
+        <button class="rules-tab-btn" data-tab="flow" title="Rule Flow Chart">
+          <i class="fa-solid fa-diagram-project"></i> Rule Flow
+        </button>
+      </div>
     </div>
-    <div class="data-table-wrapper">
+
+    <!-- Table view (default) -->
+    <div class="data-table-wrapper" id="rules-table-view">
       <table class="data-table" id="rules-table">
         <thead>
           <tr>
@@ -271,6 +281,21 @@
           </tr>
         </tbody>
       </table>
+    </div>
+
+    <!-- Flow view -->
+    <div id="rules-flow-view" class="d-none">
+      <div id="rules-flow-chart"></div>
+      <div id="flow-tooltip" class="flow-tooltip d-none"></div>
+      <div class="flow-legend">
+        <span class="flow-legend-title">Legend</span>
+        <span class="flow-legend-item"><i class="fa-solid fa-scale-balanced flow-legend-icon-trigger"></i> Balance Threshold</span>
+        <span class="flow-legend-item"><i class="fa-solid fa-chart-line flow-legend-icon-price"></i> Price Threshold</span>
+        <span class="flow-legend-item"><i class="fa-solid fa-list-check flow-legend-icon-order"></i> Order Filled</span>
+        <span class="flow-legend-item"><i class="fa-solid fa-arrows-rotate flow-legend-icon-convert"></i> Convert Asset</span>
+        <span class="flow-legend-item"><i class="fa-solid fa-arrow-right-from-bracket flow-legend-icon-withdraw"></i> Withdraw</span>
+        <span class="flow-legend-item"><i class="fa-solid fa-circle-pause flow-legend-icon-paused"></i> Paused Rule</span>
+      </div>
     </div>
   </div>
 
