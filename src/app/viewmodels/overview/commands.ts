@@ -2091,34 +2091,13 @@ class CommandsController {
             addrSelect.appendChild(opt);
           }
           if (rule.action_address_key) {
-            const target = String(rule.action_address_key).trim();
-            console.log('[EditModal] Matching address. rule.action_address_key:', JSON.stringify(rule.action_address_key));
-            console.log('[EditModal] Available option values:', Array.from(addrSelect.options).map(o => JSON.stringify(o.value)));
-            let matched = false;
+            const target = String(rule.action_address_key).trim().toLowerCase();
             for (let i = 0; i < addrSelect.options.length; i++) {
-              if (addrSelect.options[i].value === target) {
+              if (addrSelect.options[i].value.trim().toLowerCase() === target) {
                 addrSelect.selectedIndex = i;
-                matched = true;
-                console.log('[EditModal] Exact match at index', i);
                 break;
               }
             }
-            if (!matched) {
-              // Case-insensitive fallback
-              const targetLower = target.toLowerCase();
-              for (let i = 0; i < addrSelect.options.length; i++) {
-                if (addrSelect.options[i].value.trim().toLowerCase() === targetLower) {
-                  addrSelect.selectedIndex = i;
-                  console.log('[EditModal] Case-insensitive match at index', i);
-                  break;
-                }
-              }
-              if (addrSelect.selectedIndex <= 0) {
-                console.warn('[EditModal] No match found. target:', JSON.stringify(target));
-              }
-            }
-          } else {
-            console.warn('[EditModal] rule.action_address_key is falsy:', rule.action_address_key);
           }
         }
       } catch {
