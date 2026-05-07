@@ -11,6 +11,8 @@ class ExchangeStore {
   /** Kept for backward compat — in single mode equals the connection ID, in 'all' mode is null */
   static activeConnectionId: number | null = null;
   static connections: ExchangeConnection[] = [];
+  /** Full list of supported exchanges with capability flags from /api/exchanges/supported. */
+  static supportedExchanges: any[] = [];
   static openOrders: any[] = [];
   static withdrawalAddresses: any[] = [];
   static lastUpdated: Date | null = null;
@@ -20,8 +22,14 @@ class ExchangeStore {
   private static ordersByConn: Map<number, any[]> = new Map();
   private static addressesByConn: Map<number, any[]> = new Map();
 
-  /** Load & cache validated connections. Call once after login / on profile changes. */
+  /** Load & cache validated connections and supported-exchange metadata.
+   * Call once after login / on profile changes. */
   static async loadConnections(): Promise<void> {
+    try {
+      ExchangeStore.supportedExchanges = await ExchangeController.getSupportedExchanges();
+    } catch {
+      ExchangeStore.supportedExchanges = [];
+    }
     try {
       const all = await ExchangeController.getConnections();
       ExchangeStore.connections = all.filter((c: any) => c.is_validated);
@@ -29,6 +37,17 @@ class ExchangeStore {
       ExchangeStore.connections = [];
     }
     ExchangeStore.notifyConnections();
+  }
+
+  /**
+   * Returns true when the given exchange name supports crypto withdrawals
+   * (i.e. has whitelisted withdrawal addresses).
+   * Falls back to true for unknown exchanges so we never silently restrict.
+   */
+  static exchangeSupportsWithdrawals(exchangeName: string): boolean {
+    const meta = ExchangeStore.supportedExchanges.find((e: any) => e.id === exchangeName);
+    if (!meta) return true;
+    return meta.has_withdrawal_addresses === true;
   }
 
   /** Start polling. mode = 'all' or a specific connection ID. */

@@ -7,6 +7,7 @@ from helper.ExchangeRegistry import (
     SUPPORTED_EXCHANGES, get_supported_exchanges, get_user_exchange
 )
 from helper.ExchangeClient import validate_keys
+from helper.robinhood.errors import RobinhoodAuthError, RobinhoodError
 import ccxt
 
 exchange_bp = Blueprint('exchanges', __name__)
@@ -179,6 +180,13 @@ def validate_connection(conn_id):
             return success_response(data={'valid': None, 'error': 'Network connection failed'})
 
         except ccxt.ExchangeError as e:
+            return success_response(data={'valid': None, 'error': str(e)})
+
+        except RobinhoodAuthError as e:
+            ExchangeConnectionDbContext.mark_invalid(conn_id, request.user_id)
+            return success_response(data={'valid': False, 'error': str(e)})
+
+        except RobinhoodError as e:
             return success_response(data={'valid': None, 'error': str(e)})
 
         except Exception:

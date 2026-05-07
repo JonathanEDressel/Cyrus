@@ -4,7 +4,7 @@ from controllers.ExchangeConnectionDbContext import ExchangeConnectionDbContext
 from helper.Security import token_required, active_required
 from helper.ErrorHandler import handle_error, bad_request, not_found
 from helper.Helper import success_response, created_response
-from helper.ExchangeRegistry import get_minimum_withdrawal, get_all_minimums
+from helper.ExchangeRegistry import get_minimum_withdrawal, get_all_minimums, SUPPORTED_EXCHANGES
 
 automation_bp = Blueprint('automation', __name__)
 
@@ -68,6 +68,17 @@ def create_rule():
             return bad_request("Action exchange connection not found")
         if not action_conn['is_validated']:
             return bad_request("Action exchange connection keys are not validated")
+
+        # Enforce exchange capability: block withdraw actions for exchanges that
+        # don't support crypto withdrawals via API (e.g. Coinbase, Binance, Robinhood).
+        if action_type == 'withdraw_crypto':
+            action_exchange_meta = SUPPORTED_EXCHANGES.get(action_conn['exchange_name'], {})
+            if not action_exchange_meta.get('supports_withdraw', False):
+                exchange_label = action_exchange_meta.get('name', action_conn['exchange_name'])
+                return bad_request(
+                    f"Withdraw Crypto is not supported for {exchange_label}. "
+                    f"Only 'Convert Crypto' is available for this exchange."
+                )
 
         # Validate trigger params
         trigger_order_id = data.get('trigger_order_id', '').strip() or None

@@ -20,6 +20,7 @@ SUPPORTED_EXCHANGES: dict[str, dict] = {
         'ccxt_id': 'kraken',
         'requires_passphrase': False,
         'has_withdrawal_addresses': True,
+        'supports_withdraw': True,
         'has_sandbox': False,
         'website': 'https://www.kraken.com',
         'api_key_url': 'https://www.kraken.com/u/security/api',
@@ -30,6 +31,7 @@ SUPPORTED_EXCHANGES: dict[str, dict] = {
         'ccxt_id': 'coinbaseadvanced',
         'requires_passphrase': False,
         'has_withdrawal_addresses': False,
+        'supports_withdraw': False,
         'has_sandbox': False,
         'website': 'https://www.coinbase.com',
         'api_key_url': 'https://www.coinbase.com/settings/api',
@@ -40,11 +42,24 @@ SUPPORTED_EXCHANGES: dict[str, dict] = {
         'ccxt_id': 'binance',
         'requires_passphrase': False,
         'has_withdrawal_addresses': False,
+        'supports_withdraw': False,
         'has_sandbox': False,
         'website': 'https://www.binance.com',
         'api_key_url': 'https://www.binance.com/en/my/settings/api-management',
         'guide_url': 'https://www.binance.com/en/support/faq/how-to-create-api-keys-on-binance-360002502072',
     },
+    # Not supported yet
+    # 'robinhood': {
+    #     'name': 'Robinhood (Beta)',
+    #     'ccxt_id': None,  # Direct API — not CCXT-based
+    #     'requires_passphrase': False,
+    #     'has_withdrawal_addresses': False,
+    #     'supports_withdraw': False,
+    #     'has_sandbox': False,
+    #     'website': 'https://robinhood.com',
+    #     'api_key_url': 'https://robinhood.com/account/crypto',
+    #     'guide_url': 'https://docs.robinhood.com/crypto/trading/',
+    # },
 }
 
 # Minimum withdrawal amounts per exchange per asset (with a 10% safety cushion).
@@ -101,6 +116,7 @@ def get_supported_exchanges() -> list[dict]:
             'name': meta['name'],
             'requires_passphrase': meta['requires_passphrase'],
             'has_withdrawal_addresses': meta['has_withdrawal_addresses'],
+            'supports_withdraw': meta.get('supports_withdraw', False),
             'has_sandbox': meta.get('has_sandbox', False),
             'website': meta.get('website', ''),
             'api_key_url': meta.get('api_key_url', ''),
@@ -140,9 +156,14 @@ def get_user_exchange(user_id: int, connection_id: int):
     if exchange_name not in SUPPORTED_EXCHANGES:
         raise ValueError(f'Unsupported exchange: {exchange_name}')
 
-    ccxt_id = SUPPORTED_EXCHANGES[exchange_name]['ccxt_id']
     api_key = decrypt_api_key(row['api_key_encrypted'])
     private_key = decrypt_api_key(row['private_key_encrypted'])
+
+    if exchange_name == 'robinhood':
+        from helper.robinhood.adapter import RobinhoodAdapter
+        return RobinhoodAdapter(api_key=api_key, private_key_b64=private_key)
+
+    ccxt_id = SUPPORTED_EXCHANGES[exchange_name]['ccxt_id']
     passphrase = decrypt_api_key(row['passphrase_encrypted']) if row.get('passphrase_encrypted') else None
     sandbox = bool(row.get('is_sandbox', False))
     return create_exchange(ccxt_id, api_key, private_key, passphrase, sandbox)

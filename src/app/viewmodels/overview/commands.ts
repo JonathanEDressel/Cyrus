@@ -493,12 +493,11 @@ class CommandsController {
   private populateAddressDropdown(): void {
     const notice = document.getElementById('withdraw-unsupported-notice');
     const conn = ExchangeStore.connections.find(c => c.id === this.selectedConnectionId);
-    const noAddressExchanges = ['coinbase', 'binance'];
-    const noAddressSupport = noAddressExchanges.includes(conn?.exchange_name ?? '');
+    const noAddressSupport = conn ? !ExchangeStore.exchangeSupportsWithdrawals(conn.exchange_name) : false;
     if (notice) {
       if (noAddressSupport && conn) {
-        const exchangeLabels: Record<string, string> = { coinbase: 'Coinbase Advanced', binance: 'Binance' };
-        const name = exchangeLabels[conn.exchange_name] ?? conn.exchange_name;
+        const meta = ExchangeStore.supportedExchanges.find((e: any) => e.id === conn.exchange_name);
+        const name = meta?.name ?? conn.exchange_name;
         notice.textContent = `Whitelisted withdrawal addresses are not supported for ${name}. Only "Convert Crypto" is available for this exchange.`;
         notice.classList.remove('d-none');
       } else {

@@ -56,7 +56,7 @@ class AutomationWorker:
         from controllers.AutomationDbContext import AutomationDbContext
         from controllers.AuthDbContext import AuthDbContext
         from controllers.ExchangeConnectionDbContext import ExchangeConnectionDbContext
-        from helper.ExchangeRegistry import get_user_exchange, get_connection_row, get_minimum_withdrawal
+        from helper.ExchangeRegistry import get_user_exchange, get_connection_row, get_minimum_withdrawal, SUPPORTED_EXCHANGES
         from helper.ExchangeClient import get_open_orders, get_closed_orders, get_balance, withdraw, convert, get_market_price
         
         user_ids = AutomationDbContext.get_users_with_active_rules()
@@ -281,6 +281,25 @@ class AutomationWorker:
             # Check minimum withdrawal on the action exchange
             action_conn_row = get_connection_row(user_id, rule.action_exchange_id)
             action_exchange_name = action_conn_row['exchange_name'] if action_conn_row else 'kraken'
+
+            # Capability guard: skip if exchange doesn't support withdrawals
+            from helper.ExchangeRegistry import SUPPORTED_EXCHANGES
+            action_exchange_meta = SUPPORTED_EXCHANGES.get(action_exchange_name, {})
+            if not action_exchange_meta.get('supports_withdraw', False):
+                AutomationDbContext.create_log(
+                    rule_id=rule.id,
+                    user_id=rule.user_id,
+                    trigger_event=trigger_event,
+                    action_executed="Withdraw (skipped — not supported)",
+                    action_result=(
+                        f"Withdraw Crypto is not supported for "
+                        f"{action_exchange_meta.get('name', action_exchange_name)}"
+                    ),
+                    status='error',
+                )
+                print(f"[WORKER] Withdraw not supported for {action_exchange_name}, rule '{rule.rule_name}' skipped")
+                continue
+
             min_withdrawal = get_minimum_withdrawal(action_exchange_name, asset)
             withdraw_amount = current_balance
 
@@ -352,9 +371,27 @@ class AutomationWorker:
                 withdraw_amount = self._resolve_amount(rule, snapshot)
 
                 # Check minimum withdrawal on action exchange
-                from helper.ExchangeRegistry import get_connection_row
-                action_conn_row = get_connection_row(user_id, rule.action_exchange_id)
-                action_exchange_name = action_conn_row['exchange_name'] if action_conn_row else 'kraken'
+            from helper.ExchangeRegistry import get_connection_row, SUPPORTED_EXCHANGES
+            action_conn_row = get_connection_row(user_id, rule.action_exchange_id)
+            action_exchange_name = action_conn_row['exchange_name'] if action_conn_row else 'kraken'
+
+            # Capability guard: skip if exchange doesn't support withdrawals
+            action_exchange_meta = SUPPORTED_EXCHANGES.get(action_exchange_name, {})
+            if not action_exchange_meta.get('supports_withdraw', False):
+                AutomationDbContext.create_log(
+                    rule_id=rule.id,
+                    user_id=rule.user_id,
+                    trigger_event=trigger_event,
+                    action_executed="Withdraw (skipped — not supported)",
+                    action_result=(
+                        f"Withdraw Crypto is not supported for "
+                        f"{action_exchange_meta.get('name', action_exchange_name)}"
+                    ),
+                    status='error',
+                )
+                print(f"[WORKER] Withdraw not supported for {action_exchange_name}, rule '{rule.rule_name}' skipped")
+                return
+
                 min_withdrawal = get_minimum_withdrawal(action_exchange_name, rule.action_asset)
                 if min_withdrawal > 0 and float(withdraw_amount) < min_withdrawal:
                     skip_msg = (f"Amount {withdraw_amount} {rule.action_asset} is below minimum "
