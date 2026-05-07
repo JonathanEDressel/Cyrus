@@ -36,7 +36,7 @@ SUPPORTED_EXCHANGES: dict[str, dict] = {
         'guide_url': 'https://docs.cdp.coinbase.com/exchange/introduction/rest-quickstart',
     },
     'binance': {
-        'name': 'Binance',
+        'name': 'Binance (Beta)',
         'ccxt_id': 'binance',
         'requires_passphrase': False,
         'has_withdrawal_addresses': False,
