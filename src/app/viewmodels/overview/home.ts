@@ -7,6 +7,7 @@ interface ChartInstance {
   series: any;
   symbol: string;
   activeRange: string;
+  resizeObserver?: ResizeObserver;
 }
 
 class HomeController {
@@ -15,7 +16,9 @@ class HomeController {
   private allPairs: any[] = [];
   private tickerTimer: ReturnType<typeof setInterval> | null = null;
   private chartTimer: ReturnType<typeof setInterval> | null = null;
-  private draggedSymbol: string | null = null;
+  private watchlistSymbols: string[] = [];
+  private activeSymbol: string | null = null;
+  private static readonly ACTIVE_KEY = 'cyrus_live_active_symbol';
 
   constructor() {
     this.init();
@@ -86,6 +89,15 @@ class HomeController {
     document.getElementById('add-crypto-search')?.addEventListener('input', (e) => {
       this.filterPairs((e.target as HTMLInputElement).value);
     });
+
+    // Live Data: switch the active chart (selection saved locally).
+    document.getElementById('live-data-selector')?.addEventListener('change', (e) => {
+      const symbol = (e.target as HTMLSelectElement).value;
+      if (!symbol || symbol === this.activeSymbol) return;
+      this.activeSymbol = symbol;
+      localStorage.setItem(HomeController.ACTIVE_KEY, symbol);
+      this.renderActiveChart();
+    });
   }
 
   private loadDashboardData(): void {
@@ -104,25 +116,51 @@ class HomeController {
       if (!token) return;
       const resp = await WatchlistData.getWatchlist(token);
       const items: any[] = resp.data || [];
-      if (items.length === 0) {
+      this.watchlistSymbols = items.map((i: any) => i.symbol);
+
+      if (this.watchlistSymbols.length === 0) {
+        this.activeSymbol = null;
+        this.populateSelector();
+        this.destroyAllCharts();
         this.showEmptyState();
         return;
       }
-      this.hideEmptyState();
-      for (const item of items) {
-        await this.renderChartCard(item.symbol);
-      }
+
+      // Restore the last viewed chart (saved locally, not in the DB).
+      const saved = localStorage.getItem(HomeController.ACTIVE_KEY);
+      this.activeSymbol = saved && this.watchlistSymbols.includes(saved)
+        ? saved
+        : this.watchlistSymbols[0];
+
+      this.populateSelector();
+      await this.renderActiveChart();
     } catch {
       // silently fail — empty state shows
     }
   }
 
-  private async renderChartCard(symbol: string): Promise<void> {
-    if (this.charts.has(symbol)) return;
+  /** Fill the chart selector with the watched symbols. */
+  private populateSelector(): void {
+    const sel = document.getElementById('live-data-selector') as HTMLSelectElement | null;
+    if (!sel) return;
+    sel.innerHTML = this.watchlistSymbols
+      .map((s) => `<option value="${this.escapeHtml(s)}">${this.escapeHtml(s)}</option>`)
+      .join('');
+    if (this.activeSymbol) sel.value = this.activeSymbol;
+    sel.classList.toggle('d-none', this.watchlistSymbols.length === 0);
+  }
+
+  private async renderActiveChart(): Promise<void> {
+    const symbol = this.activeSymbol;
+    if (!symbol) return;
 
     this.hideEmptyState();
     const container = document.getElementById('live-data-charts');
     if (!container) return;
+
+    // Only one chart is shown at a time — tear down any previous one.
+    this.destroyAllCharts();
+    container.querySelectorAll('.chart-card').forEach((el) => el.remove());
 
     const cardId = this.symbolToId(symbol);
     const savedRange = localStorage.getItem(`chart-range-${symbol}`) || '1D';
@@ -130,7 +168,6 @@ class HomeController {
     const card = document.createElement('div');
     card.className = 'chart-card';
     card.id = `chart-card-${cardId}`;
-    card.draggable = true;
     card.setAttribute('data-symbol', symbol);
     card.innerHTML = `
       <div class="chart-header">
@@ -151,39 +188,6 @@ class HomeController {
       <div class="chart-container" id="chart-el-${cardId}"></div>
     `;
     container.appendChild(card);
-
-    // Drag-and-drop handlers
-    card.addEventListener('dragstart', (e) => {
-      this.draggedSymbol = symbol;
-      card.classList.add('dragging');
-      e.dataTransfer!.effectAllowed = 'move';
-    });
-    card.addEventListener('dragend', () => {
-      this.draggedSymbol = null;
-      card.classList.remove('dragging');
-      container.querySelectorAll('.chart-card.drag-over').forEach(el => el.classList.remove('drag-over'));
-    });
-    card.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      e.dataTransfer!.dropEffect = 'move';
-      if (this.draggedSymbol && this.draggedSymbol !== symbol) {
-        card.classList.add('drag-over');
-      }
-    });
-    card.addEventListener('dragleave', () => {
-      card.classList.remove('drag-over');
-    });
-    card.addEventListener('drop', (e) => {
-      e.preventDefault();
-      card.classList.remove('drag-over');
-      if (!this.draggedSymbol || this.draggedSymbol === symbol) return;
-      const draggedId = this.symbolToId(this.draggedSymbol);
-      const draggedCard = document.getElementById(`chart-card-${draggedId}`);
-      if (!draggedCard) return;
-      // Insert dragged card before this card
-      container.insertBefore(draggedCard, card);
-      this.persistOrder();
-    });
 
     // Remove button
     card.querySelector('.chart-remove-btn')?.addEventListener('click', () => {
@@ -239,15 +243,18 @@ class HomeController {
       priceFormat: { type: 'price', precision: 8, minMove: 0.00000001 },
     });
 
-    this.charts.set(symbol, { chart, series, symbol, activeRange: savedRange });
+    const inst: ChartInstance = { chart, series, symbol, activeRange: savedRange };
+    this.charts.set(symbol, inst);
 
-    // Responsive resize
+    // Responsive resize — skip if the chart was disposed or replaced.
     const resizeObserver = new ResizeObserver(() => {
+      if (this.charts.get(symbol) !== inst) return;
       if (chartEl.clientWidth > 0) {
-        chart.applyOptions({ width: chartEl.clientWidth });
+        try { chart.applyOptions({ width: chartEl.clientWidth }); } catch { /* disposed */ }
       }
     });
     resizeObserver.observe(chartEl);
+    inst.resizeObserver = resizeObserver;
 
     await this.loadChartData(symbol, savedRange);
     this.loadTicker(symbol);
@@ -262,6 +269,8 @@ class HomeController {
       const token = AuthController.getToken();
       if (!token) return;
       const resp = await MarketData.getOHLCV(token, symbol, range);
+      // The chart may have been disposed/replaced while awaiting data.
+      if (this.charts.get(symbol) !== inst) return;
       const candles: any[] = resp.data || [];
       const lineData = candles.map((c: any) => ({ time: c.time, value: c.close }));
 
@@ -326,34 +335,29 @@ class HomeController {
       // continue removing from UI anyway
     }
 
+    this.watchlistSymbols = this.watchlistSymbols.filter((s) => s !== symbol);
+
     const inst = this.charts.get(symbol);
     if (inst) {
+      try { inst.resizeObserver?.disconnect(); } catch {}
       inst.chart.remove();
       this.charts.delete(symbol);
     }
     const cardId = this.symbolToId(symbol);
     document.getElementById(`chart-card-${cardId}`)?.remove();
 
-    if (this.charts.size === 0) {
-      this.showEmptyState();
+    // If we removed the active chart, fall back to another (or the empty state).
+    if (this.activeSymbol === symbol) {
+      this.activeSymbol = this.watchlistSymbols[0] || null;
+      if (this.activeSymbol) localStorage.setItem(HomeController.ACTIVE_KEY, this.activeSymbol);
+      else localStorage.removeItem(HomeController.ACTIVE_KEY);
     }
-  }
 
-  private async persistOrder(): Promise<void> {
-    const container = document.getElementById('live-data-charts');
-    if (!container) return;
-    const symbols: string[] = [];
-    container.querySelectorAll('.chart-card[data-symbol]').forEach((el) => {
-      const sym = el.getAttribute('data-symbol');
-      if (sym) symbols.push(sym);
-    });
-    try {
-      const token = AuthController.getToken();
-      if (token) {
-        await WatchlistData.updateOrder(token, symbols);
-      }
-    } catch {
-      // best-effort persist
+    this.populateSelector();
+    if (this.activeSymbol) {
+      await this.renderActiveChart();
+    } else {
+      this.showEmptyState();
     }
   }
 
@@ -386,7 +390,7 @@ class HomeController {
     if (!list) return;
 
     const q = query.toLowerCase().trim();
-    const watchedSymbols = new Set(this.charts.keys());
+    const watchedSymbols = new Set(this.watchlistSymbols);
     const filtered = this.allPairs.filter((p: any) => {
       if (watchedSymbols.has(p.symbol)) return false;
       if (!q) return true;
@@ -414,7 +418,7 @@ class HomeController {
   }
 
   private async addCrypto(symbol: string): Promise<void> {
-    if (this.charts.has(symbol)) return;
+    if (this.watchlistSymbols.includes(symbol)) return;
 
     try {
       const token = AuthController.getToken();
@@ -425,8 +429,13 @@ class HomeController {
       // continue rendering even if save fails
     }
 
+    this.watchlistSymbols.push(symbol);
+    this.activeSymbol = symbol;
+    localStorage.setItem(HomeController.ACTIVE_KEY, symbol);
+
     this.hideAddCryptoModal();
-    await this.renderChartCard(symbol);
+    this.populateSelector();
+    await this.renderActiveChart();
   }
 
   private showEmptyState(): void {
@@ -451,6 +460,7 @@ class HomeController {
 
   private destroyAllCharts(): void {
     this.charts.forEach((inst) => {
+      try { inst.resizeObserver?.disconnect(); } catch {}
       try { inst.chart.remove(); } catch {}
     });
     this.charts.clear();

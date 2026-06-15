@@ -184,10 +184,11 @@ body.theme-light {
   background: var(--bg-primary);
   border-right: 1px solid var(--border-secondary);
   z-index: 100;
-  overflow-y: none;
+  overflow: hidden;
 }
 
 .sidebar-inner {
+  box-sizing: border-box;
   height: 100%;
   display: flex;
   flex-direction: column;
@@ -230,8 +231,34 @@ body.theme-light {
   display: flex;
   flex-direction: column;
   gap: 0.15rem;
-  flex: 1;
-  margin-top: 1.5rem;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  margin-top: 1rem;
+}
+
+/* Global exchange selector, relocated into the sidebar */
+.sidebar-exchange {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-top: 1.25rem;
+}
+
+.sidebar-exchange .exchange-selector {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Logout pinned to the bottom of the sidebar; never scrolls off-screen */
+.sidebar-logout {
+  flex-shrink: 0;
+  width: 100%;
+  margin-top: 1rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
 }
 
 .header-nav a {
@@ -368,24 +395,7 @@ body.theme-light {
 
 .app-sidebar:not(.d-none) ~ #app-content {
   margin-left: 220px;
-  padding-top: 48px;
-}
-
-/* Top bar — exchange panel, right of sidebar */
-.exchange-panel {
-  position: fixed;
-  top: 0;
-  left: 220px;
-  right: 0;
-  height: 48px;
-  z-index: 90;
-  background: var(--bg-primary);
-  border-bottom: 1px solid var(--border-secondary);
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0 1.5rem;
+  padding-top: 0;
 }
 
 .exchange-panel-label {
@@ -487,7 +497,7 @@ body.theme-light {
 /* Inactive Account Warning Banner */
 .inactive-warning {
   position: fixed;
-  top: 48px;
+  top: 0;
   left: 220px;
   right: 0;
   z-index: 100;
@@ -528,15 +538,15 @@ body.theme-light {
 }
 
 .inactive-warning:not(.d-none) ~ .api-key-warning {
-  top: 84px;
+  top: 36px;
 }
 
 .inactive-warning:not(.d-none) ~ #app-content {
-  padding-top: 88px;
+  padding-top: 40px;
 }
 
 .inactive-warning:not(.d-none) ~ .api-key-warning:not(.d-none) ~ #app-content {
-  padding-top: 124px;
+  padding-top: 76px;
 }
 
 .app-sidebar.d-none ~ .inactive-warning {
@@ -546,7 +556,7 @@ body.theme-light {
 /* API Key Warning Banner */
 .api-key-warning {
   position: fixed;
-  top: 48px;
+  top: 0;
   left: 220px;
   right: 0;
   z-index: 99;
@@ -622,11 +632,7 @@ body.theme-light {
 }
 
 .api-key-warning:not(.d-none) ~ #app-content {
-  padding-top: 88px;
-}
-
-.app-sidebar.d-none ~ .exchange-panel {
-  display: none !important;
+  padding-top: 40px;
 }
 
 .app-sidebar.d-none ~ .api-key-warning {

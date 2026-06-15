@@ -36,17 +36,14 @@ class Router {
 
     const header = document.getElementById('app-header');
     const footer = document.getElementById('app-footer');
-    const exchangePanel = document.getElementById('exchange-panel');
     const exchangeSelectorWrapper = document.getElementById('exchange-selector-wrapper');
     if (route.showChrome) {
       header?.classList.remove('d-none');
       footer?.classList.remove('d-none');
-      exchangePanel?.classList.remove('d-none');
       this.updateActiveNav(name);
     } else {
       header?.classList.add('d-none');
       footer?.classList.add('d-none');
-      exchangePanel?.classList.add('d-none');
     }
     if (exchangeSelectorWrapper) {
       if (route.showExchangeSelector === false || !route.showChrome) {

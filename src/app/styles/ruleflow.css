@@ -5,18 +5,23 @@
   padding: 0.5rem 0 0.5rem;
 }
 
-/* Per-exchange sections */
+/* Each exchange gets a single panel holding all of its flows */
+.rf-exchange {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border-primary);
+  border-radius: 12px;
+  padding: 1rem 1.25rem 1.25rem;
+}
+
 .rf-exchange + .rf-exchange {
   margin-top: 1.5rem;
-  padding-top: 1.25rem;
-  border-top: 1px dashed var(--border-primary);
 }
 
 .rf-exchange-title {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.5rem;
   font-size: 0.85rem;
   font-weight: 700;
   letter-spacing: 0.3px;
@@ -28,21 +33,26 @@
   font-size: 0.9rem;
 }
 
-/* Separate, non-overlapping blocks for unrelated flows */
+/* Lay the separate flows side by side; scroll horizontally if they overflow */
 .rf-components {
   display: flex;
-  flex-direction: column;
-  gap: 1.25rem;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: flex-start;
+  overflow-x: auto;
+  padding-bottom: 0.5rem;
 }
 
+/* Each flow sizes to its own content and never shrinks */
 .rf-component {
-  background: rgba(255, 255, 255, 0.015);
-  border: 1px solid var(--border-primary);
-  border-radius: 12px;
+  flex: 0 0 auto;
 }
 
+/* Plenty of space between adjacent flows, with a centered faint divider */
 .rf-component + .rf-component {
-  margin-top: 0.25rem;
+  margin-left: 4.5rem;
+  padding-left: 4.5rem;
+  border-left: 1px dashed var(--border-primary);
 }
 
 .rf-rows {

@@ -55,6 +55,7 @@
     <div class="section-header">
       <div class="section-header-left">
         <h2 class="section-title">Live Data</h2>
+        <select id="live-data-selector" class="live-data-selector d-none" title="Select chart"></select>
       </div>
       <button class="add-crypto-btn" id="add-crypto-btn"><i class="fa-solid fa-plus"></i> Add Crypto</button>
     </div>
@@ -73,7 +74,7 @@
       </div>
     </div>
 
-    <div id="live-data-charts" class="live-data-grid">
+    <div id="live-data-charts" class="live-data-single">
       <div class="live-data-empty" id="live-data-empty">
         <i class="fa-solid fa-chart-line"></i>
         <p>No cryptos tracked yet. Click <strong>Add Crypto</strong> to get started.</p>

@@ -17,6 +17,14 @@
         <img src="assets/images/cyrus-logo.png" alt="Cyrus" onerror="this.style.display='none'" />
         <span class="header-brand">Cyrus</span>
       </div>
+
+      <div id="exchange-selector-wrapper" class="sidebar-exchange">
+        <label class="exchange-panel-label">Exchange</label>
+        <select id="exchange-selector" class="exchange-selector">
+          <option value="all">All Exchanges</option>
+        </select>
+      </div>
+
       <nav class="header-nav" id="header-nav">
         <a href="#" data-route="home" class="nav-link"><i class="fa-solid fa-house"></i> Overview</a>
         <a href="#" data-route="commands" class="nav-link"><i class="fa-solid fa-bolt"></i> Automations</a>
@@ -26,23 +34,12 @@
         <!-- <a href="#" data-route="privacy" class="nav-link"><i class="fa-solid fa-user-secret"></i> Privacy</a> -->
         <a href="#" data-route="about" class="nav-link"><i class="fa-solid fa-cross"></i> About</a>
       </nav>
-    </div>
-  </aside>
 
-  <div id="exchange-panel" class="exchange-panel d-none">
-    <div id="exchange-selector-wrapper">
-      <label class="exchange-panel-label">Exchange</label>
-      <select id="exchange-selector" class="exchange-selector">
-        <option value="all">All Exchanges</option>
-      </select>
-    </div>
-    <div id="affiliate-ticker" class="affiliate-ticker"></div>
-    <div class="header-actions" id="header-actions">
-      <button class="header-user-btn" id="logout-btn">
+      <button class="header-user-btn sidebar-logout" id="logout-btn">
         <i class="fa-solid fa-right-from-bracket"></i> Logout
       </button>
     </div>
-  </div>
+  </aside>
 
   <div id="inactive-warning" class="inactive-warning d-none">
     <div class="inactive-warning-inner">
@@ -298,6 +295,5 @@
   <script src="../dist/app/services/ruleflow.js"></script>
   <script src="../dist/app/router.js"></script>
   <script src="../dist/app/app.js"></script>
-  <script src="../dist/affiliate-ticker.js"></script>
 </body>
 </html>
