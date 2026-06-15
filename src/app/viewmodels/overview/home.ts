@@ -28,14 +28,14 @@ class HomeController {
 
     this.unsubscribe = ExchangeStore.onUpdate(() => {
       this.renderFromStore();
-      this.loadCommandsAndLogs();
+      this.loadCommandsCount();
     });
 
     this.tickerTimer = setInterval(() => this.refreshAllTickers(), 5_000);
     this.chartTimer = setInterval(() => this.refreshAllChartData(), 60_000);
 
     const observer = new MutationObserver(() => {
-      if (!document.getElementById('orders-tbody')) {
+      if (!document.getElementById('live-data-charts')) {
         if (this.unsubscribe) this.unsubscribe();
         if (this.tickerTimer) { clearInterval(this.tickerTimer); this.tickerTimer = null; }
         if (this.chartTimer) { clearInterval(this.chartTimer); this.chartTimer = null; }
@@ -68,18 +68,8 @@ class HomeController {
   }
 
   private attachEventListeners(): void {
-    document.getElementById('view-all-positions')?.addEventListener('click', () => {
-      router.navigate('positions');
-    });
-    document.getElementById('view-all-orders')?.addEventListener('click', () => {
-      router.navigate('openorders');
-    });
-    document.getElementById('view-all-commands')?.addEventListener('click', () => {
-      router.navigate('commands');
-    });
-    document.getElementById('view-all-commands2')?.addEventListener('click', () => {
-      router.navigate('commands');
-    });
+    // Summary cards navigate via their data-route attribute (handled globally
+    // by the router), so no per-card click wiring is needed here.
 
     // Live Data: Add Crypto button
     document.getElementById('add-crypto-btn')?.addEventListener('click', () => {
@@ -99,14 +89,10 @@ class HomeController {
   }
 
   private loadDashboardData(): void {
-    this.setCardValue('total-balance', '$0.00');
-    this.setCardValue('open-positions-count', '0');
     this.setCardValue('custom-commands-count', '0');
 
-    this.setTableEmpty('positions-tbody', 6, 'No open positions');
-
     this.renderFromStore();
-    this.loadCommandsAndLogs();
+    this.loadCommandsCount();
     this.loadWatchlist();
   }
 
@@ -477,292 +463,43 @@ class HomeController {
   // ── Existing dashboard sections ─────────────────────────────────
 
   private renderFromStore(): void {
-    const orders = ExchangeStore.openOrders;
     const isAll = ExchangeStore.isAllMode();
 
     // Update subtitle
     const subtitle = document.getElementById('page-subtitle');
     if (subtitle) {
       subtitle.textContent = isAll
-        ? 'Overview of your exchange accounts'
-        : `Overview of your ${ExchangeStore.getExchangeName(ExchangeStore.activeMode as number)} account`;
-    }
-
-    // Update orders table header for exchange column
-    const thead = document.getElementById('orders-thead');
-    if (thead) {
-      const cols = isAll
-        ? '<tr><th>Exchange</th><th>Pair</th><th>Type</th><th>Side</th><th>Price</th><th>Volume</th><th>Status</th></tr>'
-        : '<tr><th>Pair</th><th>Type</th><th>Side</th><th>Price</th><th>Volume</th><th>Status</th></tr>';
-      thead.innerHTML = cols;
+        ? 'A quick look at your accounts'
+        : `A quick look at your ${ExchangeStore.getExchangeName(ExchangeStore.activeMode as number)} account`;
     }
 
     if (ExchangeStore.error) {
-      this.setTableEmpty('orders-tbody', isAll ? 7 : 6, 'Failed to load orders');
       this.setCardValue('open-orders-count', '--');
     } else {
-      this.renderOrders(orders, isAll);
-      this.setCardValue('open-orders-count', orders.length.toString());
+      this.setCardValue('open-orders-count', ExchangeStore.openOrders.length.toString());
     }
   }
 
-  private async loadCommandsAndLogs(): Promise<void> {
+  private async loadCommandsCount(): Promise<void> {
     try {
-      const [rules, logs] = await Promise.all([
-        AutomationController.getRules(),
-        AutomationController.getLogs(30),
-      ]);
-
+      const rules = await AutomationController.getRules();
       const isAll = ExchangeStore.isAllMode();
       const activeId = ExchangeStore.activeMode;
-
       const filteredRules = isAll
         ? rules
         : rules.filter((r: any) => r.trigger_exchange_id === activeId);
-
-      const filteredRuleIds = new Set(filteredRules.map((r: any) => r.id));
-
-      const filteredLogs = isAll
-        ? logs
-        : logs.filter((l: any) => filteredRuleIds.has(l.rule_id));
-
-      this.renderCommands(filteredRules);
       this.setCardValue('custom-commands-count', filteredRules.length.toString());
-      this.renderLogs(filteredLogs);
+
+      const flowChart = document.getElementById('overview-flow-chart');
+      if (flowChart) RuleFlow.render(flowChart, filteredRules, { exchangeName: (id) => ExchangeStore.getExchangeName(id) });
     } catch {
-      this.setTableEmpty('commands-tbody', 4, 'Failed to load commands');
+      this.setCardValue('custom-commands-count', '--');
     }
-  }
-
-  private async loadLogs(): Promise<void> {
-    try {
-      const logs = await AutomationController.getLogs(30);
-      this.renderLogs(logs);
-    } catch (error: any) {
-    }
-  }
-
-  private renderLogs(logs: any[]): void {
-    const tbody = document.getElementById('logs-tbody');
-    if (!tbody) return;
-
-    if (logs.length === 0) {
-      tbody.innerHTML = '<tr class="empty-row"><td colspan="5">No execution history yet</td></tr>';
-      return;
-    }
-
-    tbody.innerHTML = logs.map((l: any) => {
-      const time = l.created_at ? new Date(l.created_at.endsWith('Z') ? l.created_at : l.created_at + 'Z').toLocaleString() : '--';
-      const statusClass = l.status === 'success' ? 'status-success' : 'status-error';
-
-      return `<tr>
-        <td>${this.escapeHtml(time)}</td>
-        <td>${this.escapeHtml(l.trigger_event)}</td>
-        <td>${this.escapeHtml(l.action_executed)}</td>
-        <td class="result-cell">${this.formatActionResult(l.action_result, l.status)}</td>
-        <td><span class="status-badge ${statusClass}">${this.escapeHtml(l.status)}</span></td>
-      </tr>`;
-    }).join('');
-  }
-
-  private renderOrders(orders: any[], isAll: boolean): void {
-    const tbody = document.getElementById('orders-tbody');
-    if (!tbody) return;
-
-    const colspan = isAll ? 7 : 6;
-    if (orders.length === 0) {
-      tbody.innerHTML = `<tr class="empty-row"><td colspan="${colspan}">No open orders</td></tr>`;
-      return;
-    }
-
-    tbody.innerHTML = orders.map((o: any) => {
-      const sideClass = o.side === 'buy' ? 'side-buy' : 'side-sell';
-      const exchangeCol = isAll
-        ? `<td><span class="exchange-badge exchange-${this.escapeHtml(o.exchangeName).toLowerCase()}">${this.escapeHtml(o.exchangeName)}</span></td>`
-        : '';
-      return `<tr>
-        ${exchangeCol}
-        <td>${this.escapeHtml(o.pair)}</td>
-        <td>${this.escapeHtml(o.type)}</td>
-        <td><span class="${sideClass}">${this.escapeHtml(o.side)}</span></td>
-        <td>${this.escapeHtml(o.price)}</td>
-        <td>${this.escapeHtml(o.volume)}</td>
-        <td><span class="status-badge status-${this.escapeHtml(o.status).toLowerCase().replace(/[^a-z]/g, '')}">${this.escapeHtml(o.status)}</span></td>
-      </tr>`;
-    }).join('');
-  }
-
-  private async loadCommands(): Promise<void> {
-    return this.loadCommandsAndLogs();
-  }
-
-  private renderCommands(rules: any[]): void {
-    const tbody = document.getElementById('commands-tbody');
-    if (!tbody) return;
-
-    if (rules.length === 0) {
-      tbody.innerHTML = '<tr class="empty-row"><td colspan="4">No custom commands</td></tr>';
-      return;
-    }
-
-    tbody.innerHTML = rules.map((r: any) => {
-      const statusClass = r.is_active ? 'status-active' : 'status-inactive';
-      const statusText = r.is_active ? 'Active' : 'Paused';
-      const trigger = this.formatTrigger(r);
-      const action = this.formatAction(r);
-
-      return `<tr>
-        <td>${this.escapeHtml(r.rule_name)}</td>
-        <td>${trigger}</td>
-        <td>${action}</td>
-        <td><span class="status-badge ${statusClass}">${statusText}</span></td>
-      </tr>`;
-    }).join('');
-  }
-
-  private formatTrigger(rule: any): string {
-    if (rule.trigger_type === 'order_filled') {
-      const orderId = rule.trigger_order_id
-        ? this.escapeHtml(rule.trigger_order_id.substring(0, 10)) + '...'
-        : 'Any';
-      return `<span class="trigger-badge">Order Filled</span> <span class="mono-text">${orderId}</span>`;
-    }
-    if (rule.trigger_type === 'balance_threshold') {
-      const asset = rule.trigger_asset || '';
-      const threshold = rule.trigger_threshold || '0';
-      const cooldown = this.formatCooldown(rule.cooldown_minutes || 1440);
-      return `<span class="trigger-badge trigger-badge-balance">Balance ≥</span> `
-        + `<strong>${this.escapeHtml(threshold)}</strong> `
-        + `<span class="asset-badge">${this.escapeHtml(asset)}</span>`
-        + `<br><span class="cooldown-text">Cooldown: ${cooldown}</span>`;
-    }
-    if (rule.trigger_type === 'price_threshold') {
-      const asset = rule.trigger_asset || '';
-      const quote = rule.trigger_price_quote_asset || 'USDT';
-      const threshold = rule.trigger_threshold || '0';
-      const cooldown = this.formatCooldown(rule.cooldown_minutes || 1);
-      return `<span class="trigger-badge trigger-badge-balance">Price ≥</span> `
-        + `<strong>${this.escapeHtml(threshold)}</strong> `
-        + `<span class="asset-badge">${this.escapeHtml(quote)}</span>`
-        + `<br><span class="cooldown-text">${this.escapeHtml(asset)}/${this.escapeHtml(quote)} | Cooldown: ${cooldown}</span>`;
-    }
-    return this.escapeHtml(rule.trigger_type);
-  }
-
-  private formatAction(rule: any): string {
-    if (rule.action_type === 'withdraw_crypto') {
-      let amountText: string;
-      if (rule.trigger_type === 'balance_threshold') {
-        amountText = '<em>Full Balance</em>';
-      } else if (rule.use_filled_amount) {
-        amountText = '<em>Filled Amount</em>';
-      } else {
-        amountText = `<strong>${this.escapeHtml(rule.action_amount)}</strong>`;
-      }
-      return `Withdraw ${amountText} `
-        + `<span class="asset-badge">${this.escapeHtml(rule.action_asset)}</span> `
-        + `→ ${this.escapeHtml(rule.action_address_key)}`;
-    }
-    if (rule.action_type === 'convert_crypto') {
-      let convertAmountText = rule.action_amount
-        ? `<strong>${this.escapeHtml(rule.action_amount)}</strong>`
-        : '<em>Full Balance</em>';
-      if (rule.trigger_type === 'price_threshold') {
-        const mode = (rule.action_amount_mode || 'all').toLowerCase();
-        const done = Number(rule.execution_count || 0);
-        const max = rule.max_executions == null ? 'unlimited' : String(rule.max_executions);
-        if (mode === 'percent') {
-          convertAmountText = `<strong>${this.escapeHtml(rule.action_amount)}%</strong>`;
-        } else if (mode === 'fixed') {
-          convertAmountText = `<strong>${this.escapeHtml(rule.action_amount)}</strong>`;
-        } else {
-          convertAmountText = '<em>Sell All</em>';
-        }
-        return `Convert ${convertAmountText} `
-          + `<span class="asset-badge">${this.escapeHtml(rule.action_asset)}</span> `
-          + `→ <span class="asset-badge">${this.escapeHtml(rule.convert_to_asset || '?')}</span>`
-          + `<br><span class="cooldown-text">Success: ${done}/${this.escapeHtml(max)}</span>`;
-      }
-      return `Convert ${convertAmountText} `
-        + `<span class="asset-badge">${this.escapeHtml(rule.action_asset)}</span> `
-        + `→ <span class="asset-badge">${this.escapeHtml(rule.convert_to_asset || '?')}</span>`;
-    }
-    return this.escapeHtml(rule.action_type);
-  }
-
-  private formatCooldown(minutes: number): string {
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    if (hours > 0 && mins > 0) return `${hours}h ${mins}m`;
-    if (hours > 0) return `${hours}h`;
-    return `${mins}m`;
   }
 
   private setCardValue(id: string, value: string): void {
     const el = document.getElementById(id);
     if (el) el.textContent = value;
-  }
-
-  private setTableEmpty(tbodyId: string, colspan: number, message: string): void {
-    const tbody = document.getElementById(tbodyId);
-    if (tbody) {
-      tbody.innerHTML = `<tr class="empty-row"><td colspan="${colspan}">${message}</td></tr>`;
-    }
-  }
-
-  private formatActionResult(raw: string, status: string): string {
-    if (!raw) return '--';
-
-    // Error/skipped messages are already readable text
-    if (status !== 'success' || !raw.startsWith('{')) {
-      return this.escapeHtml(raw);
-    }
-
-    const parts: string[] = [];
-    const isOrder = /'symbol'\s*:/.test(raw);
-
-    if (isOrder) {
-      const symbol = this.extractField(raw, 'symbol');
-      const side = this.extractField(raw, 'side');
-      const filled = this.extractField(raw, 'filled');
-      const average = this.extractField(raw, 'average');
-      const cost = this.extractField(raw, 'cost');
-      const st = this.extractField(raw, 'status');
-
-      if (side && symbol) parts.push(`${side.toUpperCase()} ${symbol}`);
-      if (filled) parts.push(`Filled: ${filled}`);
-      if (average && average !== 'None') parts.push(`Avg Price: ${average}`);
-      if (cost) parts.push(`Cost: ${cost}`);
-      if (st) parts.push(`Status: ${st}`);
-    } else {
-      const id = this.extractField(raw, 'id');
-      const amount = this.extractField(raw, 'amount');
-      const currency = this.extractField(raw, 'currency');
-      const st = this.extractField(raw, 'status');
-
-      if (amount && currency) parts.push(`${amount} ${currency}`);
-      if (id) parts.push(`Ref: ${id}`);
-      if (st) parts.push(`Status: ${st}`);
-    }
-
-    // Extract fee from top-level 'fee' dict
-    const feeMatch = raw.match(/'fee'\s*:\s*\{([^}]*)\}/);
-    if (feeMatch) {
-      const feeStr = feeMatch[1];
-      const feeCost = feeStr.match(/'cost'\s*:\s*([\d.]+)/);
-      const feeCurrency = feeStr.match(/'currency'\s*:\s*'([^']*)'/);
-      if (feeCost && feeCurrency) parts.push(`Fee: ${feeCost[1]} ${feeCurrency[1]}`);
-    }
-
-    return this.escapeHtml(parts.length > 0 ? parts.join(' | ') : raw);
-  }
-
-  private extractField(raw: string, field: string): string | null {
-    const strMatch = raw.match(new RegExp(`'${field}'\\s*:\\s*'([^']*)'`));
-    if (strMatch) return strMatch[1];
-    const numMatch = raw.match(new RegExp(`'${field}'\\s*:\\s*([\\d.]+)`));
-    if (numMatch) return numMatch[1];
-    return null;
   }
 
   private escapeHtml(str: string): string {

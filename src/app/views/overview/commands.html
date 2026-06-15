@@ -1,7 +1,7 @@
 <div class="page-container">
   <div class="overview-header">
-    <h1 class="page-title">Custom Commands</h1>
-    <p class="page-subtitle" id="commands-subtitle">Automation rules for your exchange orders</p>
+    <h1 class="page-title">Automations</h1>
+    <p class="page-subtitle" id="commands-subtitle">Set up trigger &rarr; action rules that run for you, 24/7</p>
   </div>
 
   <div class="commands-exchange-selector-row">
@@ -19,247 +19,53 @@
     <span id="commands-success-message"></span>
   </div>
 
-  <!-- Create New Rule -->
-  <div class="overview-section">
-    <div class="section-header">
-      <h2 class="section-title">Create Rule</h2>
-    </div>
-    <form id="create-rule-form" class="rule-form">
-      <div class="form-row">
-        <div class="form-group">
-          <label for="rule-name" data-help="A friendly name so you can identify this rule later, e.g. 'Auto-withdraw BTC after sell'.">Rule Name</label>
-          <input type="text" id="rule-name" placeholder="e.g. Auto-withdraw BTC after sell" required>
-        </div>
-      </div>
-
-      <div class="form-row">
-        <div class="form-group">
-          <label for="trigger-type" data-help="Choose what event triggers this rule. 'Order is Filled' fires when a specific order completes. 'Balance Threshold' fires when an asset balance reaches a set amount.">When (Trigger)</label>
-          <select id="trigger-type">
-            <option value="order_filled">Order is Filled</option>
-            <option value="balance_threshold">Balance Threshold</option>
-            <option value="price_threshold">Price Threshold</option>
-          </select>
-        </div>
-        <div class="form-group trigger-order-section" id="trigger-order-section">
-          <label for="trigger-order-id" data-help="Select the open order that should trigger this rule when it gets filled.">Order ID</label>
-          <select id="trigger-order-id">
-            <option value="" disabled selected>Loading orders...</option>
-          </select>
-        </div>
-      </div>
-
-      <!-- Balance Threshold trigger fields -->
-      <div class="form-row trigger-balance-section d-none" id="trigger-balance-section">
-        <div class="form-group">
-          <label for="trigger-asset" data-help="The asset whose balance will be monitored. The rule triggers when this asset's balance meets the threshold.">Monitor Asset</label>
-          <select id="trigger-asset" disabled>
-            <option value="" disabled selected>Loading balances...</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label for="trigger-threshold" data-help="The minimum balance that triggers this rule. The rule fires when the asset balance is greater than or equal to this amount.">Threshold Amount</label>
-          <input type="number" id="trigger-threshold" step="any" min="0" placeholder="e.g. 0.001" disabled>
-          <span class="form-hint" id="threshold-hint"></span>
-        </div>
-      </div>
-
-      <div class="form-row trigger-price-section d-none" id="trigger-price-section">
-        <div class="form-group">
-          <label for="price-trigger-asset" data-help="The coin to monitor and sell when the trigger price is reached.">Coin to Monitor/Sell</label>
-          <select id="price-trigger-asset" disabled>
-            <option value="" disabled selected>Loading balances...</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label for="price-trigger-threshold" data-help="Execute when current price is greater than or equal to this value.">Trigger Price</label>
-          <input type="number" id="price-trigger-threshold" step="any" min="0" placeholder="e.g. 0.67" disabled>
-          <span class="form-hint" id="price-threshold-hint"></span>
-        </div>
-      </div>
-
-      <div class="form-row trigger-price-section d-none" id="price-trigger-quote-row">
-        <div class="form-group">
-          <label for="price-quote-asset" data-help="The quote currency used for the trigger price check.">Price Quote Currency</label>
-          <select id="price-quote-asset">
-            <option value="USD">USD</option>
-            <option value="USDT" selected>USDT</option>
-            <option value="USDC">USDC</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label for="price-convert-to-asset" data-help="The currency or coin you want to receive after selling/converting.">Convert Into</label>
-          <select id="price-convert-to-asset" disabled>
-            <option value="" disabled selected>Select a coin first</option>
-          </select>
-        </div>
-      </div>
-
-      <div class="form-row trigger-price-section d-none" id="price-amount-section">
-        <div class="form-group">
-          <label data-help="Choose how much of your holdings to convert each time the rule triggers.">Sell Amount Mode</label>
-          <div class="amount-mode-group">
-            <label class="radio-label">
-              <input type="radio" name="price-amount-mode" value="all" checked>
-              <span>Sell All</span>
-            </label>
-            <label class="radio-label">
-              <input type="radio" name="price-amount-mode" value="percent">
-              <span>Percent</span>
-            </label>
-            <label class="radio-label">
-              <input type="radio" name="price-amount-mode" value="fixed">
-              <span>Fixed Amount</span>
-            </label>
-          </div>
-        </div>
-        <div class="form-group">
-          <label for="price-amount-value" data-help="For percent mode enter 1-100. For fixed mode enter amount of the source coin.">Amount Value</label>
-          <input type="number" id="price-amount-value" step="any" min="0" placeholder="Only used for percent/fixed" disabled>
-          <span class="form-hint" id="price-amount-hint"></span>
-        </div>
-      </div>
-
-      <div class="form-row trigger-price-section d-none" id="price-execution-limit-row">
-        <div class="form-group">
-          <label data-help="Number of times this custom command can successfully execute.">Execution Limit</label>
-          <label class="radio-label" style="margin-bottom: 8px;">
-            <input type="checkbox" id="price-unlimited" checked>
-            <span>Unlimited executions</span>
-          </label>
-          <input type="number" id="price-max-executions" min="1" step="1" placeholder="e.g. 5" disabled>
-          <span class="form-hint">Rule auto-pauses after reaching max successful executions</span>
-        </div>
-      </div>
-
-      <div class="form-row trigger-balance-section d-none" id="cooldown-section">
-        <div class="form-group">
-          <label data-help="Minimum time to wait between rule executions. Prevents the same rule from firing repeatedly in quick succession.">Cooldown Period</label>
-          <div class="cooldown-inputs">
-            <div class="cooldown-field">
-              <input type="number" id="cooldown-hours" min="0" value="24" step="1" placeholder="0">
-              <span class="cooldown-label">hours</span>
-            </div>
-            <div class="cooldown-field">
-              <input type="number" id="cooldown-minutes" min="0" max="59" value="0" step="1" placeholder="0">
-              <span class="cooldown-label">minutes</span>
-            </div>
-          </div>
-          <span class="form-hint">Minimum 1 minute between executions</span>
-        </div>
-      </div>
-
-      <div class="form-divider" id="action-type-divider">
-        <span class="form-divider-text">THEN</span>
-      </div>
-
-      <div class="form-row" id="action-type-row">
-        <div class="form-group">
-          <label for="action-type" data-help="The action to perform when the trigger fires. 'Withdraw Crypto' sends funds to a whitelisted address. 'Convert Crypto' swaps one asset for another via a market order.">Do (Action)</label>
-          <select id="action-type">
-            <option value="withdraw_crypto">Withdraw Crypto</option>
-            <option value="convert_crypto">Convert Crypto</option>
-          </select>
-        </div>
-      </div>
-
-      <!-- Withdraw fields -->
-      <div class="form-row" id="withdraw-fields">
-        <div class="form-group">
-          <label for="action-asset" data-help="The cryptocurrency to withdraw when the rule triggers.">Asset</label>
-          <select id="action-asset" disabled>
-            <option value="" disabled selected>Select an order first</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label for="action-address-key" data-help="The whitelisted withdrawal address to send funds to. Addresses must be added to your exchange's whitelist first.">Withdrawal Address Key</label>
-          <select id="action-address-key" disabled>
-            <option value="" disabled selected>Select an order first</option>
-          </select>
-        </div>
-      </div>
-
-      <!-- Withdrawal address unsupported notice -->
-      <div class="alert alert-info d-none" id="withdraw-unsupported-notice"></div>
-
-      <!-- Convert fields (only shown for balance_threshold + convert_crypto) -->
-      <div class="form-row d-none" id="convert-fields">
-        <div class="form-group">
-          <label for="convert-from-asset" data-help="The asset you want to convert from. This is locked to your trigger asset.">From Asset</label>
-          <select id="convert-from-asset" disabled>
-            <option value="" disabled selected>Select a trigger asset first</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label for="convert-to-asset" data-help="The asset you want to receive after conversion. A valid trading pair must exist on the exchange.">To Asset</label>
-          <select id="convert-to-asset" disabled>
-            <option value="" disabled selected>Select a trigger asset first</option>
-          </select>
-        </div>
-      </div>
-
-      <!-- Convert amount (only shown for convert_crypto) -->
-      <div class="form-row d-none" id="convert-amount-section">
-        <div class="form-group" style="flex: 1">
-          <label for="convert-amount" data-help="The amount to convert. Leave empty to convert the full balance. Note: exchanges have minimum order sizes — amounts below the minimum will be rejected.">Amount <span class="form-hint-inline">(leave empty for full balance)</span></label>
-          <input type="number" id="convert-amount" step="any" min="0" placeholder="Full balance">
-          <span class="form-hint" id="convert-amount-hint"></span>
-        </div>
-      </div>
-
-      <div class="form-row" id="amount-mode-section">
-        <div class="form-group">
-          <label data-help="'Fixed Amount' lets you specify an exact amount to withdraw. 'Use Filled Amount' automatically withdraws the amount that was filled from the triggering order.">Amount Mode</label>
-          <div class="amount-mode-group">
-            <label class="radio-label">
-              <input type="radio" name="amount-mode" value="fixed" checked>
-              <span>Fixed Amount</span>
-            </label>
-            <label class="radio-label">
-              <input type="radio" name="amount-mode" value="filled" disabled>
-              <span>Use Filled Amount</span>
-            </label>
-          </div>
-          <span class="form-hint" id="amount-mode-hint"></span>
-        </div>
-        <div class="form-group">
-          <label for="action-amount" data-help="The amount of the asset to withdraw when the rule fires.">Amount</label>
-          <input type="number" id="action-amount" step="any" min="0" placeholder="Select an order first" disabled>
-          <div class="slider-container">
-            <input type="range" id="amount-slider" min="0" max="100" value="100" step="1" disabled>
-            <span class="slider-value" id="slider-value">100%</span>
-          </div>
-          <span class="form-hint" id="amount-hint"></span>
-          <span class="form-hint min-hint" id="min-withdrawal-hint"></span>
-        </div>
-      </div>
-
-      <!-- Rule Summary -->
-      <div id="rule-summary" class="rule-summary d-none">
-        <i class="fa-solid fa-lightbulb"></i>
-        <span id="rule-summary-text" class="rule-summary-text">Fill in the form to see your automation summary...</span>
-      </div>
-
-      <div class="form-actions">
-        <button type="submit" class="btn-primary" id="create-rule-btn">
-          <i class="fa-solid fa-plus"></i> Create Rule
-        </button>
-      </div>
-    </form>
-  </div>
-
-  <!-- Active Rules -->
+  <!-- Automations list -->
   <div class="overview-section">
     <div class="section-header rules-tab-header">
-      <h2 class="section-title" id="rules-count-title">Active Rules</h2>
-      <div class="rules-tab-strip" id="rules-tab-strip">
-        <button class="rules-tab-btn active" data-tab="table" title="Active Rules Table">
-          <i class="fa-solid fa-table-list"></i> Active Rules
-        </button>
-        <button class="rules-tab-btn" data-tab="flow" title="Rule Flow Chart">
-          <i class="fa-solid fa-diagram-project"></i> Rule Flow
+      <h2 class="section-title" id="rules-count-title">Your Automations</h2>
+      <div class="rules-header-actions">
+        <div class="rules-tab-strip" id="rules-tab-strip">
+          <button class="rules-tab-btn active" data-tab="table" title="Rules list">
+            <i class="fa-solid fa-table-list"></i> Rules
+          </button>
+          <button class="rules-tab-btn" data-tab="flow" title="Rule flow chart">
+            <i class="fa-solid fa-diagram-project"></i> Flow
+          </button>
+          <button class="rules-tab-btn" data-tab="log" title="Execution log">
+            <i class="fa-solid fa-clock-rotate-left"></i> Log
+          </button>
+        </div>
+        <button type="button" class="btn-primary" id="new-automation-btn">
+          <i class="fa-solid fa-plus"></i> New Automation
         </button>
       </div>
+    </div>
+
+    <!-- Empty state with starter templates -->
+    <div class="automations-empty d-none" id="rules-empty-state">
+      <div class="automations-empty-icon"><i class="fa-solid fa-bolt"></i></div>
+      <h3 class="automations-empty-title">Create your first automation</h3>
+      <p class="automations-empty-text">An automation watches for something to happen (a <strong>trigger</strong>) and then does something for you (an <strong>action</strong>). Pick a template to start &mdash; you can tweak every detail before saving.</p>
+      <div class="template-grid">
+        <button type="button" class="template-card" data-template="take_profit">
+          <span class="template-icon template-icon-price"><i class="fa-solid fa-chart-line"></i></span>
+          <span class="template-name">Take profit at a target price</span>
+          <span class="template-desc">When a coin hits a price you choose, sell it into a stablecoin.</span>
+        </button>
+        <button type="button" class="template-card" data-template="auto_withdraw">
+          <span class="template-icon template-icon-withdraw"><i class="fa-solid fa-arrow-right-from-bracket"></i></span>
+          <span class="template-name">Auto-withdraw after a sale</span>
+          <span class="template-desc">When an order fills, send the proceeds to a saved address.</span>
+        </button>
+        <button type="button" class="template-card" data-template="convert_balance">
+          <span class="template-icon template-icon-convert"><i class="fa-solid fa-arrows-rotate"></i></span>
+          <span class="template-name">Convert when a balance builds up</span>
+          <span class="template-desc">When an asset reaches a threshold, convert it to another coin.</span>
+        </button>
+      </div>
+      <button type="button" class="btn-secondary" id="empty-blank-btn">
+        <i class="fa-solid fa-pen"></i> Start from scratch
+      </button>
     </div>
 
     <!-- Table view (default) -->
@@ -285,43 +91,321 @@
 
     <!-- Flow view -->
     <div id="rules-flow-view" class="d-none">
+      <p class="flow-hint">Each circle is an asset; arrows show where your automations move funds. Hover a circle for details.</p>
       <div id="rules-flow-chart"></div>
-      <div id="flow-tooltip" class="flow-tooltip d-none"></div>
       <div class="flow-legend">
         <span class="flow-legend-title">Legend</span>
-        <span class="flow-legend-item"><i class="fa-solid fa-scale-balanced flow-legend-icon-trigger"></i> Balance Threshold</span>
-        <span class="flow-legend-item"><i class="fa-solid fa-chart-line flow-legend-icon-price"></i> Price Threshold</span>
-        <span class="flow-legend-item"><i class="fa-solid fa-list-check flow-legend-icon-order"></i> Order Filled</span>
-        <span class="flow-legend-item"><i class="fa-solid fa-arrows-rotate flow-legend-icon-convert"></i> Convert Asset</span>
-        <span class="flow-legend-item"><i class="fa-solid fa-arrow-right-from-bracket flow-legend-icon-withdraw"></i> Withdraw</span>
-        <span class="flow-legend-item"><i class="fa-solid fa-circle-pause flow-legend-icon-paused"></i> Paused Rule</span>
+        <span class="flow-legend-item"><i class="fa-solid fa-circle rf-legend-source"></i> Source asset</span>
+        <span class="flow-legend-item"><i class="fa-solid fa-circle rf-legend-mid"></i> Intermediate</span>
+        <span class="flow-legend-item"><i class="fa-solid fa-circle rf-legend-terminal"></i> Final destination</span>
+        <span class="flow-legend-item"><i class="fa-solid fa-circle rf-legend-wallet"></i> Withdrawal wallet</span>
+      </div>
+    </div>
+
+    <!-- Execution log view -->
+    <div id="rules-log-view" class="d-none">
+      <div class="data-table-wrapper">
+        <table class="data-table" id="logs-table">
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Trigger</th>
+              <th>Action</th>
+              <th>Result</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="logs-tbody">
+            <tr class="empty-row">
+              <td colspan="5">Loading logs...</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
   </div>
+</div>
 
-  <!-- Execution Log -->
-  <div class="overview-section">
-    <div class="section-header">
-      <h2 class="section-title">Execution Log</h2>
+<!-- Create Automation Wizard Modal -->
+<div class="edit-rule-overlay create-rule-overlay d-none" id="create-rule-overlay">
+  <div class="edit-rule-modal create-rule-modal">
+    <div class="edit-rule-modal-header">
+      <div>
+        <h3>New Automation</h3>
+        <span class="edit-rule-modal-subtitle" id="wizard-step-label">Step 1 of 3 &middot; When this happens</span>
+      </div>
+      <button class="edit-rule-modal-close" id="create-rule-modal-close" title="Close">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
     </div>
-    <div class="data-table-wrapper">
-      <table class="data-table" id="logs-table">
-        <thead>
-          <tr>
-            <th>Time</th>
-            <th>Trigger</th>
-            <th>Action</th>
-            <th>Result</th>
-            <th>Status</th>
-          </tr>
-        </thead>
-        <tbody id="logs-tbody">
-          <tr class="empty-row">
-            <td colspan="5">Loading logs...</td>
-          </tr>
-        </tbody>
-      </table>
+
+    <div class="wizard-progress" id="wizard-progress">
+      <span class="wizard-dot active" data-step="1"><span class="wizard-dot-num">1</span> When</span>
+      <span class="wizard-dot-sep"></span>
+      <span class="wizard-dot" data-step="2"><span class="wizard-dot-num">2</span> Then</span>
+      <span class="wizard-dot-sep"></span>
+      <span class="wizard-dot" data-step="3"><span class="wizard-dot-num">3</span> Review</span>
     </div>
+
+    <form id="create-rule-form" class="create-rule-form">
+      <div class="edit-rule-modal-body">
+
+        <!-- ───────── Step 1: WHEN (trigger) ───────── -->
+        <div class="wizard-step" id="wizard-step-when">
+          <p class="wizard-step-intro">What should set this automation off?</p>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="trigger-type" data-help="Choose what event triggers this rule. 'Order is Filled' fires when a specific order completes. 'Balance Threshold' fires when an asset balance reaches a set amount. 'Price Threshold' fires when a coin reaches a target price.">Trigger</label>
+              <select id="trigger-type">
+                <option value="order_filled">An order is filled</option>
+                <option value="balance_threshold">A balance reaches a threshold</option>
+                <option value="price_threshold">A price reaches a target</option>
+              </select>
+            </div>
+            <div class="form-group trigger-order-section" id="trigger-order-section">
+              <label for="trigger-order-id" data-help="Select the open order that should trigger this rule when it gets filled.">Order</label>
+              <select id="trigger-order-id">
+                <option value="" disabled selected>Loading orders...</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Balance Threshold trigger fields -->
+          <div class="form-row trigger-balance-section d-none" id="trigger-balance-section">
+            <div class="form-group">
+              <label for="trigger-asset" data-help="The asset whose balance will be monitored. The rule triggers when this asset's balance meets the threshold.">Monitor Asset</label>
+              <select id="trigger-asset" disabled>
+                <option value="" disabled selected>Loading balances...</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="trigger-threshold" data-help="The minimum balance that triggers this rule. The rule fires when the asset balance is greater than or equal to this amount.">Threshold Amount</label>
+              <input type="number" id="trigger-threshold" step="any" min="0" placeholder="e.g. 0.001" disabled>
+              <span class="form-hint" id="threshold-hint"></span>
+            </div>
+          </div>
+
+          <!-- Price Threshold: coin + trigger price -->
+          <div class="form-row trigger-price-section d-none" id="trigger-price-section">
+            <div class="form-group">
+              <label for="price-trigger-asset" data-help="The coin to monitor and sell when the trigger price is reached.">Coin to Monitor / Sell</label>
+              <select id="price-trigger-asset" disabled>
+                <option value="" disabled selected>Loading balances...</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="price-trigger-threshold" data-help="Execute when current price is greater than or equal to this value.">Trigger Price</label>
+              <input type="number" id="price-trigger-threshold" step="any" min="0" placeholder="e.g. 0.67" disabled>
+              <span class="form-hint" id="price-threshold-hint"></span>
+            </div>
+          </div>
+
+          <!-- Price Threshold: quote currency (part of the trigger) -->
+          <div class="form-row trigger-price-section d-none" id="price-quote-row">
+            <div class="form-group">
+              <label for="price-quote-asset" data-help="The quote currency used for the trigger price check.">Price Quote Currency</label>
+              <select id="price-quote-asset">
+                <option value="USD">USD</option>
+                <option value="USDT" selected>USDT</option>
+                <option value="USDC">USDC</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Cooldown (balance + price triggers) -->
+          <div class="form-row trigger-balance-section d-none" id="cooldown-section">
+            <div class="form-group">
+              <label data-help="Minimum time to wait between rule executions. Prevents the same rule from firing repeatedly in quick succession.">Cooldown Period</label>
+              <div class="cooldown-inputs">
+                <div class="cooldown-field">
+                  <input type="number" id="cooldown-hours" min="0" value="24" step="1" placeholder="0">
+                  <span class="cooldown-label">hours</span>
+                </div>
+                <div class="cooldown-field">
+                  <input type="number" id="cooldown-minutes" min="0" max="59" value="0" step="1" placeholder="0">
+                  <span class="cooldown-label">minutes</span>
+                </div>
+              </div>
+              <span class="form-hint">Minimum 1 minute between executions</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- ───────── Step 2: THEN (action) ───────── -->
+        <div class="wizard-step d-none" id="wizard-step-then">
+          <p class="wizard-step-intro">When the trigger fires, what should happen?</p>
+
+          <div class="form-divider" id="action-type-divider">
+            <span class="form-divider-text">THEN</span>
+          </div>
+
+          <div class="form-row" id="action-type-row">
+            <div class="form-group">
+              <label for="action-type" data-help="The action to perform when the trigger fires. 'Withdraw Crypto' sends funds to a saved address. 'Convert Crypto' swaps one asset for another via a market order.">Action</label>
+              <select id="action-type">
+                <option value="withdraw_crypto">Withdraw crypto</option>
+                <option value="convert_crypto">Convert crypto</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Withdraw fields -->
+          <div class="form-row" id="withdraw-fields">
+            <div class="form-group">
+              <label for="action-asset" data-help="The cryptocurrency to withdraw when the rule triggers.">Asset</label>
+              <select id="action-asset" disabled>
+                <option value="" disabled selected>Select an order first</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="action-address-key" data-help="The withdrawal address to send funds to. Addresses must be added to your exchange's whitelist first.">Withdrawal Address</label>
+              <select id="action-address-key" disabled>
+                <option value="" disabled selected>Select an order first</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Withdrawal address unsupported notice -->
+          <div class="alert alert-info d-none" id="withdraw-unsupported-notice"></div>
+
+          <!-- Convert fields (balance_threshold + convert_crypto) -->
+          <div class="form-row d-none" id="convert-fields">
+            <div class="form-group">
+              <label for="convert-from-asset" data-help="The asset you want to convert from. This is locked to your trigger asset.">From Asset</label>
+              <select id="convert-from-asset" disabled>
+                <option value="" disabled selected>Select a trigger asset first</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="convert-to-asset" data-help="The asset you want to receive after conversion. A valid trading pair must exist on the exchange.">To Asset</label>
+              <select id="convert-to-asset" disabled>
+                <option value="" disabled selected>Select a trigger asset first</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Convert amount (convert_crypto) -->
+          <div class="form-row d-none" id="convert-amount-section">
+            <div class="form-group" style="flex: 1">
+              <label for="convert-amount" data-help="The amount to convert. Leave empty to convert the full balance. Note: exchanges have minimum order sizes — amounts below the minimum will be rejected.">Amount <span class="form-hint-inline">(leave empty for full balance)</span></label>
+              <input type="number" id="convert-amount" step="any" min="0" placeholder="Full balance">
+              <span class="form-hint" id="convert-amount-hint"></span>
+            </div>
+          </div>
+
+          <!-- Price Threshold: convert into (the action) -->
+          <div class="form-row trigger-price-section d-none" id="price-convert-row">
+            <div class="form-group">
+              <label for="price-convert-to-asset" data-help="The currency or coin you want to receive after selling/converting.">Convert Into</label>
+              <select id="price-convert-to-asset" disabled>
+                <option value="" disabled selected>Select a coin first</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Price Threshold: sell amount mode -->
+          <div class="form-row trigger-price-section d-none" id="price-amount-section">
+            <div class="form-group">
+              <label data-help="Choose how much of your holdings to convert each time the rule triggers.">Sell Amount</label>
+              <div class="amount-mode-group">
+                <label class="radio-label">
+                  <input type="radio" name="price-amount-mode" value="all" checked>
+                  <span>Sell All</span>
+                </label>
+                <label class="radio-label">
+                  <input type="radio" name="price-amount-mode" value="percent">
+                  <span>Percent</span>
+                </label>
+                <label class="radio-label">
+                  <input type="radio" name="price-amount-mode" value="fixed">
+                  <span>Fixed Amount</span>
+                </label>
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="price-amount-value" data-help="For percent mode enter 1-100. For fixed mode enter amount of the source coin.">Amount Value</label>
+              <input type="number" id="price-amount-value" step="any" min="0" placeholder="Only used for percent/fixed" disabled>
+              <span class="form-hint" id="price-amount-hint"></span>
+            </div>
+          </div>
+
+          <!-- Price Threshold: execution limit -->
+          <div class="form-row trigger-price-section d-none" id="price-execution-limit-row">
+            <div class="form-group">
+              <label data-help="Number of times this automation can successfully execute.">Execution Limit</label>
+              <label class="radio-label" style="margin-bottom: 8px;">
+                <input type="checkbox" id="price-unlimited" checked>
+                <span>Unlimited executions</span>
+              </label>
+              <input type="number" id="price-max-executions" min="1" step="1" placeholder="e.g. 5" disabled>
+              <span class="form-hint">Rule auto-pauses after reaching max successful executions</span>
+            </div>
+          </div>
+
+          <!-- Order-filled withdraw amount -->
+          <div class="form-row" id="amount-mode-section">
+            <div class="form-group">
+              <label data-help="'Fixed Amount' lets you specify an exact amount to withdraw. 'Use Filled Amount' automatically withdraws the amount that was filled from the triggering order.">Amount Mode</label>
+              <div class="amount-mode-group">
+                <label class="radio-label">
+                  <input type="radio" name="amount-mode" value="fixed" checked>
+                  <span>Fixed Amount</span>
+                </label>
+                <label class="radio-label">
+                  <input type="radio" name="amount-mode" value="filled" disabled>
+                  <span>Use Filled Amount</span>
+                </label>
+              </div>
+              <span class="form-hint" id="amount-mode-hint"></span>
+            </div>
+            <div class="form-group">
+              <label for="action-amount" data-help="The amount of the asset to withdraw when the rule fires.">Amount</label>
+              <input type="number" id="action-amount" step="any" min="0" placeholder="Select an order first" disabled>
+              <div class="slider-container">
+                <input type="range" id="amount-slider" min="0" max="100" value="100" step="1" disabled>
+                <span class="slider-value" id="slider-value">100%</span>
+              </div>
+              <span class="form-hint" id="amount-hint"></span>
+              <span class="form-hint min-hint" id="min-withdrawal-hint"></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- ───────── Step 3: REVIEW ───────── -->
+        <div class="wizard-step d-none" id="wizard-step-review">
+          <p class="wizard-step-intro">Give it a name and confirm.</p>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="rule-name" data-help="A friendly name so you can identify this rule later, e.g. 'Auto-withdraw BTC after sell'.">Automation Name</label>
+              <input type="text" id="rule-name" placeholder="e.g. Auto-withdraw BTC after sell" required>
+            </div>
+          </div>
+
+          <!-- Plain-English summary anchor -->
+          <div id="rule-summary" class="rule-summary">
+            <i class="fa-solid fa-lightbulb"></i>
+            <span id="rule-summary-text" class="rule-summary-text">Fill in the steps to see your automation summary...</span>
+          </div>
+        </div>
+
+        <div class="alert alert-warning d-none" id="create-rule-error"></div>
+
+      </div>
+
+      <div class="edit-rule-modal-footer wizard-footer">
+        <button type="button" class="btn-secondary d-none" id="wizard-back">
+          <i class="fa-solid fa-arrow-left"></i> Back
+        </button>
+        <button type="button" class="btn-primary" id="wizard-next">
+          Next <i class="fa-solid fa-arrow-right"></i>
+        </button>
+        <button type="submit" class="btn-primary d-none" id="create-rule-btn">
+          <i class="fa-solid fa-plus"></i> Create Automation
+        </button>
+      </div>
+    </form>
   </div>
 </div>
 

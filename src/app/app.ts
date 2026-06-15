@@ -52,13 +52,15 @@ function applyTheme(theme: string): void {
     title: 'Open Orders',
   });
 
-  router.register('whitelist', {
-    view: 'app/views/overview/whitelist.html',
-    viewModel: '../dist/app/viewmodels/overview/whitelist.js',
-    style: 'app/styles/overview/whitelist.css',
-    showChrome: true,
-    title: 'Whitelisted Addresses',
-  });
+  // Whitelisted Addresses page is hidden — withdraw rules read addresses
+  // directly from the exchange, so this read-only view isn't needed.
+  // router.register('whitelist', {
+  //   view: 'app/views/overview/whitelist.html',
+  //   viewModel: '../dist/app/viewmodels/overview/whitelist.js',
+  //   style: 'app/styles/overview/whitelist.css',
+  //   showChrome: true,
+  //   title: 'Whitelisted Addresses',
+  // });
 
   router.register('commands', {
     view: 'app/views/overview/commands.html',
@@ -66,7 +68,7 @@ function applyTheme(theme: string): void {
     style: 'app/styles/overview/commands.css',
     showChrome: true,
     showExchangeSelector: false,
-    title: 'Custom Commands',
+    title: 'Automations',
   });
 
   router.register('profile', {
@@ -126,28 +128,27 @@ function applyTheme(theme: string): void {
       }
 
       ApiKeyWarning.init();
-      UserController.refreshKeyStatus().then(async () => {
-        if (ApiKeyState.status === 'valid') {
-          try {
-            await ExchangeStore.loadConnections();
-            populateExchangeSelector();
-            const saved = localStorage.getItem('cyrus_exchange_mode');
-            if (saved && saved !== 'all') {
-              const id = parseInt(saved, 10);
-              const valid = ExchangeStore.connections.find(c => c.id === id);
-              if (valid) {
-                ExchangeStore.start(id);
-                setExchangeSelectorValue(saved);
-              } else {
-                ExchangeStore.start('all');
-              }
-            } else if (ExchangeStore.connections.length > 0) {
+      await UserController.refreshKeyStatus();
+      if (ApiKeyState.status === 'valid') {
+        try {
+          await ExchangeStore.loadConnections();
+          populateExchangeSelector();
+          const saved = localStorage.getItem('cyrus_exchange_mode');
+          if (saved && saved !== 'all') {
+            const id = parseInt(saved, 10);
+            const valid = ExchangeStore.connections.find(c => c.id === id);
+            if (valid) {
+              ExchangeStore.start(id);
+              setExchangeSelectorValue(saved);
+            } else {
               ExchangeStore.start('all');
             }
-          } catch {}
-          NotificationService.start();
-        }
-      });
+          } else if (ExchangeStore.connections.length > 0) {
+            ExchangeStore.start('all');
+          }
+        } catch {}
+        NotificationService.start();
+      }
 
       ExchangeStore.onConnectionsChange(() => populateExchangeSelector());
 
@@ -162,7 +163,9 @@ function applyTheme(theme: string): void {
         }
       });
 
-      router.navigate('home');
+      // Users without an exchange connection land on Profile to set one up;
+      // everyone else lands on the Overview.
+      router.navigate(ApiKeyState.status === 'none' ? 'profile' : 'home');
     }
   } else {
     router.navigate('login');

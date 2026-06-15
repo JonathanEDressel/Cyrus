@@ -31,7 +31,9 @@ class CommandsController {
   private localWithdrawalAddresses: any[] = [];
   private allRules: any[] = [];
   private allLogs: any[] = [];
-  private rulesViewMode: 'table' | 'flow' = 'table';
+  private rulesViewMode: 'table' | 'flow' | 'log' = 'table';
+  private wizardStep: 1 | 2 | 3 = 1;
+  private filteredRules: any[] = [];
 
   constructor() {
     this.init();
@@ -290,50 +292,35 @@ class CommandsController {
     document.getElementById('rules-tab-strip')?.addEventListener('click', (e) => {
       const btn = (e.target as HTMLElement).closest('.rules-tab-btn') as HTMLElement | null;
       if (!btn) return;
-      const tab = btn.getAttribute('data-tab') as 'table' | 'flow' | null;
+      const tab = btn.getAttribute('data-tab') as 'table' | 'flow' | 'log' | null;
       if (!tab || tab === this.rulesViewMode) return;
       this.rulesViewMode = tab;
       document.querySelectorAll('.rules-tab-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
-      const tableView = document.getElementById('rules-table-view');
-      const flowView  = document.getElementById('rules-flow-view');
-      if (tab === 'flow') {
-        tableView?.classList.add('d-none');
-        flowView?.classList.remove('d-none');
-      } else {
-        flowView?.classList.add('d-none');
-        tableView?.classList.remove('d-none');
-      }
+      this.applyTabView();
+      // Re-render the flow once visible so SVG arrows measure real positions.
+      if (tab === 'flow') this.renderRuleFlow(this.filteredRules);
     });
 
-    // Floating tooltip for flow node icons
-    document.getElementById('rules-flow-chart')?.addEventListener('mousemove', (e) => {
-      const icon = (e.target as HTMLElement).closest('.flow-node-icon[data-tooltip-json]') as HTMLElement | null;
-      const tooltip = document.getElementById('flow-tooltip');
-      if (!icon || !tooltip) return;
-      try {
-        const data: Array<{ k: string; v: string }> = JSON.parse(icon.getAttribute('data-tooltip-json') || '[]');
-        const title = icon.getAttribute('data-tooltip-title') || '';
-        tooltip.innerHTML = `<span class="flow-tooltip-title">${this.escapeHtml(title)}</span>` +
-          data.map(row =>
-            `<div class="flow-tooltip-row"><span class="flow-tooltip-key">${this.escapeHtml(row.k)}</span><span class="flow-tooltip-val">${this.escapeHtml(row.v)}</span></div>`
-          ).join('');
-        tooltip.style.left = `${e.clientX + 14}px`;
-        tooltip.style.top  = `${e.clientY - 8}px`;
-        tooltip.classList.remove('d-none');
-      } catch { /* ignore */ }
+    // ── Create Automation wizard modal ──
+    document.getElementById('new-automation-btn')?.addEventListener('click', () => this.openCreateModal());
+    document.getElementById('empty-blank-btn')?.addEventListener('click', () => this.openCreateModal());
+    document.getElementById('create-rule-modal-close')?.addEventListener('click', () => this.closeCreateModal());
+    document.getElementById('create-rule-overlay')?.addEventListener('click', (e) => {
+      if ((e.target as HTMLElement).id === 'create-rule-overlay') this.closeCreateModal();
+    });
+    document.getElementById('wizard-next')?.addEventListener('click', () => this.wizardNext());
+    document.getElementById('wizard-back')?.addEventListener('click', () => this.setWizardStep((this.wizardStep - 1) as 1 | 2 | 3));
+
+    // Starter templates (empty state)
+    document.querySelectorAll('.template-card').forEach(card => {
+      card.addEventListener('click', () => {
+        const tpl = card.getAttribute('data-template');
+        if (tpl) this.openCreateModal(tpl);
+      });
     });
 
-    document.getElementById('rules-flow-chart')?.addEventListener('mouseleave', () => {
-      document.getElementById('flow-tooltip')?.classList.add('d-none');
-    });
-
-    document.getElementById('rules-flow-chart')?.addEventListener('mouseout', (e) => {
-      const related = (e as MouseEvent).relatedTarget as HTMLElement | null;
-      if (!related?.closest('.flow-node-icon[data-tooltip-json]')) {
-        document.getElementById('flow-tooltip')?.classList.add('d-none');
-      }
-    });
+    // Flow chart hover tooltips are handled internally by RuleFlow.
 
     // Edit rule modal
     document.getElementById('edit-rule-modal-close')?.addEventListener('click', () => this.closeEditModal());
@@ -371,8 +358,10 @@ class CommandsController {
 
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
-        const overlay = document.getElementById('edit-rule-overlay');
-        if (overlay && !overlay.classList.contains('d-none')) this.closeEditModal();
+        const editOverlay = document.getElementById('edit-rule-overlay');
+        if (editOverlay && !editOverlay.classList.contains('d-none')) { this.closeEditModal(); return; }
+        const createOverlay = document.getElementById('create-rule-overlay');
+        if (createOverlay && !createOverlay.classList.contains('d-none')) this.closeCreateModal();
       }
     });
   }
@@ -1419,15 +1408,16 @@ class CommandsController {
 
       await AutomationController.createRule(payload);
 
-      this.showSuccess('Rule created successfully');
+      this.showSuccess('Automation created successfully');
       this.clearForm();
+      this.closeCreateModal();
       this.loadRules();
     } catch (error: any) {
       this.showError(error.message || 'Failed to create rule');
     } finally {
       const btn = document.getElementById('create-rule-btn') as HTMLButtonElement;
       btn.disabled = false;
-      btn.innerHTML = '<i class="fa-solid fa-plus"></i> Create Rule';
+      btn.innerHTML = '<i class="fa-solid fa-plus"></i> Create Automation';
     }
   }
 
@@ -1448,10 +1438,12 @@ class CommandsController {
     const filtered = this.selectedConnectionId !== null
       ? this.allRules.filter((r: any) => r.trigger_exchange_id === this.selectedConnectionId)
       : this.allRules;
+    this.filteredRules = filtered;
     this.ruleOrderIds = new Set(filtered.map((r: any) => r.trigger_order_id).filter(Boolean));
     this.renderRules(filtered);
     this.renderRuleFlow(filtered);
     this.updateRulesCount(filtered.length);
+    this.updateEmptyState(filtered.length);
   }
 
   private applyLogsFilter(): void {
@@ -1639,7 +1631,7 @@ class CommandsController {
 
   private updateRulesCount(count: number): void {
     const el = document.getElementById('rules-count-title');
-    if (el) el.textContent = `Active Rules (${count})`;
+    if (el) el.textContent = `Your Automations (${count})`;
   }
 
   private clearForm(): void {
@@ -1683,7 +1675,148 @@ class CommandsController {
     this.resetDependentFields();
   }
 
+  // ─── Create Automation wizard ──────────────────────────────────────────────
+
+  private openCreateModal(template?: string): void {
+    if (!this.selectedConnectionId) {
+      this.showError('Select an exchange first, then create an automation.');
+      return;
+    }
+
+    this.clearForm();
+    document.getElementById('create-rule-error')?.classList.add('d-none');
+
+    // Apply a starter template, if one was chosen from the empty state.
+    const triggerSel = document.getElementById('trigger-type') as HTMLSelectElement;
+    const actionSel  = document.getElementById('action-type') as HTMLSelectElement;
+    if (template === 'take_profit') {
+      triggerSel.value = 'price_threshold';
+      this.onTriggerTypeChanged();
+    } else if (template === 'convert_balance') {
+      triggerSel.value = 'balance_threshold';
+      this.onTriggerTypeChanged();
+      if (actionSel) { actionSel.value = 'convert_crypto'; this.onActionTypeChanged(); }
+    } else if (template === 'auto_withdraw') {
+      triggerSel.value = 'order_filled';
+      this.onTriggerTypeChanged();
+      if (actionSel) { actionSel.value = 'withdraw_crypto'; this.onActionTypeChanged(); }
+    }
+
+    this.setWizardStep(1);
+    document.getElementById('create-rule-overlay')?.classList.remove('d-none');
+  }
+
+  private closeCreateModal(): void {
+    document.getElementById('create-rule-overlay')?.classList.add('d-none');
+  }
+
+  private setWizardStep(step: 1 | 2 | 3): void {
+    this.wizardStep = step;
+    document.getElementById('create-rule-error')?.classList.add('d-none');
+
+    const stepIds: Record<number, string> = {
+      1: 'wizard-step-when', 2: 'wizard-step-then', 3: 'wizard-step-review',
+    };
+    Object.entries(stepIds).forEach(([n, id]) => {
+      document.getElementById(id)?.classList.toggle('d-none', Number(n) !== step);
+    });
+
+    document.querySelectorAll('.wizard-dot').forEach(dot => {
+      const dStep = Number(dot.getAttribute('data-step'));
+      dot.classList.toggle('active', dStep === step);
+      dot.classList.toggle('done', dStep < step);
+    });
+
+    const labels: Record<number, string> = {
+      1: 'Step 1 of 3 · When this happens',
+      2: 'Step 2 of 3 · Then do this',
+      3: 'Step 3 of 3 · Review & name',
+    };
+    const lbl = document.getElementById('wizard-step-label');
+    if (lbl) lbl.textContent = labels[step];
+
+    document.getElementById('wizard-back')?.classList.toggle('d-none', step === 1);
+    document.getElementById('wizard-next')?.classList.toggle('d-none', step === 3);
+    document.getElementById('create-rule-btn')?.classList.toggle('d-none', step !== 3);
+
+    if (step === 3) this.updateRuleSummary();
+  }
+
+  private wizardNext(): void {
+    if (this.wizardStep === 1 && !this.validateWizardStep1()) return;
+    if (this.wizardStep === 2 && !this.validateWizardStep2()) return;
+    if (this.wizardStep < 3) this.setWizardStep((this.wizardStep + 1) as 1 | 2 | 3);
+  }
+
+  private validateWizardStep1(): boolean {
+    const t = (document.getElementById('trigger-type') as HTMLSelectElement).value;
+    if (t === 'order_filled') {
+      const v = (document.getElementById('trigger-order-id') as HTMLSelectElement).value;
+      if (!v) { this.showError('Pick an order that should trigger this automation.'); return false; }
+    } else if (t === 'balance_threshold') {
+      const a = (document.getElementById('trigger-asset') as HTMLSelectElement).value;
+      const th = (document.getElementById('trigger-threshold') as HTMLInputElement).value.trim();
+      if (!a || !th) { this.showError('Choose an asset to monitor and a threshold amount.'); return false; }
+    } else if (t === 'price_threshold') {
+      const a = (document.getElementById('price-trigger-asset') as HTMLSelectElement).value;
+      const th = (document.getElementById('price-trigger-threshold') as HTMLInputElement).value.trim();
+      if (!a || !th) { this.showError('Choose a coin to monitor and a trigger price.'); return false; }
+    }
+    return true;
+  }
+
+  private validateWizardStep2(): boolean {
+    const t = (document.getElementById('trigger-type') as HTMLSelectElement).value;
+    if (t === 'price_threshold') {
+      const to = (document.getElementById('price-convert-to-asset') as HTMLSelectElement).value;
+      if (!to) { this.showError('Choose what to convert into.'); return false; }
+      return true;
+    }
+    const action = (document.getElementById('action-type') as HTMLSelectElement).value;
+    if (action === 'withdraw_crypto') {
+      const asset = (document.getElementById('action-asset') as HTMLSelectElement).value;
+      const addr  = (document.getElementById('action-address-key') as HTMLSelectElement).value;
+      if (!asset || !addr) { this.showError('Choose the asset and withdrawal address.'); return false; }
+    } else {
+      const to = (document.getElementById('convert-to-asset') as HTMLSelectElement).value;
+      if (!to) { this.showError('Choose the asset to convert into.'); return false; }
+    }
+    return true;
+  }
+
+  private applyTabView(): void {
+    const views: Record<string, string> = {
+      table: 'rules-table-view', flow: 'rules-flow-view', log: 'rules-log-view',
+    };
+    Object.entries(views).forEach(([mode, id]) => {
+      document.getElementById(id)?.classList.toggle('d-none', mode !== this.rulesViewMode);
+    });
+  }
+
+  private updateEmptyState(count: number): void {
+    const isEmpty = count === 0;
+    document.getElementById('rules-empty-state')?.classList.toggle('d-none', !isEmpty);
+    document.getElementById('rules-tab-strip')?.classList.toggle('d-none', isEmpty);
+    if (isEmpty) {
+      ['rules-table-view', 'rules-flow-view', 'rules-log-view'].forEach(id =>
+        document.getElementById(id)?.classList.add('d-none'));
+    } else {
+      this.applyTabView();
+    }
+  }
+
   private showError(message: string): void {
+    // When the create wizard is open it covers the page, so surface errors
+    // inside the modal instead of on the (hidden) page banner.
+    const createOverlay = document.getElementById('create-rule-overlay');
+    if (createOverlay && !createOverlay.classList.contains('d-none')) {
+      const inline = document.getElementById('create-rule-error');
+      if (inline) {
+        inline.textContent = message;
+        inline.classList.remove('d-none');
+        return;
+      }
+    }
     const el = document.getElementById('commands-error');
     const msgEl = document.getElementById('commands-error-message');
     if (el && msgEl) {
@@ -1708,268 +1841,7 @@ class CommandsController {
   private renderRuleFlow(rules: any[]): void {
     const chart = document.getElementById('rules-flow-chart');
     if (!chart) return;
-
-    if (rules.length === 0) {
-      chart.innerHTML = '<div class="flow-empty"><i class="fa-solid fa-diagram-project"></i>No rules to display. Create an automation rule to see the flow.</div>';
-      return;
-    }
-
-    // Helpers: determine input/output asset for chaining
-    const getInputAsset = (r: any): string | null => {
-      if (r.trigger_type === 'balance_threshold' || r.trigger_type === 'price_threshold') {
-        return (r.trigger_asset || '').toUpperCase() || null;
-      }
-      return null; // order_filled rules are not chainable
-    };
-    const getOutputAsset = (r: any): string | null => {
-      if (r.action_type === 'convert_crypto') {
-        const out = r.convert_to_asset || r.price_convert_to_asset || '';
-        return out.toUpperCase() || null;
-      }
-      return null; // withdraw is terminal
-    };
-
-    // Build adjacency graph by asset-matching
-    const edges: Map<number, number[]> = new Map();
-    const revEdges: Map<number, number[]> = new Map();
-    rules.forEach(r => { edges.set(r.id, []); revEdges.set(r.id, []); });
-    for (let i = 0; i < rules.length; i++) {
-      const out = getOutputAsset(rules[i]);
-      if (!out) continue;
-      for (let j = 0; j < rules.length; j++) {
-        if (i === j) continue;
-        const inp = getInputAsset(rules[j]);
-        if (inp && inp === out) {
-          edges.get(rules[i].id)!.push(rules[j].id);
-          revEdges.get(rules[j].id)!.push(rules[i].id);
-        }
-      }
-    }
-
-    // Find connected components via iterative DFS
-    const visited = new Set<number>();
-    const components: number[][] = [];
-    for (const r of rules) {
-      if (visited.has(r.id)) continue;
-      const stack = [r.id];
-      const comp: number[] = [];
-      while (stack.length) {
-        const id = stack.pop()!;
-        if (visited.has(id)) continue;
-        visited.add(id);
-        comp.push(id);
-        (edges.get(id) || []).forEach(n => { if (!visited.has(n)) stack.push(n); });
-        (revEdges.get(id) || []).forEach(n => { if (!visited.has(n)) stack.push(n); });
-      }
-      components.push(comp);
-    }
-
-    // Build id→rule lookup
-    const ruleById: Map<number, any> = new Map(rules.map(r => [r.id, r]));
-
-    // Assign column depths within each component via BFS
-    const getDepths = (compIds: number[]): Map<number, number> => {
-      const depthMap = new Map<number, number>();
-      const inComp = new Set(compIds);
-      // Source: no in-edges within component
-      const sources = compIds.filter(id => !(revEdges.get(id) || []).some(p => inComp.has(p)));
-      const queue: number[] = [...sources];
-      sources.forEach(id => depthMap.set(id, 0));
-      while (queue.length) {
-        const id = queue.shift()!;
-        const d = depthMap.get(id)!;
-        (edges.get(id) || []).filter(n => inComp.has(n)).forEach(n => {
-          const existing = depthMap.get(n) ?? -1;
-          const newD = d + 1;
-          if (newD > existing) {
-            depthMap.set(n, newD);
-            queue.push(n);
-          }
-        });
-      }
-      // Assign depth 0 to any unreached node (isolated)
-      compIds.forEach(id => { if (!depthMap.has(id)) depthMap.set(id, 0); });
-      return depthMap;
-    };
-
-    // Render
-    const groupsHtml: string[] = [];
-    const groupEdgeSets: Array<{ compIds: number[]; edgePairs: Array<[number, number, string]> }> = [];
-
-    for (const compIds of components) {
-      const depths = getDepths(compIds);
-      const maxDepth = Math.max(...[...depths.values()]);
-      const columns: number[][] = Array.from({ length: maxDepth + 1 }, () => []);
-      compIds.forEach(id => columns[depths.get(id)!].push(id));
-
-      // Build label for group (source assets → final output)
-      const sources = compIds.filter(id => !(revEdges.get(id) || []).some(p => compIds.includes(p)));
-      const sourceLabels = [...new Set(sources.map(id => getInputAsset(ruleById.get(id)!) || ruleById.get(id)!.rule_name))];
-      const sinks = compIds.filter(id => !(edges.get(id) || []).some(c => compIds.includes(c)));
-      const sinkAction = sinks.map(id => ruleById.get(id)!.action_type === 'withdraw_crypto' ? 'Withdraw' : getOutputAsset(ruleById.get(id)!) || 'End').join(', ');
-      const groupLabel = compIds.length > 1 ? `${sourceLabels.join(', ')} → ${sinkAction}` : '';
-
-      // Collect edges within this component for SVG drawing
-      const edgePairs: Array<[number, number, string]> = [];
-      compIds.forEach(id => {
-        (edges.get(id) || []).filter(n => compIds.includes(n)).forEach(n => {
-          edgePairs.push([id, n, getOutputAsset(ruleById.get(id)!) || '']);
-        });
-      });
-      groupEdgeSets.push({ compIds, edgePairs });
-
-      // Build card HTML per rule
-      const cardHtml = (r: any): string => {
-        const paused = !r.is_active;
-        const pausedClass = paused ? ' paused' : '';
-
-        // Trigger icon
-        let trigIconClass = 'flow-icon-balance';
-        let trigIconFa    = 'fa-scale-balanced';
-        let trigTitle     = 'Balance Threshold';
-        const trigRows: Array<{ k: string; v: string }> = [];
-        if (r.trigger_type === 'order_filled') {
-          trigIconClass = 'flow-icon-order';
-          trigIconFa    = 'fa-list-check';
-          trigTitle     = 'Order Filled';
-          trigRows.push({ k: 'Order ID', v: r.trigger_order_id ? String(r.trigger_order_id).substring(0, 16) + '…' : 'Any' });
-        } else if (r.trigger_type === 'price_threshold') {
-          trigIconClass = 'flow-icon-price';
-          trigIconFa    = 'fa-chart-line';
-          trigTitle     = 'Price Threshold';
-          trigRows.push({ k: 'Coin', v: r.trigger_asset || '—' });
-          trigRows.push({ k: 'Quote', v: r.trigger_price_quote_asset || 'USDT' });
-          trigRows.push({ k: 'Min Price', v: r.trigger_threshold ? `${r.trigger_threshold} ${r.trigger_price_quote_asset || 'USDT'}` : '—' });
-          trigRows.push({ k: 'Cooldown', v: this.formatCooldown(r.cooldown_minutes || 1) });
-        } else {
-          // balance_threshold
-          trigRows.push({ k: 'Asset', v: r.trigger_asset || '—' });
-          trigRows.push({ k: 'Min Balance', v: r.trigger_threshold ? `${r.trigger_threshold} ${r.trigger_asset || ''}` : '—' });
-          trigRows.push({ k: 'Cooldown', v: this.formatCooldown(r.cooldown_minutes || 1440) });
-        }
-        trigRows.push({ k: 'Status', v: r.is_active ? 'Active' : 'Paused' });
-
-        // Action icon
-        let actIconClass = 'flow-icon-convert';
-        let actIconFa    = 'fa-arrows-rotate';
-        let actTitle     = 'Convert Asset';
-        const actRows: Array<{ k: string; v: string }> = [];
-        if (r.action_type === 'withdraw_crypto') {
-          actIconClass = 'flow-icon-withdraw';
-          actIconFa    = 'fa-arrow-right-from-bracket';
-          actTitle     = 'Withdraw';
-          actRows.push({ k: 'Asset', v: r.action_asset || '—' });
-          actRows.push({ k: 'To Address', v: r.action_address_key || '—' });
-          const amt = r.use_filled_amount ? 'Filled Amount' : (r.action_amount ? String(r.action_amount) : 'Full Balance');
-          actRows.push({ k: 'Amount', v: amt });
-        } else {
-          actRows.push({ k: 'From', v: r.action_asset || r.trigger_asset || '—' });
-          actRows.push({ k: 'To', v: r.convert_to_asset || '—' });
-          const mode = r.action_amount_mode || 'all';
-          const amt = mode === 'percent' ? `${r.action_amount}%` : mode === 'fixed' ? String(r.action_amount) : 'Full Balance';
-          actRows.push({ k: 'Amount', v: amt });
-        }
-
-        const trigJson = JSON.stringify(trigRows).replace(/"/g, '&quot;');
-        const actJson  = JSON.stringify(actRows).replace(/"/g, '&quot;');
-
-        // Asset pill under trigger icon
-        const inputAsset = getInputAsset(r);
-        const outputAsset = getOutputAsset(r);
-        const trigLabel  = inputAsset || (r.trigger_type === 'order_filled' ? 'Order' : '');
-        const actLabel   = outputAsset || (r.action_type === 'withdraw_crypto' ? r.action_address_key || 'Addr' : '');
-
-        return `<div class="flow-rule-card${pausedClass}" data-rule-id="${r.id}">
-          <div class="flow-node-section">
-            <div class="flow-node-icon ${trigIconClass}" data-tooltip-title="${trigTitle}" data-tooltip-json="${trigJson}"><i class="fa-solid ${trigIconFa}"></i></div>
-            <div class="flow-node-label">${this.escapeHtml(trigLabel)}</div>
-          </div>
-          <span class="flow-node-arrow">→</span>
-          <div class="flow-card-info">
-            <span class="flow-card-name">${this.escapeHtml(r.rule_name)}</span>
-            <span class="flow-card-meta">${this.escapeHtml(r.trigger_type.replace('_', ' ').replace('_', ' '))} → ${this.escapeHtml(r.action_type.replace('_', ' ').replace('_', ' '))}</span>
-          </div>
-          <span class="flow-node-arrow">→</span>
-          <div class="flow-node-section">
-            <div class="flow-node-icon ${actIconClass}" data-tooltip-title="${actTitle}" data-tooltip-json="${actJson}"><i class="fa-solid ${actIconFa}"></i></div>
-            <div class="flow-node-label">${this.escapeHtml(actLabel)}</div>
-          </div>
-        </div>`;
-      };
-
-      const columnsHtml = columns.map(colIds =>
-        `<div class="flow-column">${colIds.map(id => cardHtml(ruleById.get(id)!)).join('')}</div>`
-      ).join('');
-
-      groupsHtml.push(
-        `<div class="flow-group" data-group-idx="${groupEdgeSets.length - 1}">`
-        + (groupLabel ? `<div class="flow-group-label">${this.escapeHtml(groupLabel)}</div>` : '')
-        + `<div class="flow-columns">${columnsHtml}</div></div>`
-      );
-    }
-
-    chart.innerHTML = groupsHtml.join('');
-
-    // Draw SVG arrows after DOM is ready
-    requestAnimationFrame(() => {
-      document.querySelectorAll<HTMLElement>('.flow-group').forEach((groupEl, idx) => {
-        const { edgePairs } = groupEdgeSets[idx];
-        if (!edgePairs.length) return;
-
-        const columnsEl = groupEl.querySelector('.flow-columns') as HTMLElement | null;
-        if (!columnsEl) return;
-
-        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-        svg.setAttribute('class', 'flow-svg-overlay');
-        columnsEl.style.position = 'relative';
-        columnsEl.appendChild(svg);
-
-        // Define arrowhead marker
-        const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
-        defs.innerHTML = `<marker id="arrowhead-${idx}" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
-          <path d="M0,0 L8,3 L0,6 Z" class="flow-arrowhead"/>
-        </marker>`;
-        svg.appendChild(defs);
-
-        const contRect = columnsEl.getBoundingClientRect();
-
-        for (const [fromId, toId, assetLabel] of edgePairs) {
-          const fromCard = columnsEl.querySelector<HTMLElement>(`.flow-rule-card[data-rule-id="${fromId}"]`);
-          const toCard   = columnsEl.querySelector<HTMLElement>(`.flow-rule-card[data-rule-id="${toId}"]`);
-          if (!fromCard || !toCard) continue;
-
-          const fromRect = fromCard.getBoundingClientRect();
-          const toRect   = toCard.getBoundingClientRect();
-
-          const x1 = fromRect.right  - contRect.left;
-          const y1 = fromRect.top    - contRect.top  + fromRect.height / 2;
-          const x2 = toRect.left     - contRect.left;
-          const y2 = toRect.top      - contRect.top  + toRect.height / 2;
-
-          const cpOffset = Math.max(40, (x2 - x1) * 0.45);
-          const d = `M${x1},${y1} C${x1 + cpOffset},${y1} ${x2 - cpOffset},${y2} ${x2},${y2}`;
-
-          const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-          path.setAttribute('d', d);
-          path.setAttribute('class', 'flow-arrow-path');
-          path.setAttribute('marker-end', `url(#arrowhead-${idx})`);
-          svg.appendChild(path);
-
-          // Asset label at midpoint
-          if (assetLabel) {
-            const mx = (x1 + x2) / 2;
-            const my = (y1 + y2) / 2 - 5;
-            const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-            text.setAttribute('x', String(mx));
-            text.setAttribute('y', String(my));
-            text.setAttribute('text-anchor', 'middle');
-            text.setAttribute('class', 'flow-arrow-label');
-            text.textContent = assetLabel;
-            svg.appendChild(text);
-          }
-        }
-      });
-    });
+    RuleFlow.render(chart, rules, { exchangeName: (id) => ExchangeStore.getExchangeName(id) });
   }
 
   // ──────────────────────────────────────────────────────────────────────────

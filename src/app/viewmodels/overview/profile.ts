@@ -150,7 +150,7 @@ class ProfileController {
         : 'Never';
       const label = c.label || 'Default';
 
-      return `<div class="connection-card" data-conn-id="${c.id}">
+      return `<div class="connection-card mt-4" data-conn-id="${c.id}">
         <div class="connection-info mb-4">
           <span class="connection-label">${this.escapeHtml(label)} - </span>
           <span class="status-badge ${statusClass}">${statusText}</span>${sandboxBadge}

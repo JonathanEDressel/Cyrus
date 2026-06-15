@@ -1,0 +1,216 @@
+/* ─── RuleFlow: asset-centric automations flow chart ──────────────── */
+
+.rf-chart {
+  width: 100%;
+  padding: 0.5rem 0 0.5rem;
+}
+
+/* Per-exchange sections */
+.rf-exchange + .rf-exchange {
+  margin-top: 1.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px dashed var(--border-primary);
+}
+
+.rf-exchange-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  color: var(--text-secondary);
+}
+
+.rf-exchange-title i {
+  color: var(--accent-cyan);
+  font-size: 0.9rem;
+}
+
+/* Separate, non-overlapping blocks for unrelated flows */
+.rf-components {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.rf-component {
+  background: rgba(255, 255, 255, 0.015);
+  border: 1px solid var(--border-primary);
+  border-radius: 12px;
+}
+
+.rf-component + .rf-component {
+  margin-top: 0.25rem;
+}
+
+.rf-rows {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 3.25rem;
+  padding: 1.5rem 0.5rem 1.75rem;
+}
+
+.rf-row {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 2.5rem;
+}
+
+/* Circle node */
+.rf-node {
+  position: relative;
+  z-index: 1;
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.15rem;
+  background: var(--bg-secondary);
+  border: 2px solid var(--border-primary);
+  cursor: default;
+  transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s;
+}
+
+.rf-node:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+}
+
+.rf-node-icon {
+  font-size: 1.05rem;
+  line-height: 1;
+}
+
+.rf-node-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  color: var(--text-primary);
+  max-width: 70px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Role colors */
+.rf-node-source   { border-color: var(--accent-cyan); }
+.rf-node-source   .rf-node-icon { color: var(--accent-cyan); }
+
+.rf-node-mid      { border-color: var(--accent-purple-light); }
+.rf-node-mid      .rf-node-icon { color: var(--accent-purple-light); }
+
+.rf-node-terminal { border-color: #22c55e; }
+.rf-node-terminal .rf-node-icon { color: #22c55e; }
+
+.rf-node-wallet   { border-color: #f59e0b; }
+.rf-node-wallet   .rf-node-icon { color: #f59e0b; }
+
+.rf-node.rf-paused {
+  opacity: 0.5;
+  border-style: dashed;
+}
+
+/* SVG arrow overlay */
+.rf-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.rf-arrow {
+  fill: none;
+  stroke: var(--accent-purple-light);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  opacity: 0.85;
+}
+
+.rf-arrow-paused {
+  stroke: var(--text-muted);
+  stroke-dasharray: 5 4;
+  opacity: 0.6;
+}
+
+.rf-arrowhead { fill: var(--accent-purple-light); }
+.rf-arrowhead-paused { fill: var(--text-muted); }
+.rf-arrowhead-hl { fill: var(--accent-cyan); }
+
+/* On node hover: recolor the connected paths, fade the rest (no size change) */
+.rf-arrow-hl {
+  stroke: var(--accent-cyan);
+  opacity: 1;
+}
+
+.rf-arrow-dim {
+  opacity: 0.12;
+}
+
+/* Hover tooltip */
+.rf-tooltip {
+  position: fixed;
+  z-index: 1000;
+  max-width: 320px;
+  padding: 0.6rem 0.8rem;
+  background: var(--bg-tertiary, #1e293b);
+  border: 1px solid var(--border-primary);
+  border-radius: 8px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+}
+
+.rf-tooltip-line {
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.rf-tooltip-line + .rf-tooltip-line {
+  margin-top: 0.3rem;
+  padding-top: 0.3rem;
+  border-top: 1px solid var(--border-primary);
+}
+
+/* Empty state */
+.rf-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 2.5rem 1rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.rf-empty i {
+  font-size: 1.6rem;
+  opacity: 0.6;
+}
+
+.rf-empty p { margin: 0; font-size: 0.9rem; }
+
+/* Legend dots + hint (Automations Flow tab) */
+.flow-hint {
+  margin: 0 0 0.25rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.rf-legend-source   { color: var(--accent-cyan); }
+.rf-legend-mid      { color: var(--accent-purple-light); }
+.rf-legend-terminal { color: #22c55e; }
+.rf-legend-wallet   { color: #f59e0b; }

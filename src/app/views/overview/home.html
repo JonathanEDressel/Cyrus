@@ -1,8 +1,8 @@
 <div class="page-container">
 
   <div class="overview-header">
-    <h1 class="page-title">Dashboard</h1>
-    <p class="page-subtitle" id="page-subtitle">Overview of your exchange accounts</p>
+    <h1 class="page-title">Overview</h1>
+    <p class="page-subtitle" id="page-subtitle">A quick look at your account</p>
   </div>
 
   <div class="summary-cards">
@@ -22,53 +22,38 @@
       </div>
     </div> -->
 
-    <div class="summary-card">
+    <a href="#" class="summary-card summary-card-link" data-route="openorders" title="View open orders">
       <div class="summary-icon"><i class="fa-solid fa-clock-rotate-left"></i></div>
       <div class="summary-body">
         <span class="summary-label">Open Orders</span>
         <span class="summary-value" id="open-orders-count">--</span>
       </div>
-    </div>
+      <i class="fa-solid fa-chevron-right summary-card-arrow"></i>
+    </a>
 
-    <div class="summary-card">
+    <a href="#" class="summary-card summary-card-link" data-route="commands" title="View automations">
       <div class="summary-icon"><i class="fa-solid fa-bolt"></i></div>
       <div class="summary-body">
-        <span class="summary-label">Custom Commands</span>
+        <span class="summary-label">Automations</span>
         <span class="summary-value" id="custom-commands-count">--</span>
       </div>
-    </div>
+      <i class="fa-solid fa-chevron-right summary-card-arrow"></i>
+    </a>
   </div>
 
-  <!-- <div class="overview-section">
+  <div class="overview-section" data-section="automations-flow" id="overview-flow-section">
     <div class="section-header">
-      <h2 class="section-title">Recent Positions</h2>
-      <button class="btn-link-sm" id="view-all-positions">View All <i class="fa-solid fa-arrow-right"></i></button>
+      <div class="section-header-left">
+        <h2 class="section-title">Automations Flow</h2>
+      </div>
+      <a href="#" class="btn-link-sm" data-route="commands">Open <i class="fa-solid fa-arrow-right"></i></a>
     </div>
-    <div class="data-table-wrapper">
-      <table class="data-table" id="positions-table">
-        <thead>
-          <tr>
-            <th>Pair</th>
-            <th>Side</th>
-            <th>Size</th>
-            <th>Entry Price</th>
-            <th>Current Price</th>
-            <th>P&L</th>
-          </tr>
-        </thead>
-        <tbody id="positions-tbody">
-          <tr class="empty-row">
-            <td colspan="6">Loading positions...</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-  </div> -->
+    <div id="overview-flow-chart"></div>
+  </div>
 
   <div class="overview-section" data-section="live-data">
-    <div class="section-header" data-collapse="live-data">
+    <div class="section-header">
       <div class="section-header-left">
-        <i class="fa-solid fa-chevron-down collapse-chevron"></i>
         <h2 class="section-title">Live Data</h2>
       </div>
       <button class="add-crypto-btn" id="add-crypto-btn"><i class="fa-solid fa-plus"></i> Add Crypto</button>
@@ -93,90 +78,6 @@
         <i class="fa-solid fa-chart-line"></i>
         <p>No cryptos tracked yet. Click <strong>Add Crypto</strong> to get started.</p>
       </div>
-    </div>
-  </div>
-
-  <div class="overview-section" data-section="open-orders">
-    <div class="section-header" data-collapse="open-orders">
-      <div class="section-header-left">
-        <i class="fa-solid fa-chevron-down collapse-chevron"></i>
-        <h2 class="section-title">Open Orders</h2>
-      </div>
-      <button class="btn-link-sm" id="view-all-orders">View All <i class="fa-solid fa-arrow-right"></i></button>
-    </div>
-    <div class="data-table-wrapper">
-      <table class="data-table" id="orders-table">
-        <thead id="orders-thead">
-          <tr>
-            <th>Pair</th>
-            <th>Type</th>
-            <th>Side</th>
-            <th>Price</th>
-            <th>Volume</th>
-            <th>Status</th>
-          </tr>
-        </thead>
-        <tbody id="orders-tbody" class="orders-list">
-          <tr class="empty-row">
-            <td colspan="6">Loading orders...</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
-
-  <div class="overview-section" data-section="custom-commands">
-    <div class="section-header" data-collapse="custom-commands">
-      <div class="section-header-left">
-        <i class="fa-solid fa-chevron-down collapse-chevron"></i>
-        <h2 class="section-title">Custom Commands</h2>
-      </div>
-      <button class="btn-link-sm" id="view-all-commands">View All <i class="fa-solid fa-arrow-right"></i></button>
-    </div>
-    <div class="data-table-wrapper">
-      <table class="data-table" id="commands-table">
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Trigger</th>
-            <th>Action</th>
-            <th>Status</th>
-          </tr>
-        </thead>
-        <tbody id="commands-tbody">
-          <tr class="empty-row">
-            <td colspan="4">Loading commands...</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
-
-  <div class="overview-section" data-section="execution-log">
-    <div class="section-header" data-collapse="execution-log">
-      <div class="section-header-left">
-        <i class="fa-solid fa-chevron-down collapse-chevron"></i>
-        <h2 class="section-title">Execution Log</h2>
-      </div>
-      <button class="btn-link-sm" id="view-all-commands2">View All <i class="fa-solid fa-arrow-right"></i></button>
-    </div>
-    <div class="data-table-wrapper">
-      <table class="data-table" id="logs-table">
-        <thead>
-          <tr>
-            <th>Time</th>
-            <th>Trigger</th>
-            <th>Action</th>
-            <th>Result</th>
-            <th>Status</th>
-          </tr>
-        </thead>
-        <tbody id="logs-tbody">
-          <tr class="empty-row">
-            <td colspan="5">Loading logs...</td>
-          </tr>
-        </tbody>
-      </table>
     </div>
   </div>
 

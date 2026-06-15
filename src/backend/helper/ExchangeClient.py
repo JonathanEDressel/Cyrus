@@ -167,33 +167,52 @@ def convert(exchange: ccxt.Exchange, from_asset: str, to_asset: str,
     )
 
 
+_STABLECOIN_FALLBACKS: dict[str, list[str]] = {
+    'USDT': ['USD', 'USDC'],
+    'USDC': ['USD', 'USDT'],
+    'BUSD': ['USD', 'USDT'],
+    'USD':  ['USDT', 'USDC'],
+}
+
+
+def _fetch_price_for_symbol(exchange: ccxt.Exchange, symbol: str, inverse: bool = False) -> float | None:
+    """Fetch last price for a symbol. Returns None if unavailable. Inverts if inverse=True."""
+    if symbol not in exchange.markets:
+        return None
+    ticker = exchange.fetch_ticker(symbol)
+    price = ticker.get('last')
+    if price is None or (inverse and float(price) <= 0):
+        return None
+    return (1.0 / float(price)) if inverse else float(price)
+
+
 def get_market_price(exchange: ccxt.Exchange, base_asset: str, quote_asset: str) -> float:
     """Return latest market price for base/quote.
 
     If only the inverse pair exists, the returned price is inverted.
+    Falls back to stablecoin equivalents (e.g. USDT -> USD) when the
+    exact pair is not listed on the exchange (common on Kraken).
     """
     exchange.load_markets()
 
-    direct_symbol = f"{base_asset}/{quote_asset}"
-    inverse_symbol = f"{quote_asset}/{base_asset}"
+    quotes_to_try = [quote_asset] + [
+        q for q in _STABLECOIN_FALLBACKS.get(quote_asset, [])
+        if q != quote_asset
+    ]
 
-    if direct_symbol in exchange.markets:
-        ticker = exchange.fetch_ticker(direct_symbol)
-        price = ticker.get('last')
-        if price is None:
-            raise ValueError(f"No last price available for {direct_symbol}")
-        return float(price)
+    for quote in quotes_to_try:
+        direct_symbol = f"{base_asset}/{quote}"
+        inverse_symbol = f"{quote}/{base_asset}"
 
-    if inverse_symbol in exchange.markets:
-        ticker = exchange.fetch_ticker(inverse_symbol)
-        price = ticker.get('last')
-        if price is None:
-            raise ValueError(f"No last price available for {inverse_symbol}")
-        price = float(price)
-        if price <= 0:
-            raise ValueError(f"Invalid inverse price for {inverse_symbol}")
-        return 1.0 / price
+        price = _fetch_price_for_symbol(exchange, direct_symbol)
+        if price is not None:
+            return price
+
+        price = _fetch_price_for_symbol(exchange, inverse_symbol, inverse=True)
+        if price is not None:
+            return price
 
     raise ValueError(
-        f"No trading pair found for {direct_symbol} or {inverse_symbol} on {exchange.id}"
+        f"No trading pair found for {base_asset}/{quote_asset} or "
+        f"{quote_asset}/{base_asset} on {exchange.id}"
     )
