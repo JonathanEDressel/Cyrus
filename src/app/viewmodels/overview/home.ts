@@ -21,12 +21,15 @@ class HomeController {
   private portfolioSig = '';
   private static readonly ACTIVE_KEY = 'cyrus_live_active_symbol';
 
+  private flowTab: 'automations' | 'orders' = 'automations';
+
   constructor() {
     this.init();
   }
 
   private init(): void {
     this.initCollapsibleSections();
+    this.bindFlowTabs();
     this.attachEventListeners();
     this.loadDashboardData();
 
@@ -50,6 +53,27 @@ class HomeController {
     });
     const content = document.getElementById('app-content');
     if (content) observer.observe(content, { childList: true });
+  }
+
+  private bindFlowTabs(): void {
+    document.getElementById('overview-flow-tab-strip')?.addEventListener('click', (e) => {
+      const btn = (e.target as HTMLElement).closest('.rules-tab-btn') as HTMLElement | null;
+      if (!btn) return;
+      const tab = btn.getAttribute('data-tab') as 'automations' | 'orders';
+      if (!tab || tab === this.flowTab) return;
+      this.flowTab = tab;
+      document.querySelectorAll('#overview-flow-tab-strip .rules-tab-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const flowChart = document.getElementById('overview-flow-chart');
+      const ordersChart = document.getElementById('overview-orders-chart');
+      const openLink = document.getElementById('overview-flow-open-link');
+      flowChart?.classList.toggle('d-none', tab !== 'automations');
+      ordersChart?.classList.toggle('d-none', tab !== 'orders');
+      if (openLink) openLink.setAttribute('data-route', tab === 'automations' ? 'commands' : 'openorders');
+      if (tab === 'orders') {
+        OrderFlow.render(ordersChart!, ExchangeStore.openOrders);
+      }
+    });
   }
 
   private initCollapsibleSections(): void {
@@ -565,6 +589,8 @@ class HomeController {
       this.setCardValue('open-orders-count', '--');
     } else {
       this.setCardValue('open-orders-count', ExchangeStore.openOrders.length.toString());
+      const ordersChart = document.getElementById('overview-orders-chart');
+      if (ordersChart) OrderFlow.render(ordersChart, ExchangeStore.openOrders);
     }
   }
 

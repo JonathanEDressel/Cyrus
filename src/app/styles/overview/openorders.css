@@ -4,6 +4,17 @@
   font-weight: 400;
 }
 
+/* ── Tab strip (reuses .rules-tab-btn from commands page) ────────── */
+.orders-tab-strip {
+  display: flex;
+  gap: 0.2rem;
+}
+
+/* ── Flow view wrapper ───────────────────────────────────────────── */
+#orders-flow-view {
+  padding-top: 0.25rem;
+}
+
 .side-buy {
   color: #22c55e;
   font-weight: 600;

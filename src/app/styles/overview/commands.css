@@ -490,32 +490,6 @@
   border-radius: 8px;
 }
 
-.rules-tab-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0.35rem 0.9rem;
-  border: none;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--text-muted);
-  font-size: 0.8rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.2s, color 0.2s;
-  white-space: nowrap;
-}
-
-.rules-tab-btn.active {
-  background: var(--accent-purple);
-  color: #fff;
-}
-
-.rules-tab-btn:hover:not(.active) {
-  background: var(--border-primary);
-  color: var(--text-secondary);
-}
-
 #rules-flow-view {
   padding: 0.25rem 0;
 }

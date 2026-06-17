@@ -19,6 +19,7 @@ const RuleFlow = (() => {
     depth: number;
     out: any[];                  // rules originating from this node
     inFrom: Set<string>;         // labels of assets feeding into this node
+    inRules: any[];              // rules flowing INTO this node (for amount summing)
   }
   interface FlowEdge { from: string; to: string; rule: any; }
 
@@ -93,17 +94,7 @@ const RuleFlow = (() => {
   function drawArrows(rowsEl: HTMLElement, edges: FlowEdge[]): void {
     const svg = document.createElementNS(NS, 'svg');
     svg.setAttribute('class', 'rf-svg');
-    svg.innerHTML = `<defs>
-      <marker id="rf-ah" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto">
-        <path d="M0,0 L9,3.5 L0,7 Z" class="rf-arrowhead"/>
-      </marker>
-      <marker id="rf-ah-p" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto">
-        <path d="M0,0 L9,3.5 L0,7 Z" class="rf-arrowhead-paused"/>
-      </marker>
-      <marker id="rf-ah-hl" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto">
-        <path d="M0,0 L9,3.5 L0,7 Z" class="rf-arrowhead-hl"/>
-      </marker>
-    </defs>`;
+    svg.innerHTML = '';
     rowsEl.appendChild(svg);
 
     const base = rowsEl.getBoundingClientRect();
@@ -219,7 +210,6 @@ const RuleFlow = (() => {
       const path = document.createElementNS(NS, 'path');
       path.setAttribute('d', d);
       path.setAttribute('class', paused ? 'rf-arrow rf-arrow-paused' : 'rf-arrow');
-      path.setAttribute('marker-end', `url(#${paused ? 'rf-ah-p' : 'rf-ah'})`);
       path.setAttribute('data-from', fromKey);
       path.setAttribute('data-to', toKey);
       svg.appendChild(path);
@@ -250,10 +240,7 @@ const RuleFlow = (() => {
         p.classList.toggle('rf-arrow-hl', on);
         p.classList.toggle('rf-arrow-dim', !!key && !on); // fade the unrelated ones
         if (on) {
-          p.setAttribute('marker-end', 'url(#rf-ah-hl)');
           p.parentNode?.appendChild(p); // raise above sibling arrows
-        } else {
-          p.setAttribute('marker-end', p.classList.contains('rf-arrow-paused') ? 'url(#rf-ah-p)' : 'url(#rf-ah)');
         }
       });
     };
@@ -288,7 +275,7 @@ const RuleFlow = (() => {
     const nodes = new Map<string, FlowNode>();
     const ensure = (key: string, label: string, kind: 'asset' | 'wallet'): FlowNode => {
       let n = nodes.get(key);
-      if (!n) { n = { key, label, kind, depth: 0, out: [], inFrom: new Set() }; nodes.set(key, n); }
+      if (!n) { n = { key, label, kind, depth: 0, out: [], inFrom: new Set(), inRules: [] }; nodes.set(key, n); }
       return n;
     };
     const edges: FlowEdge[] = [];
@@ -305,6 +292,7 @@ const RuleFlow = (() => {
       const dNode = ensure(destKey, dest.label, dest.kind);
       sNode.out.push(r);
       dNode.inFrom.add(srcLabel);
+      dNode.inRules.push(r);
       edges.push({ from: srcKey, to: destKey, rule: r });
     }
 
@@ -347,6 +335,7 @@ const RuleFlow = (() => {
           : `Final destination${from ? ` — receives from ${from}` : ''}.`;
       }
 
+      // Compute badge for this node.
       const icon = n.kind === 'wallet' ? 'fa-wallet' : 'fa-coins';
       return `<div class="rf-node ${kindClass}${paused ? ' rf-paused' : ''}" data-key="${escAttr(n.key)}" data-desc="${escAttr(desc)}">
           <i class="fa-solid ${icon} rf-node-icon"></i>

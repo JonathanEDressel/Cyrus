@@ -31,7 +31,7 @@ class CommandsController {
   private localWithdrawalAddresses: any[] = [];
   private allRules: any[] = [];
   private allLogs: any[] = [];
-  private rulesViewMode: 'table' | 'flow' | 'log' = 'table';
+  private rulesViewMode: 'table' | 'flow' | 'log' = 'flow';
   private wizardStep: 1 | 2 | 3 = 1;
   private filteredRules: any[] = [];
 

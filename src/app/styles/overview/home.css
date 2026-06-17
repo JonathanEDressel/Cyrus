@@ -63,6 +63,13 @@
   }
 }
 
+/* Flow section scroll wrap */
+.flow-scroll-wrap {
+  overflow-x: auto;
+  overflow-y: visible;
+  padding-bottom: 0.5rem;
+}
+
 .summary-card {
   background: var(--bg-secondary);
   border: 1px solid var(--border-primary);

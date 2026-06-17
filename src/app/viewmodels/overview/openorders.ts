@@ -2,13 +2,18 @@
 
 class OpenOrdersController {
   private unsubscribe: (() => void) | null = null;
+  private viewMode: 'table' | 'flow' = 'flow';
 
   constructor() {
     this.init();
   }
 
   private init(): void {
+    this.bindTabs();
+    this.applyTabView();
     this.render();
+    // Start on flow tab — render it after the DOM is ready
+    requestAnimationFrame(() => this.renderOrderFlow());
 
     this.unsubscribe = ExchangeStore.onUpdate(() => this.render());
 
@@ -20,6 +25,25 @@ class OpenOrdersController {
     });
     const content = document.getElementById('app-content');
     if (content) observer.observe(content, { childList: true });
+  }
+
+  private bindTabs(): void {
+    document.getElementById('orders-tab-strip')?.addEventListener('click', (e) => {
+      const btn = (e.target as HTMLElement).closest('.rules-tab-btn') as HTMLElement | null;
+      if (!btn) return;
+      const tab = btn.getAttribute('data-tab') as 'table' | 'flow' | null;
+      if (!tab || tab === this.viewMode) return;
+      this.viewMode = tab;
+      document.querySelectorAll('#orders-tab-strip .rules-tab-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      this.applyTabView();
+      if (tab === 'flow') this.renderOrderFlow();
+    });
+  }
+
+  private applyTabView(): void {
+    document.getElementById('orders-table-view')?.classList.toggle('d-none', this.viewMode !== 'table');
+    document.getElementById('orders-flow-view')?.classList.toggle('d-none', this.viewMode !== 'flow');
   }
 
   private render(): void {
@@ -57,6 +81,15 @@ class OpenOrdersController {
         this.setRefreshLabel(`Last updated: ${lastUpdated.toLocaleTimeString()}`);
       }
     }
+
+    // Refresh the flow chart if it's currently visible.
+    if (this.viewMode === 'flow') this.renderOrderFlow();
+  }
+
+  private renderOrderFlow(): void {
+    const chart = document.getElementById('orders-flow-chart');
+    if (!chart) return;
+    OrderFlow.render(chart, ExchangeStore.openOrders);
   }
 
   private renderOrders(orders: any[], isAll: boolean): void {

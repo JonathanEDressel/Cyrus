@@ -77,8 +77,8 @@
 .rf-node {
   position: relative;
   z-index: 1;
-  width: 76px;
-  height: 76px;
+  width: 86px;
+  height: 86px;
   border-radius: 50%;
   display: flex;
   flex-direction: column;
@@ -106,10 +106,22 @@
   font-weight: 700;
   letter-spacing: 0.3px;
   color: var(--text-primary);
-  max-width: 70px;
+  max-width: 78px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.rf-node-amount {
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: var(--accent-cyan);
+  max-width: 78px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  letter-spacing: 0.2px;
+  margin-top: 0.05rem;
 }
 
 /* Role colors */
@@ -156,10 +168,6 @@
   opacity: 0.6;
 }
 
-.rf-arrowhead { fill: var(--accent-purple-light); }
-.rf-arrowhead-paused { fill: var(--text-muted); }
-.rf-arrowhead-hl { fill: var(--accent-cyan); }
-
 /* On node hover: recolor the connected paths, fade the rest (no size change) */
 .rf-arrow-hl {
   stroke: var(--accent-cyan);
@@ -193,6 +201,33 @@
   margin-top: 0.3rem;
   padding-top: 0.3rem;
   border-top: 1px solid var(--border-primary);
+}
+
+/* ── Tab strip (shared by Commands and Open Orders pages) ─────────── */
+.rules-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.9rem;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+  white-space: nowrap;
+}
+
+.rules-tab-btn.active {
+  background: var(--accent-purple);
+  color: #fff;
+}
+
+.rules-tab-btn:hover:not(.active) {
+  background: var(--border-primary);
+  color: var(--text-secondary);
 }
 
 /* Empty state */

@@ -11,8 +11,18 @@
   <div class="overview-section">
     <div class="section-header">
       <h2 class="section-title" id="orders-count-title">Orders</h2>
+      <div class="orders-tab-strip" id="orders-tab-strip">
+        <button class="rules-tab-btn active" data-tab="flow" title="Order flow chart">
+          <i class="fa-solid fa-diagram-project"></i> Flow
+        </button>
+        <button class="rules-tab-btn" data-tab="table" title="Orders table">
+          <i class="fa-solid fa-table-list"></i> Table
+        </button>
+      </div>
     </div>
-    <div class="data-table-wrapper">
+
+    <!-- Table view (default) -->
+    <div class="data-table-wrapper" id="orders-table-view">
       <table class="data-table" id="orders-table">
         <thead id="orders-thead">
           <tr>
@@ -33,6 +43,11 @@
           </tr>
         </tbody>
       </table>
+    </div>
+
+    <!-- Flow view -->
+    <div id="orders-flow-view" class="d-none">
+      <div id="orders-flow-chart"></div>
     </div>
   </div>
 </div>

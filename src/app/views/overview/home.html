@@ -67,14 +67,21 @@
     </div>
   </div>
 
-  <div class="overview-section" data-section="automations-flow" id="overview-flow-section">
+  <div class="overview-section" id="overview-flow-section">
     <div class="section-header">
       <div class="section-header-left">
-        <h2 class="section-title">Automations Flow</h2>
+        <h2 class="section-title">Flow</h2>
+        <div class="orders-tab-strip" id="overview-flow-tab-strip">
+          <button class="rules-tab-btn active" data-tab="automations">Automations</button>
+          <button class="rules-tab-btn" data-tab="orders">Open Orders</button>
+        </div>
       </div>
-      <a href="#" class="btn-link-sm" data-route="commands">Open <i class="fa-solid fa-arrow-right"></i></a>
+      <a href="#" class="btn-link-sm" id="overview-flow-open-link" data-route="commands">Open <i class="fa-solid fa-arrow-right"></i></a>
     </div>
-    <div id="overview-flow-chart"></div>
+    <div class="flow-scroll-wrap">
+      <div id="overview-flow-chart"></div>
+      <div id="overview-orders-chart" class="d-none"></div>
+    </div>
   </div>
 
 </div>
