@@ -9,6 +9,20 @@
 
   const ENTRIES: TickerEntry[] = [
     // {
+    //   icon: 'fa-solid fa-key',
+    //   iconColorClass: 'nord',
+    //   label: 'Kraken',
+    //   description: 'Secure your API keys & passwords',
+    //   link: 'https://go.nordpass.io/aff_c?offer_id=488&aff_id=143568&url_id=9356',
+    // },
+    // {
+    //   icon: 'fa-solid fa-key',
+    //   iconColorClass: 'nord',
+    //   label: 'Coinbase',
+    //   description: 'Secure your API keys & passwords',
+    //   link: 'https://go.nordpass.io/aff_c?offer_id=488&aff_id=143568&url_id=9356',
+    // },
+    // {
     //   icon: 'fa-solid fa-shield-halved',
     //   iconColorClass: 'nord',
     //   label: 'NordVPN',
