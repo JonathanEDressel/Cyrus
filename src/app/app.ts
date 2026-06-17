@@ -4,6 +4,10 @@ function applyTheme(theme: string): void {
 }
 
 (async function () {
+  // Point API_BASE at the port the backend actually bound to before any
+  // service makes a request.
+  await AppConfig.init();
+
   router.register('login', {
     view: 'app/views/login.html',
     viewModel: '../dist/app/viewmodels/login.js',

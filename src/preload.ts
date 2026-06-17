@@ -1,5 +1,9 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
+contextBridge.exposeInMainWorld('cyrus', {
+  getBackendPort: (): Promise<number> => ipcRenderer.invoke('get-backend-port'),
+});
+
 contextBridge.exposeInMainWorld('api', {
   send: (channel: string, data: any) => {
     const validChannels = ['toMain'];
