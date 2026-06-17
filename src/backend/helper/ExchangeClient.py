@@ -126,6 +126,7 @@ def get_withdrawal_addresses(exchange: ccxt.Exchange) -> list[dict]:
         try:
             response = exchange.privatePostWithdrawAddresses()
             raw = response.get('result', response) if isinstance(response, dict) else []
+            print(f"[DEBUG] Kraken withdrawal addresses response: {raw}")
             if isinstance(raw, list):
                 return [
                     {
