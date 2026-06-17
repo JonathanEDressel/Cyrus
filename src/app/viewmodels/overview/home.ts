@@ -259,38 +259,58 @@ class HomeController {
     const chartEl = document.getElementById(`chart-el-${cardId}`);
     if (!chartEl) return;
 
-    const isDark = document.body.classList.contains('theme-light') ? false : true;
+    const isDark = !document.body.classList.contains('theme-light');
+    const gridColor    = isDark ? 'rgba(148,163,184,0.05)' : 'rgba(0,0,0,0.05)';
+    const borderColor  = isDark ? 'rgba(148,163,184,0.10)' : 'rgba(0,0,0,0.10)';
+    const textColor    = isDark ? '#64748b' : '#64748b';
     const chart = LightweightCharts.createChart(chartEl, {
       width: chartEl.clientWidth,
-      height: 250,
+      height: 280,
       layout: {
         background: { type: 'solid', color: 'transparent' },
-        textColor: isDark ? '#94a3b8' : '#475569',
+        textColor,
+        fontSize: 11,
       },
       grid: {
-        vertLines: { color: isDark ? 'rgba(148,163,184,0.06)' : 'rgba(0,0,0,0.06)' },
-        horzLines: { color: isDark ? 'rgba(148,163,184,0.06)' : 'rgba(0,0,0,0.06)' },
+        vertLines: { color: gridColor },
+        horzLines: { color: gridColor },
       },
       rightPriceScale: {
-        borderColor: isDark ? 'rgba(148,163,184,0.12)' : 'rgba(0,0,0,0.12)',
+        borderColor,
+        scaleMargins: { top: 0.12, bottom: 0.08 },
       },
       timeScale: {
-        borderColor: isDark ? 'rgba(148,163,184,0.12)' : 'rgba(0,0,0,0.12)',
+        borderColor,
         timeVisible: true,
+        fixLeftEdge: true,
+        fixRightEdge: true,
       },
       crosshair: {
         mode: LightweightCharts.CrosshairMode.Normal,
+        vertLine: {
+          color: 'rgba(6, 182, 212, 0.4)',
+          labelBackgroundColor: '#0891b2',
+        },
+        horzLine: {
+          color: 'rgba(6, 182, 212, 0.4)',
+          labelBackgroundColor: '#0891b2',
+        },
       },
       handleScroll: false,
       handleScale: false,
     });
 
     const series = chart.addSeries(LightweightCharts.AreaSeries, {
-      topColor: 'rgba(6, 182, 212, 0.3)',
-      bottomColor: 'rgba(6, 182, 212, 0.02)',
+      topColor: isDark ? 'rgba(6, 182, 212, 0.22)' : 'rgba(6, 182, 212, 0.18)',
+      bottomColor: 'rgba(6, 182, 212, 0.0)',
       lineColor: '#06b6d4',
       lineWidth: 2,
       priceFormat: { type: 'price', precision: 8, minMove: 0.00000001 },
+      lastValueVisible: true,
+      priceLineVisible: true,
+      priceLineColor: 'rgba(6, 182, 212, 0.4)',
+      priceLineWidth: 1,
+      priceLineStyle: LightweightCharts.LineStyle?.Dashed ?? 1,
     });
 
     const inst: ChartInstance = { chart, series, symbol, activeRange: savedRange };
@@ -300,7 +320,10 @@ class HomeController {
     const resizeObserver = new ResizeObserver(() => {
       if (this.charts.get(symbol) !== inst) return;
       if (chartEl.clientWidth > 0) {
-        try { chart.applyOptions({ width: chartEl.clientWidth }); } catch { /* disposed */ }
+        try {
+          chart.applyOptions({ width: chartEl.clientWidth });
+          chart.timeScale().fitContent();
+        } catch { /* disposed */ }
       }
     });
     resizeObserver.observe(chartEl);
@@ -349,8 +372,13 @@ class HomeController {
         changeEl.textContent = `${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%`;
         changeEl.className = `chart-change ${pct >= 0 ? 'price-positive' : 'price-negative'}`;
       }
-    } catch {
-      // chart stays empty on error
+    } catch (err: any) {
+      // Show a visible error inside the chart card so silent failures are obvious
+      const cardId = this.symbolToId(symbol);
+      const chartContainerEl = document.getElementById(`chart-el-${cardId}`);
+      if (chartContainerEl && this.charts.get(symbol) === inst) {
+        chartContainerEl.innerHTML = `<div class="chart-error"><i class="fa-solid fa-triangle-exclamation"></i> Failed to load data${err?.message ? ': ' + err.message : ''}</div>`;
+      }
     }
   }
 
