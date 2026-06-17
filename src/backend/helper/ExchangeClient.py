@@ -63,6 +63,58 @@ def get_balance(exchange: ccxt.Exchange) -> dict:
             if amount and float(amount) > 0}
 
 
+_USD_STABLES = {'USD', 'USDT', 'USDC', 'DAI', 'USDD', 'TUSD', 'PYUSD', 'ZUSD'}
+
+
+def get_portfolio(exchange: ccxt.Exchange) -> dict:
+    """Value every non-zero holding in USD.
+
+    Returns ``{'positions': [{asset, amount, usd_value}, ...], 'total_usd': float}``
+    sorted by USD value descending. Holdings that can't be priced are skipped.
+    """
+    exchange.load_markets()
+    balances = get_balance(exchange)
+
+    tickers: dict = {}
+    try:
+        if exchange.has.get('fetchTickers'):
+            tickers = exchange.fetch_tickers()
+    except Exception:
+        tickers = {}
+
+    def price_in_usd(asset: str) -> float | None:
+        if asset in _USD_STABLES:
+            return 1.0
+        # Prefer the bulk tickers we already fetched.
+        for quote in ('USD', 'USDT', 'USDC'):
+            t = tickers.get(f"{asset}/{quote}")
+            if t and t.get('last'):
+                return float(t['last'])
+        # Fall back to a direct/inverse lookup (handles stablecoin equivalents).
+        try:
+            return get_market_price(exchange, asset, 'USD')
+        except Exception:
+            return None
+
+    positions: list[dict] = []
+    total = 0.0
+    for asset, amt in balances.items():
+        try:
+            amount = float(amt)
+        except (TypeError, ValueError):
+            continue
+        price = price_in_usd(asset)
+        if price is None:
+            continue
+        usd = amount * price
+        if usd > 0:
+            positions.append({'asset': asset, 'amount': amount, 'usd_value': usd})
+            total += usd
+
+    positions.sort(key=lambda p: p['usd_value'], reverse=True)
+    return {'positions': positions, 'total_usd': total}
+
+
 def get_withdrawal_addresses(exchange: ccxt.Exchange) -> list[dict]:
     """Return whitelisted withdrawal addresses if the exchange supports it.
 

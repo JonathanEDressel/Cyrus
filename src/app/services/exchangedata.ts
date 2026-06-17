@@ -68,4 +68,22 @@ class ExchangeData {
       token
     );
   }
+
+  static async getPortfolio(token: string, connectionId: number): Promise<ApiResponse<PortfolioData>> {
+    return DataAccess.get<PortfolioData>(
+      `${AppConfig.API_BASE}/exchange/${connectionId}/portfolio`,
+      token
+    );
+  }
+}
+
+interface PortfolioPosition {
+  asset: string;
+  amount: number;
+  usd_value: number;
+}
+
+interface PortfolioData {
+  positions: PortfolioPosition[];
+  total_usd: number;
 }

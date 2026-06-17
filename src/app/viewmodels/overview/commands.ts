@@ -146,16 +146,11 @@ class CommandsController {
       orderSelect.innerHTML = '<option value="" disabled selected>Loading orders...</option>';
       orderSelect.disabled = true;
     }
-    try {
-      this.localOpenOrders = await ExchangeController.getOpenOrders(this.selectedConnectionId);
-    } catch {
-      this.localOpenOrders = [];
-    }
-    try {
-      this.localWithdrawalAddresses = await ExchangeController.getWithdrawalAddresses(this.selectedConnectionId);
-    } catch {
-      this.localWithdrawalAddresses = [];
-    }
+    // Reuse the store's short-lived cache so opening this page (or switching
+    // back to it) doesn't refetch within a few minutes for the same exchange.
+    const { orders, addresses } = await ExchangeStore.getConnectionData(this.selectedConnectionId);
+    this.localOpenOrders = orders;
+    this.localWithdrawalAddresses = addresses;
     this.populateOrderDropdown();
     this.loadWithdrawalMinimums();
   }

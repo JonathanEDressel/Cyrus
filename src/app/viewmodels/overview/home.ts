@@ -18,6 +18,7 @@ class HomeController {
   private chartTimer: ReturnType<typeof setInterval> | null = null;
   private watchlistSymbols: string[] = [];
   private activeSymbol: string | null = null;
+  private portfolioSig = '';
   private static readonly ACTIVE_KEY = 'cyrus_live_active_symbol';
 
   constructor() {
@@ -32,6 +33,7 @@ class HomeController {
     this.unsubscribe = ExchangeStore.onUpdate(() => {
       this.renderFromStore();
       this.loadCommandsCount();
+      this.refreshPortfolio();
     });
 
     this.tickerTimer = setInterval(() => this.refreshAllTickers(), 5_000);
@@ -105,7 +107,55 @@ class HomeController {
 
     this.renderFromStore();
     this.loadCommandsCount();
+    this.refreshPortfolio();
     this.loadWatchlist();
+  }
+
+  /** Reload the portfolio only when the exchange mode or connection set changes. */
+  private refreshPortfolio(): void {
+    const sig = `${ExchangeStore.activeMode}:${ExchangeStore.connections.length}`;
+    if (sig === this.portfolioSig) return;
+    this.portfolioSig = sig;
+    this.loadPortfolio();
+  }
+
+  private async loadPortfolio(): Promise<void> {
+    const chartEl = document.getElementById('portfolio-chart');
+    if (!chartEl) return;
+
+    const isAll = ExchangeStore.isAllMode();
+    const targets = isAll
+      ? ExchangeStore.connections.map((c: any) => c.id)
+      : (typeof ExchangeStore.activeMode === 'number' ? [ExchangeStore.activeMode] : []);
+
+    if (targets.length === 0) {
+      PortfolioChart.render(chartEl, [], 0);
+      return;
+    }
+
+    chartEl.innerHTML = '<div class="pf-empty"><i class="fa-solid fa-circle-notch fa-spin"></i><p>Valuing your holdings…</p></div>';
+
+    try {
+      const results = await Promise.all(targets.map((id: number) =>
+        ExchangeController.getPortfolio(id).catch(() => ({ positions: [], total_usd: 0 }))
+      ));
+
+      // Aggregate the same asset across exchanges.
+      const byAsset = new Map<string, { asset: string; amount: number; usd_value: number }>();
+      let total = 0;
+      for (const r of results) {
+        for (const p of (r.positions || [])) {
+          const cur = byAsset.get(p.asset);
+          if (cur) { cur.amount += p.amount; cur.usd_value += p.usd_value; }
+          else byAsset.set(p.asset, { asset: p.asset, amount: p.amount, usd_value: p.usd_value });
+          total += p.usd_value;
+        }
+      }
+      const positions = [...byAsset.values()].sort((a, b) => b.usd_value - a.usd_value);
+      PortfolioChart.render(chartEl, positions, total);
+    } catch {
+      PortfolioChart.render(chartEl, [], 0);
+    }
   }
 
   // ── Live Data / Charts ──────────────────────────────────────────

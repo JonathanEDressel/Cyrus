@@ -1,6 +1,9 @@
 class ExchangeStore {
-  private static readonly ORDER_INTERVAL = 30000;
-  private static readonly ADDRESS_INTERVAL = 3600000;
+  // Poll cadence is kept conservative to stay well under exchange rate limits.
+  // Orders refresh every 4 minutes; withdrawal addresses (which rarely change)
+  // every hour. A fresh fetch still happens immediately on login / mode change.
+  private static readonly ORDER_INTERVAL = 240000;   // 4 minutes
+  private static readonly ADDRESS_INTERVAL = 3600000; // 1 hour
   private static orderTimer: number | null = null;
   private static addressTimer: number | null = null;
   private static listeners: Array<() => void> = [];
@@ -21,6 +24,29 @@ class ExchangeStore {
   // Per-connection data used in 'all' mode
   private static ordersByConn: Map<number, any[]> = new Map();
   private static addressesByConn: Map<number, any[]> = new Map();
+
+  // Short-lived cache of a single connection's orders + addresses, shared across
+  // pages so re-opening a page doesn't trigger a fresh fetch every time.
+  private static readonly EXCHANGE_DATA_TTL = 240000; // 4 minutes
+  private static exchangeDataCache: Map<number, { orders: any[]; addresses: any[]; at: number }> = new Map();
+
+  /**
+   * Get a connection's open orders + withdrawal addresses, reusing a recent
+   * cached result (within EXCHANGE_DATA_TTL) instead of refetching. Persists
+   * across page navigations because the store is a singleton.
+   */
+  static async getConnectionData(connId: number, force = false): Promise<{ orders: any[]; addresses: any[] }> {
+    const cached = ExchangeStore.exchangeDataCache.get(connId);
+    if (!force && cached && Date.now() - cached.at < ExchangeStore.EXCHANGE_DATA_TTL) {
+      return { orders: cached.orders, addresses: cached.addresses };
+    }
+    let orders: any[] = [];
+    let addresses: any[] = [];
+    try { orders = await ExchangeController.getOpenOrders(connId); } catch { orders = cached?.orders ?? []; }
+    try { addresses = await ExchangeController.getWithdrawalAddresses(connId); } catch { addresses = cached?.addresses ?? []; }
+    ExchangeStore.exchangeDataCache.set(connId, { orders, addresses, at: Date.now() });
+    return { orders, addresses };
+  }
 
   /** Load & cache validated connections and supported-exchange metadata.
    * Call once after login / on profile changes. */
@@ -85,6 +111,7 @@ class ExchangeStore {
     ExchangeStore.withdrawalAddresses = [];
     ExchangeStore.ordersByConn.clear();
     ExchangeStore.addressesByConn.clear();
+    ExchangeStore.exchangeDataCache.clear();
     ExchangeStore.lastUpdated = null;
     ExchangeStore.error = null;
     ExchangeStore.listeners = [];

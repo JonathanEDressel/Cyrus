@@ -28,6 +28,41 @@
   margin-bottom: 2.5rem;
 }
 
+/* Portfolio panel beside the Live Data chart */
+.overview-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 1.25rem;
+  align-items: stretch;
+  margin-bottom: 2rem;
+}
+
+.overview-split .overview-section {
+  margin-bottom: 0;
+}
+
+.portfolio-panel {
+  display: flex;
+  flex-direction: column;
+}
+
+#portfolio-chart {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#portfolio-chart .pf-chart {
+  width: 100%;
+}
+
+@media (max-width: 1000px) {
+  .overview-split {
+    grid-template-columns: 1fr;
+  }
+}
+
 .summary-card {
   background: var(--bg-secondary);
   border: 1px solid var(--border-primary);

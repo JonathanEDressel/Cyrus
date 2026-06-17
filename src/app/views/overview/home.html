@@ -6,22 +6,6 @@
   </div>
 
   <div class="summary-cards">
-    <!-- <div class="summary-card">
-      <div class="summary-icon"><i class="fa-solid fa-wallet"></i></div>
-      <div class="summary-body">
-        <span class="summary-label">Total Balance</span>
-        <span class="summary-value" id="total-balance">--</span>
-      </div>
-    </div> -->
-
-    <!-- <div class="summary-card">
-      <div class="summary-icon"><i class="fa-solid fa-chart-line"></i></div>
-      <div class="summary-body">
-        <span class="summary-label">Open Positions</span>
-        <span class="summary-value" id="open-positions-count">--</span>
-      </div>
-    </div> -->
-
     <a href="#" class="summary-card summary-card-link" data-route="openorders" title="View open orders">
       <div class="summary-icon"><i class="fa-solid fa-clock-rotate-left"></i></div>
       <div class="summary-body">
@@ -41,6 +25,48 @@
     </a>
   </div>
 
+  <div class="overview-split">
+    <div class="overview-section portfolio-panel">
+      <div class="section-header">
+        <div class="section-header-left">
+          <h2 class="section-title">Portfolio</h2>
+        </div>
+      </div>
+      <div id="portfolio-chart"></div>
+    </div>
+
+    <div class="overview-section" data-section="live-data">
+      <div class="section-header">
+        <div class="section-header-left">
+          <h2 class="section-title">Live Data</h2>
+          <select id="live-data-selector" class="live-data-selector d-none" title="Select chart"></select>
+        </div>
+        <button class="add-crypto-btn" id="add-crypto-btn"><i class="fa-solid fa-plus"></i> Add Crypto</button>
+      </div>
+
+      <!-- Add Crypto Modal -->
+      <div class="add-crypto-modal d-none" id="add-crypto-modal">
+        <div class="add-crypto-modal-content">
+          <div class="add-crypto-modal-header">
+            <h3>Add Crypto</h3>
+            <button class="add-crypto-modal-close" id="add-crypto-modal-close"><i class="fa-solid fa-xmark"></i></button>
+          </div>
+          <input type="text" class="add-crypto-search" id="add-crypto-search" placeholder="Search pairs (e.g. BTC, ETH)..." />
+          <div class="add-crypto-list" id="add-crypto-list">
+            <p class="add-crypto-loading">Loading pairs...</p>
+          </div>
+        </div>
+      </div>
+
+      <div id="live-data-charts" class="live-data-single">
+        <div class="live-data-empty" id="live-data-empty">
+          <i class="fa-solid fa-chart-line"></i>
+          <p>No cryptos tracked yet. Click <strong>Add Crypto</strong> to get started.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div class="overview-section" data-section="automations-flow" id="overview-flow-section">
     <div class="section-header">
       <div class="section-header-left">
@@ -49,37 +75,6 @@
       <a href="#" class="btn-link-sm" data-route="commands">Open <i class="fa-solid fa-arrow-right"></i></a>
     </div>
     <div id="overview-flow-chart"></div>
-  </div>
-
-  <div class="overview-section" data-section="live-data">
-    <div class="section-header">
-      <div class="section-header-left">
-        <h2 class="section-title">Live Data</h2>
-        <select id="live-data-selector" class="live-data-selector d-none" title="Select chart"></select>
-      </div>
-      <button class="add-crypto-btn" id="add-crypto-btn"><i class="fa-solid fa-plus"></i> Add Crypto</button>
-    </div>
-
-    <!-- Add Crypto Modal -->
-    <div class="add-crypto-modal d-none" id="add-crypto-modal">
-      <div class="add-crypto-modal-content">
-        <div class="add-crypto-modal-header">
-          <h3>Add Crypto</h3>
-          <button class="add-crypto-modal-close" id="add-crypto-modal-close"><i class="fa-solid fa-xmark"></i></button>
-        </div>
-        <input type="text" class="add-crypto-search" id="add-crypto-search" placeholder="Search pairs (e.g. BTC, ETH)..." />
-        <div class="add-crypto-list" id="add-crypto-list">
-          <p class="add-crypto-loading">Loading pairs...</p>
-        </div>
-      </div>
-    </div>
-
-    <div id="live-data-charts" class="live-data-single">
-      <div class="live-data-empty" id="live-data-empty">
-        <i class="fa-solid fa-chart-line"></i>
-        <p>No cryptos tracked yet. Click <strong>Add Crypto</strong> to get started.</p>
-      </div>
-    </div>
   </div>
 
 </div>

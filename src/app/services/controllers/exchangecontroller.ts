@@ -75,4 +75,11 @@ class ExchangeController {
     const response = await ExchangeData.getBalance(token, connectionId);
     return response.data;
   }
+
+  static async getPortfolio(connectionId: number): Promise<{ positions: Array<{ asset: string; amount: number; usd_value: number }>; total_usd: number }> {
+    const token = AuthController.getToken();
+    if (!token) throw new Error('Not authenticated');
+    const response = await ExchangeData.getPortfolio(token, connectionId);
+    return response.data;
+  }
 }

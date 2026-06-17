@@ -1,0 +1,105 @@
+/* ─── PortfolioChart: USD-value doughnut ──────────────────────────── */
+
+.pf-chart {
+  width: 100%;
+}
+
+.pf-svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  overflow: visible;
+}
+
+.pf-slice {
+  transition: opacity 0.15s, transform 0.15s;
+  transform-origin: center;
+  cursor: default;
+}
+
+.pf-slice.pf-dim {
+  opacity: 0.28;
+}
+
+.pf-leader {
+  stroke: var(--border-primary);
+  stroke-width: 1;
+  opacity: 0.7;
+}
+
+.pf-label {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.pf-label-asset {
+  font-weight: 700;
+}
+
+.pf-label-pct {
+  fill: var(--text-muted);
+  font-size: 11px;
+}
+
+.pf-center-value {
+  fill: var(--text-primary);
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.pf-center-label {
+  fill: var(--text-muted);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+/* Hover tooltip */
+.pf-tooltip {
+  position: fixed;
+  z-index: 1000;
+  min-width: 150px;
+  max-width: 280px;
+  padding: 0.55rem 0.7rem;
+  background: var(--bg-tertiary, #1e293b);
+  border: 1px solid var(--border-primary);
+  border-radius: 8px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+}
+
+.pf-tip-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 0.35rem;
+}
+
+.pf-tip-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.pf-tip-row span:last-child {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+/* Empty state */
+.pf-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 2.5rem 1rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.pf-empty i { font-size: 1.8rem; opacity: 0.6; }
+.pf-empty p { margin: 0; font-size: 0.9rem; }

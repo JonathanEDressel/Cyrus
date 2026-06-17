@@ -3,7 +3,7 @@ from helper.Security import token_required, active_required
 from helper.ErrorHandler import handle_error, bad_request, not_found
 from helper.Helper import success_response
 from helper.ExchangeRegistry import get_user_exchange, get_connection_row
-from helper.ExchangeClient import get_open_orders, get_withdrawal_addresses, get_balance
+from helper.ExchangeClient import get_open_orders, get_withdrawal_addresses, get_balance, get_portfolio
 import ccxt
 
 exchange_data_bp = Blueprint('exchange_data', __name__)
@@ -88,6 +88,24 @@ def balance(conn_id):
 
         non_zero = get_balance(exchange)
         return success_response(data=non_zero)
+
+    except ccxt.AuthenticationError as e:
+        return _keys_invalid_response(str(e))
+    except Exception as e:
+        return handle_error(e)
+
+
+@exchange_data_bp.route('/<int:conn_id>/portfolio', methods=['GET'])
+@token_required
+@active_required
+def portfolio(conn_id):
+    try:
+        exchange, err = _get_validated_exchange(request.user_id, conn_id)
+        if err:
+            return err
+
+        data = get_portfolio(exchange)
+        return success_response(data=data)
 
     except ccxt.AuthenticationError as e:
         return _keys_invalid_response(str(e))
