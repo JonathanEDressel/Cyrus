@@ -11,7 +11,7 @@
     "dev": "npm run build && electron . --dev",
     "pack": "electron-builder --dir",
     "dist": "electron-builder",
-    "build:backend": "cd src/backend && call venv\\Scripts\\activate && pyinstaller server.spec",
+    "build:backend": "cd src/backend && call venv\\Scripts\\activate && pyinstaller --onefile --name CyrusServer Server.py",
     "build:all": "npm run build && npm run build:backend && npm run dist"
   },
   "build": {
