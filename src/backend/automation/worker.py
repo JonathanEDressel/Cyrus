@@ -265,7 +265,7 @@ class AutomationWorker:
                     self._notify_execution(
                         rule.user_id, rule, trigger_event,
                         f"Convert {convert_amount} {rule.action_asset} → {rule.convert_to_asset}",
-                        str(result),
+                        result,
                     )
 
                     print(f"[WORKER] Convert rule '{rule.rule_name}' executed for user {rule.user_id}")
@@ -343,7 +343,7 @@ class AutomationWorker:
                 self._notify_execution(
                     rule.user_id, rule, trigger_event,
                     f"Withdraw {withdraw_amount} {rule.action_asset} to {rule.action_address_key}",
-                    str(result),
+                    result,
                 )
 
                 print(f"[WORKER] Balance rule '{rule.rule_name}' executed for user {rule.user_id}")
@@ -441,7 +441,7 @@ class AutomationWorker:
                 self._notify_execution(
                     rule.user_id, rule, trigger_event,
                     f"Withdraw {withdraw_amount} {rule.action_asset} to {rule.action_address_key}{amount_note}",
-                    str(result),
+                    result,
                 )
 
             print(f"[WORKER] Rule '{rule.rule_name}' executed for user {rule.user_id}")
@@ -565,7 +565,7 @@ class AutomationWorker:
                 self._notify_execution(
                     rule.user_id, rule, trigger_event,
                     f"Convert {amount_desc} {rule.action_asset} -> {rule.convert_to_asset}",
-                    str(result),
+                    result,
                 )
                 print(f"[WORKER] Price rule '{rule.rule_name}' executed for user {rule.user_id}")
 
@@ -635,9 +635,87 @@ class AutomationWorker:
         if self._deactivate_if_limit_reached(rule, AutomationDbContext):
             return
 
+    @staticmethod
+    def _fmt_num(v) -> str:
+        """Format a numeric value compactly (no trailing-zero noise)."""
+        try:
+            return f"{float(v):.10g}"
+        except (TypeError, ValueError):
+            return str(v)
+
+    def _format_result(self, result) -> str:
+        """Render a CCXT order/withdrawal result as one human-readable line.
+
+        Orders become e.g. ``Sold 0.5 BTC @ 72000 USD → 36000 USD (closed)``;
+        withdrawals become ``Withdrew 0.25 BTC to my-wallet (success)``.
+        Falls back to ``str(result)`` for any unexpected shape so detail is
+        never lost (the full dict is still kept verbatim in the log).
+        """
+        if not isinstance(result, dict):
+            return str(result)
+
+        fmt = self._fmt_num
+        symbol = result.get('symbol') or ''
+        base, quote = '', ''
+        if '/' in symbol:
+            base, quote = symbol.split('/', 1)
+
+        side = (result.get('side') or '').lower()
+        status = result.get('status')
+        fee = result.get('fee') or {}
+        fee_cost, fee_ccy = fee.get('cost'), (fee.get('currency') or '')
+
+        def _with_fee(line: str) -> str:
+            if fee_cost:
+                line += f" · fee {fmt(fee_cost)} {fee_ccy}".rstrip()
+            return line.strip()
+
+        # Order-shaped result (a trade has a symbol and/or side).
+        if symbol or side:
+            verb = {'sell': 'Sold', 'buy': 'Bought'}.get(side, 'Traded')
+            qty = result.get('filled')
+            if qty in (None, 0, 0.0, '0'):
+                qty = result.get('amount')
+            avg = result.get('average') or result.get('price')
+            cost = result.get('cost')
+
+            line = verb
+            if qty is not None:
+                line += f" {fmt(qty)}{(' ' + base) if base else ''}"
+            if avg is not None:
+                line += f" @ {fmt(avg)}{(' ' + quote) if quote else ''}"
+            if cost is not None:
+                line += f" → {fmt(cost)}{(' ' + quote) if quote else ''}"
+            if status:
+                line += f" ({status})"
+            line = _with_fee(line)
+            oid = result.get('id')
+            return f"{line} [id {oid}]" if oid else line
+
+        # Withdrawal-shaped result (transaction).
+        currency = result.get('currency')
+        if currency or result.get('txid') or result.get('address'):
+            amount = result.get('amount')
+            address = result.get('address') or result.get('addressTo')
+            line = "Withdrew"
+            if amount is not None:
+                line += f" {fmt(amount)} {currency or ''}".rstrip()
+            if address:
+                line += f" to {address}"
+            if status:
+                line += f" ({status})"
+            line = _with_fee(line)
+            txid = result.get('txid') or result.get('id')
+            return f"{line} [tx {txid}]" if txid else line
+
+        return str(result)
+
     def _notify_execution(self, user_id, rule, trigger_event: str,
-                          action_executed: str, action_result: str) -> None:
+                          action_executed: str, result) -> None:
         """Email the user that a rule executed, if they enabled email alerts.
+
+        ``result`` is the raw CCXT order/withdrawal object; it's rendered into a
+        readable line via ``_format_result``.
 
         Best-effort and fully isolated: the SMTP send is fire-and-forget and any
         failure here is swallowed so it can never affect rule execution. Runs in
@@ -663,7 +741,7 @@ class AutomationWorker:
                 f"Your automation rule '{rule.rule_name}' just executed.\n\n"
                 f"Trigger: {trigger_event}\n"
                 f"Action:  {action_executed}\n"
-                f"Result:  {action_result}\n"
+                f"Result:  {self._format_result(result)}\n"
             )
             send_email_async(
                 to_addr=to_addr, subject=subject, body=body,
