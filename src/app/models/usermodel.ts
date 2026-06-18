@@ -18,8 +18,22 @@ interface UserModel {
   donation_modal_enabled: boolean;
   is_active: boolean;
   theme: 'dark' | 'light';
+  email_notifications_enabled: boolean;
+  notify_email: string | null;
+  smtp_password_set: boolean;
+  smtp_host: string | null;
+  smtp_port: number | null;
   exchange_connections: ExchangeConnection[];
   has_validated_connection: boolean;
+}
+
+interface EmailNotificationSettings {
+  email_notifications_enabled: boolean;
+  notify_email: string;
+  // Only sent when the user types a new password; omit to keep the stored one.
+  smtp_password?: string;
+  smtp_host?: string;
+  smtp_port?: number | null;
 }
 
 interface AccountSummary {

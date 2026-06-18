@@ -418,6 +418,11 @@ const DemoData = (() => {
       donation_modal_enabled: true,
       is_active: true,
       theme,
+      email_notifications_enabled: false,
+      notify_email: null,
+      smtp_password_set: false,
+      smtp_host: null,
+      smtp_port: null,
       exchange_connections: connections(),
       has_validated_connection: true,
     };

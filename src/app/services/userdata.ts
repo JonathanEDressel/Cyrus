@@ -44,6 +44,28 @@ class UserData {
     );
   }
 
+  static async updateEmailNotifications(
+    settings: EmailNotificationSettings,
+    token: string
+  ): Promise<ApiResponse<UserModel>> {
+    return DataAccess.put(
+      `${AppConfig.API_BASE}/user/update-email-notifications`,
+      settings,
+      token
+    );
+  }
+
+  static async testEmail(
+    settings: EmailNotificationSettings,
+    token: string
+  ): Promise<ApiResponse<any>> {
+    return DataAccess.post(
+      `${AppConfig.API_BASE}/user/test-email`,
+      settings,
+      token
+    );
+  }
+
   static async updateDonationModal(enabled: boolean, token: string): Promise<ApiResponse<UserModel>> {
     return DataAccess.put(
       `${AppConfig.API_BASE}/user/update-donation-modal`,

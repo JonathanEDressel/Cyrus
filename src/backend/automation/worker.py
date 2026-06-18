@@ -262,6 +262,11 @@ class AutomationWorker:
                         status='success',
                     )
                     self._on_rule_success(rule, AutomationDbContext)
+                    self._notify_execution(
+                        rule.user_id, rule, trigger_event,
+                        f"Convert {convert_amount} {rule.action_asset} → {rule.convert_to_asset}",
+                        str(result),
+                    )
 
                     print(f"[WORKER] Convert rule '{rule.rule_name}' executed for user {rule.user_id}")
 
@@ -335,6 +340,11 @@ class AutomationWorker:
                     status='success',
                 )
                 self._on_rule_success(rule, AutomationDbContext)
+                self._notify_execution(
+                    rule.user_id, rule, trigger_event,
+                    f"Withdraw {withdraw_amount} {rule.action_asset} to {rule.action_address_key}",
+                    str(result),
+                )
 
                 print(f"[WORKER] Balance rule '{rule.rule_name}' executed for user {rule.user_id}")
 
@@ -428,7 +438,12 @@ class AutomationWorker:
                     status='success',
                 )
                 self._on_rule_success(rule, AutomationDbContext)
-            
+                self._notify_execution(
+                    rule.user_id, rule, trigger_event,
+                    f"Withdraw {withdraw_amount} {rule.action_asset} to {rule.action_address_key}{amount_note}",
+                    str(result),
+                )
+
             print(f"[WORKER] Rule '{rule.rule_name}' executed for user {rule.user_id}")
             
         except Exception as e:
@@ -547,6 +562,11 @@ class AutomationWorker:
                     status='success',
                 )
                 self._on_rule_success(rule, AutomationDbContext)
+                self._notify_execution(
+                    rule.user_id, rule, trigger_event,
+                    f"Convert {amount_desc} {rule.action_asset} -> {rule.convert_to_asset}",
+                    str(result),
+                )
                 print(f"[WORKER] Price rule '{rule.rule_name}' executed for user {rule.user_id}")
 
             except Exception as e:
@@ -614,6 +634,44 @@ class AutomationWorker:
         rule.execution_count = int(rule.execution_count or 0) + 1
         if self._deactivate_if_limit_reached(rule, AutomationDbContext):
             return
+
+    def _notify_execution(self, user_id, rule, trigger_event: str,
+                          action_executed: str, action_result: str) -> None:
+        """Email the user that a rule executed, if they enabled email alerts.
+
+        Best-effort and fully isolated: the SMTP send is fire-and-forget and any
+        failure here is swallowed so it can never affect rule execution. Runs in
+        the worker's app context, so the encrypted app password can be decrypted.
+        """
+        try:
+            from controllers.UserDbContext import UserDbContext
+            settings = UserDbContext.get_email_settings(user_id)
+            if not settings or not settings.get('email_notifications_enabled'):
+                return
+
+            to_addr = settings.get('notify_email')
+            enc_pw = settings.get('smtp_password_encrypted')
+            if not to_addr or not enc_pw:
+                return
+
+            from helper.Security import decrypt_api_key
+            from helper.notifier import send_email_async
+
+            password = decrypt_api_key(enc_pw)
+            subject = f"Cyrus: '{rule.rule_name}' executed"
+            body = (
+                f"Your automation rule '{rule.rule_name}' just executed.\n\n"
+                f"Trigger: {trigger_event}\n"
+                f"Action:  {action_executed}\n"
+                f"Result:  {action_result}\n"
+            )
+            send_email_async(
+                to_addr=to_addr, subject=subject, body=body,
+                smtp_user=to_addr, smtp_password=password,
+                smtp_host=settings.get('smtp_host'), smtp_port=settings.get('smtp_port'),
+            )
+        except Exception as e:
+            print(f"[WORKER] Failed to send execution email for user {user_id}: {e}")
 
 
 _worker_instance = None

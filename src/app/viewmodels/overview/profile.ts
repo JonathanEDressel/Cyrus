@@ -39,6 +39,9 @@ class ProfileController {
       this.saveActive(isActive);
     });
 
+    document.getElementById('save-email-btn')?.addEventListener('click', () => this.saveEmailSettings());
+    document.getElementById('test-email-btn')?.addEventListener('click', () => this.sendTestEmail());
+
     document.getElementById('new-exchange-name')?.addEventListener('change', () => {
       const select = document.getElementById('new-exchange-name') as HTMLSelectElement;
       const exchange = this.supportedExchanges.find(e => e.id === select.value);
@@ -80,6 +83,17 @@ class ProfileController {
       const activeToggle = document.getElementById('active-toggle') as HTMLInputElement;
       if (activeToggle) activeToggle.checked = user.is_active !== false;
       NotificationService.setEnabled(user.notifications_enabled !== false);
+
+      const emailToggle = document.getElementById('email-notifications-toggle') as HTMLInputElement;
+      if (emailToggle) emailToggle.checked = user.email_notifications_enabled === true;
+      const emailAddr = document.getElementById('email-address') as HTMLInputElement;
+      if (emailAddr) emailAddr.value = user.notify_email || '';
+      const emailHost = document.getElementById('email-smtp-host') as HTMLInputElement;
+      if (emailHost) emailHost.value = user.smtp_host || '';
+      const emailPort = document.getElementById('email-smtp-port') as HTMLInputElement;
+      if (emailPort) emailPort.value = user.smtp_port != null ? String(user.smtp_port) : '';
+      const emailPw = document.getElementById('email-app-password') as HTMLInputElement;
+      if (emailPw) emailPw.placeholder = user.smtp_password_set ? 'Saved — leave blank to keep' : 'Enter app password';
     } catch (error: any) {
       this.showError('username', error.message || 'Failed to load profile');
     }
@@ -315,6 +329,71 @@ class ProfileController {
       this.showError('notifications', error.message || 'Failed to update account status');
       const toggle = document.getElementById('active-toggle') as HTMLInputElement;
       if (toggle) toggle.checked = !isActive;
+    }
+  }
+
+  private collectEmailSettings(forceEnabled?: boolean): EmailNotificationSettings {
+    const enabled = forceEnabled ?? ((document.getElementById('email-notifications-toggle') as HTMLInputElement)?.checked ?? false);
+    const email = (document.getElementById('email-address') as HTMLInputElement)?.value.trim() ?? '';
+    const password = (document.getElementById('email-app-password') as HTMLInputElement)?.value ?? '';
+    const host = (document.getElementById('email-smtp-host') as HTMLInputElement)?.value.trim() ?? '';
+    const portRaw = (document.getElementById('email-smtp-port') as HTMLInputElement)?.value.trim() ?? '';
+
+    const settings: EmailNotificationSettings = {
+      email_notifications_enabled: enabled,
+      notify_email: email,
+    };
+    if (password) settings.smtp_password = password;       // only sent when changed
+    if (host) settings.smtp_host = host;
+    if (portRaw) settings.smtp_port = parseInt(portRaw, 10);
+    return settings;
+  }
+
+  private async saveEmailSettings(): Promise<void> {
+    const settings = this.collectEmailSettings();
+
+    if (settings.email_notifications_enabled && !settings.notify_email) {
+      this.showError('email', 'Enter an email address to enable email notifications');
+      return;
+    }
+
+    try {
+      const user = await UserController.updateEmailNotifications(settings);
+      // Clear the password field after saving and reflect stored state.
+      const pwInput = document.getElementById('email-app-password') as HTMLInputElement;
+      if (pwInput) {
+        pwInput.value = '';
+        pwInput.placeholder = user.smtp_password_set ? 'Saved — leave blank to keep' : 'Enter app password';
+      }
+      this.showSuccess('email', 'Email notification settings saved');
+    } catch (error: any) {
+      this.showError('email', error.message || 'Failed to save email settings');
+    }
+  }
+
+  private async sendTestEmail(): Promise<void> {
+    const settings = this.collectEmailSettings(true);
+    if (!settings.notify_email) {
+      this.showError('email', 'Enter an email address first');
+      return;
+    }
+
+    const btn = document.getElementById('test-email-btn') as HTMLButtonElement;
+    const original = btn?.innerHTML;
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Sending...';
+    }
+    try {
+      const msg = await UserController.testEmail(settings);
+      this.showSuccess('email', msg || 'Test email sent');
+    } catch (error: any) {
+      this.showError('email', error.message || 'Failed to send test email');
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        if (original) btn.innerHTML = original;
+      }
     }
   }
 

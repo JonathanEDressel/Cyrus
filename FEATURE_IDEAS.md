@@ -52,14 +52,12 @@ varies by exchange.
 
 | Feature | Feasible? | Notes |
 |---|---|---|
-| **Alerts on rule fire / fill / error** | 🌐 | Telegram Bot API, Discord webhook, SMTP email, or Electron desktop notifications. Not an exchange API. |
 | **Price alerts (notify-only)** | ✅ | Reuses the existing price polling; just don't take an action. |
 
 ## Portfolio & analytics
 
 | Feature | Feasible? | Notes |
 |---|---|---|
-| **Unified portfolio (total value, allocation)** | ✅ | `fetch_balance` per connection + `fetch_ticker` for USD valuation. |
 | **P&L tracking (realized/unrealized)** | 🟡 | Realized P&L needs trade history (`fetch_my_trades`) — supported by CCXT but not wired up yet. History depth varies by exchange; cost-basis across deposits/transfers is approximate. |
 | **Tax / transaction CSV export** | 🟡 | Needs `fetch_my_trades` + `fetch_deposits` + `fetch_withdrawals` (`fetch_ledger` where available). Feasible, but watch pagination and per-exchange history limits. |
 | **Chart indicators (MA, RSI, volume)** | ✅ | Compute from `fetch_ohlcv` candles we already pull. |
@@ -77,11 +75,9 @@ varies by exchange.
 
 ## Suggested build order
 
-1. **Notifications** (🌐) — fastest path to "my automations feel trustworthy"; closes the loop on silent rule execution.
-2. **DCA / scheduled recurring buys** (✅) — broadens who the app is for; reuses `create_order`.
-3. **Dry-run / simulation mode** (✅) — removes the fear of automating real funds.
-4. **Unified portfolio view** (✅) — makes the Overview a real dashboard.
-5. **Trailing stop / take-profit** (✅) — high-value risk management on top of price triggers.
+1. **DCA / scheduled recurring buys** (✅) — broadens who the app is for; reuses `create_order`.
+2. **Dry-run / simulation mode** (✅) — removes the fear of automating real funds.
+3. **Trailing stop / take-profit** (✅) — high-value risk management on top of price triggers.
 
 > Only **P&L** and **tax export** need genuinely new exchange calls (trade/ledger
 > history); everything else is either app-side logic, CCXT methods we already

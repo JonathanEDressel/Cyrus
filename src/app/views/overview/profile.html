@@ -135,6 +135,60 @@
 
     <section class="profile-section">
       <div class="section-header">
+        <h2 class="section-title"><i class="fa-solid fa-envelope me-2"></i>Email Notifications</h2>
+      </div>
+      <div class="alert alert-success d-none" data-alert="email-success"><i class="fa-solid fa-circle-check me-2"></i><span></span></div>
+      <div class="alert alert-warning d-none" data-alert="email-error"><span></span></div>
+      <div class="profile-card">
+        <div class="setting-toggle-row">
+          <div class="setting-toggle-info">
+            <span class="setting-toggle-title">Email Me on Execution</span>
+            <span class="setting-toggle-desc">Send an email whenever an automation rule executes an order</span>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="email-notifications-toggle">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+
+        <form id="email-settings-form" onsubmit="return false;" class="mt-4">
+          <div class="form-group">
+            <label for="email-address" class="form-label">Email Address</label>
+            <input id="email-address" type="email" class="form-control" placeholder="you@gmail.com" autocomplete="email" />
+          </div>
+          <div class="form-group">
+            <label for="email-app-password" class="form-label">App Password</label>
+            <input id="email-app-password" type="password" class="form-control" placeholder="Enter app password" autocomplete="new-password" />
+            <small class="form-text text-muted">
+              Use an app password from your email provider (e.g. Gmail / Outlook), not your normal login password.
+              Leave blank to keep the one already saved.
+            </small>
+          </div>
+          <div class="form-group">
+            <label class="form-label">SMTP Server <span class="text-muted small">(optional — auto-detected for common providers)</span></label>
+            <div style="display:flex; gap:8px;">
+              <input id="email-smtp-host" type="text" class="form-control" placeholder="smtp.gmail.com" autocomplete="off" />
+              <input id="email-smtp-port" type="number" class="form-control" placeholder="587" style="max-width:120px;" />
+            </div>
+          </div>
+          <small class="form-text text-muted">
+            <i class="fa-solid fa-lock"></i> Your app password is encrypted and stored locally on your device.
+            Emails are sent from your own account while Cyrus is running.
+          </small>
+          <div style="display:flex; gap:8px;" class="mt-2">
+            <button type="button" class="btn btn-primary" id="save-email-btn">
+              Save <i class="fa-solid fa-floppy-disk ms-2"></i>
+            </button>
+            <button type="button" class="btn btn-secondary" id="test-email-btn">
+              Send Test Email <i class="fa-solid fa-paper-plane ms-2"></i>
+            </button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <section class="profile-section">
+      <div class="section-header">
         <h2 class="section-title"><i class="fa-solid fa-lock me-2"></i>Change Password</h2>
       </div>
       <div class="alert alert-success d-none" data-alert="password-success"><i class="fa-solid fa-circle-check me-2"></i><span></span></div>

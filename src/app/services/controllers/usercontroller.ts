@@ -77,6 +77,20 @@ class UserController {
     await UserData.updateDonationModal(enabled, token);
   }
 
+  static async updateEmailNotifications(settings: EmailNotificationSettings): Promise<UserModel> {
+    const token = AuthController.getToken();
+    if (!token) throw new Error('Not authenticated');
+    const response = await UserData.updateEmailNotifications(settings, token);
+    return response.data;
+  }
+
+  static async testEmail(settings: EmailNotificationSettings): Promise<string> {
+    const token = AuthController.getToken();
+    if (!token) throw new Error('Not authenticated');
+    const response = await UserData.testEmail(settings, token);
+    return response.result;
+  }
+
   static async updateTheme(theme: string): Promise<void> {
     const token = AuthController.getToken();
     if (!token) throw new Error('Not authenticated');

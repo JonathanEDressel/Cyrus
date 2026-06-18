@@ -182,6 +182,33 @@ def run_column_migrations():
             conn.execute('ALTER TABLE automation_rules ADD COLUMN execution_count INTEGER DEFAULT 0')
             conn.commit()
             print("[MIGRATION] Added execution_count column to automation_rules")
+
+        # Email notifications (per-user SMTP). The app password is stored
+        # encrypted (Fernet) in smtp_password_encrypted — never in plaintext.
+        if not _has_column(conn, 'users', 'email_notifications_enabled'):
+            conn.execute('ALTER TABLE users ADD COLUMN email_notifications_enabled INTEGER NOT NULL DEFAULT 0')
+            conn.commit()
+            print("[MIGRATION] Added email_notifications_enabled column to users")
+
+        if not _has_column(conn, 'users', 'notify_email'):
+            conn.execute('ALTER TABLE users ADD COLUMN notify_email TEXT')
+            conn.commit()
+            print("[MIGRATION] Added notify_email column to users")
+
+        if not _has_column(conn, 'users', 'smtp_password_encrypted'):
+            conn.execute('ALTER TABLE users ADD COLUMN smtp_password_encrypted TEXT')
+            conn.commit()
+            print("[MIGRATION] Added smtp_password_encrypted column to users")
+
+        if not _has_column(conn, 'users', 'smtp_host'):
+            conn.execute('ALTER TABLE users ADD COLUMN smtp_host TEXT')
+            conn.commit()
+            print("[MIGRATION] Added smtp_host column to users")
+
+        if not _has_column(conn, 'users', 'smtp_port'):
+            conn.execute('ALTER TABLE users ADD COLUMN smtp_port INTEGER')
+            conn.commit()
+            print("[MIGRATION] Added smtp_port column to users")
     except Exception as e:
         conn.rollback()
         print(f"[MIGRATION ERROR] Column migration failed: {e}")

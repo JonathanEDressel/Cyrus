@@ -1,5 +1,6 @@
 from helper.Helper import execute_query_one, execute_non_query
 from models.UserModel import UserModel
+from typing import Optional
 
 
 class UserDbContext:
@@ -71,3 +72,50 @@ class UserDbContext:
             (1 if is_active else 0, user_id)
         )
         return True
+
+    @staticmethod
+    def update_email_notifications(user_id: int, enabled: bool,
+                                   notify_email: Optional[str],
+                                   smtp_host: Optional[str],
+                                   smtp_port: Optional[int],
+                                   smtp_password_encrypted: Optional[str] = None,
+                                   update_password: bool = False) -> bool:
+        """Persist a user's email-notification settings.
+
+        The SMTP app password is only written when ``update_password`` is True
+        (i.e. the user typed a new one), so toggling the feature or editing the
+        address never wipes a previously stored credential. The password value
+        passed in is already Fernet-encrypted.
+        """
+        if update_password:
+            execute_non_query(
+                '''UPDATE users
+                   SET email_notifications_enabled = ?, notify_email = ?,
+                       smtp_host = ?, smtp_port = ?, smtp_password_encrypted = ?
+                   WHERE id = ?''',
+                (1 if enabled else 0, notify_email, smtp_host, smtp_port,
+                 smtp_password_encrypted, user_id)
+            )
+        else:
+            execute_non_query(
+                '''UPDATE users
+                   SET email_notifications_enabled = ?, notify_email = ?,
+                       smtp_host = ?, smtp_port = ?
+                   WHERE id = ?''',
+                (1 if enabled else 0, notify_email, smtp_host, smtp_port, user_id)
+            )
+        return True
+
+    @staticmethod
+    def get_email_settings(user_id: int) -> Optional[dict]:
+        """Return the raw email-notification columns for the worker to use.
+
+        Includes ``smtp_password_encrypted`` (still encrypted) — the caller
+        decrypts it only at send time.
+        """
+        return execute_query_one(
+            '''SELECT email_notifications_enabled, notify_email,
+                      smtp_password_encrypted, smtp_host, smtp_port
+               FROM users WHERE id = ?''',
+            (user_id,)
+        )
