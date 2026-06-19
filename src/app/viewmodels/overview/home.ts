@@ -19,6 +19,8 @@ class HomeController {
   private watchlistSymbols: string[] = [];
   private activeSymbol: string | null = null;
   private portfolioSig = '';
+  private pfHistory: { reload: () => void; destroy: () => void } | null = null;
+  private historyTimer: ReturnType<typeof setInterval> | null = null;
   private static readonly ACTIVE_KEY = 'cyrus_live_active_symbol';
 
   private flowTab: 'automations' | 'orders' = 'automations';
@@ -32,6 +34,8 @@ class HomeController {
     this.bindFlowTabs();
     this.attachEventListeners();
     this.loadDashboardData();
+    // Portfolio value-over-time chart disabled for now.
+    // this.initPortfolioHistory();
 
     this.unsubscribe = ExchangeStore.onUpdate(() => {
       this.renderFromStore();
@@ -41,12 +45,16 @@ class HomeController {
 
     this.tickerTimer = setInterval(() => this.refreshAllTickers(), 5_000);
     this.chartTimer = setInterval(() => this.refreshAllChartData(), 60_000);
+    // Portfolio history chart disabled for now.
+    // this.historyTimer = setInterval(() => this.pfHistory?.reload(), 5 * 60_000);
 
     const observer = new MutationObserver(() => {
       if (!document.getElementById('live-data-charts')) {
         if (this.unsubscribe) this.unsubscribe();
         if (this.tickerTimer) { clearInterval(this.tickerTimer); this.tickerTimer = null; }
         if (this.chartTimer) { clearInterval(this.chartTimer); this.chartTimer = null; }
+        if (this.historyTimer) { clearInterval(this.historyTimer); this.historyTimer = null; }
+        if (this.pfHistory) { this.pfHistory.destroy(); this.pfHistory = null; }
         this.destroyAllCharts();
         observer.disconnect();
       }
@@ -141,6 +149,24 @@ class HomeController {
     if (sig === this.portfolioSig) return;
     this.portfolioSig = sig;
     this.loadPortfolio();
+    this.pfHistory?.reload();
+  }
+
+  /** Create the portfolio value-over-time chart beside the allocation doughnut. */
+  private initPortfolioHistory(): void {
+    const el = document.getElementById('portfolio-history');
+    if (!el || this.pfHistory) return;
+
+    this.pfHistory = PortfolioHistoryChart.create(el, {
+      isDark: !document.body.classList.contains('theme-light'),
+      fetch: (range: string) => {
+        const isAll = ExchangeStore.isAllMode();
+        const connId: number | 'all' = isAll
+          ? 'all'
+          : (typeof ExchangeStore.activeMode === 'number' ? ExchangeStore.activeMode : 'all');
+        return ExchangeController.getPortfolioHistory(range, connId);
+      },
+    });
   }
 
   private async loadPortfolio(): Promise<void> {

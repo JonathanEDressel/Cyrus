@@ -8,6 +8,8 @@ from ccxt.base.errors import DDoSProtection, RateLimitExceeded, ExchangeNotAvail
 from dotenv import load_dotenv
 from flask import Flask
 
+from automation.portfolio_snapshots import PortfolioSnapshotter
+
 load_dotenv()
 
 
@@ -25,6 +27,7 @@ class AutomationWorker:
         self.app = app
         self._stop_event = threading.Event()
         self._thread = None
+        self._snapshotter = PortfolioSnapshotter()
     
     def start(self):
         self._stop_event.clear()
@@ -42,6 +45,8 @@ class AutomationWorker:
         while not self._stop_event.is_set():
             try:
                 with self.app.app_context():
+                    # Portfolio snapshots paused for now.
+                    # self._snapshotter.run(self._stop_event)
                     self._poll_cycle()
             except Exception as e:
                 print(f"[WORKER ERROR] {e}")
@@ -51,6 +56,15 @@ class AutomationWorker:
                 if self._stop_event.is_set():
                     return
                 time.sleep(1)
+                # Portfolio snapshots paused for now. When re-enabled, this ticks
+                # the snapshotter every second so short snapshot intervals are
+                # honoured between the (slower) rule poll cycles. The bucket guard
+                # makes this a cheap no-op until a new bucket begins.
+                # try:
+                #     with self.app.app_context():
+                #         self._snapshotter.run(self._stop_event)
+                # except Exception as e:
+                #     print(f"[WORKER] snapshot tick error: {e}")
     
     def _poll_cycle(self):
         from controllers.AutomationDbContext import AutomationDbContext

@@ -269,3 +269,32 @@ def get_market_price(exchange: ccxt.Exchange, base_asset: str, quote_asset: str)
         f"No trading pair found for {base_asset}/{quote_asset} or "
         f"{quote_asset}/{base_asset} on {exchange.id}"
     )
+
+
+def get_ohlcv_price_map(exchange: ccxt.Exchange, base_asset: str,
+                        since_ts_sec: int, timeframe: str = '30m') -> dict:
+    """Return ``{bucket_epoch_sec: close_price_usd}`` for an asset from ``since``.
+
+    Used to value historical holdings when backfilling gaps. Each candle's
+    timestamp is floored to its 30-minute bucket so it lines up with stored
+    snapshots. Returns an empty dict if no USD-ish pair exists or the exchange
+    doesn't support OHLCV.
+    """
+    exchange.load_markets()
+    since_ms = int(since_ts_sec * 1000)
+    for quote in ('USD', 'USDT', 'USDC'):
+        symbol = f"{base_asset}/{quote}"
+        if symbol not in exchange.markets:
+            continue
+        try:
+            candles = exchange.fetch_ohlcv(symbol, timeframe=timeframe,
+                                           since=since_ms, limit=1000)
+        except Exception:
+            return {}
+        out: dict = {}
+        for c in candles:
+            ts = int(c[0] // 1000)
+            bucket = ts - (ts % 1800)
+            out[bucket] = float(c[4])
+        return out
+    return {}

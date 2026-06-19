@@ -112,11 +112,42 @@ def setup_database():
             )
         ''')
 
+        # Portfolio value history — one header row per snapshot (per connection,
+        # 30-min aligned), with a detail row per held asset. captured_at is a
+        # UNIX epoch second so the frontend chart can consume it directly.
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS portfolio_snapshots (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                exchange_connection_id INTEGER,
+                captured_at INTEGER NOT NULL,
+                total_usd REAL NOT NULL,
+                is_estimated INTEGER NOT NULL DEFAULT 0,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(user_id, exchange_connection_id, captured_at),
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                FOREIGN KEY (exchange_connection_id) REFERENCES exchange_connections(id) ON DELETE CASCADE
+            )
+        ''')
+
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS portfolio_snapshot_assets (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                snapshot_id INTEGER NOT NULL,
+                asset TEXT NOT NULL,
+                amount REAL NOT NULL,
+                usd_value REAL NOT NULL,
+                FOREIGN KEY (snapshot_id) REFERENCES portfolio_snapshots(id) ON DELETE CASCADE
+            )
+        ''')
+
         conn.execute('CREATE INDEX IF NOT EXISTS idx_username ON users(username)')
         conn.execute('CREATE INDEX IF NOT EXISTS idx_user_active ON automation_rules(user_id, is_active)')
         conn.execute('CREATE INDEX IF NOT EXISTS idx_user_log ON automation_log(user_id, created_at)')
         conn.execute('CREATE INDEX IF NOT EXISTS idx_exchange_conn_user ON exchange_connections(user_id)')
         conn.execute('CREATE INDEX IF NOT EXISTS idx_watched_cryptos_user ON watched_cryptos(user_id)')
+        conn.execute('CREATE INDEX IF NOT EXISTS idx_pf_snap_user_time ON portfolio_snapshots(user_id, captured_at)')
+        conn.execute('CREATE INDEX IF NOT EXISTS idx_pf_snap_assets_snap ON portfolio_snapshot_assets(snapshot_id)')
 
         for migration in [
             'ALTER TABLE automation_rules ADD COLUMN trigger_exchange_id INTEGER REFERENCES exchange_connections(id) ON DELETE SET NULL',

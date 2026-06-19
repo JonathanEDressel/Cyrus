@@ -82,4 +82,11 @@ class ExchangeController {
     const response = await ExchangeData.getPortfolio(token, connectionId);
     return response.data;
   }
+
+  static async getPortfolioHistory(range: string, connId?: number | 'all'): Promise<any> {
+    const token = AuthController.getToken();
+    if (!token) throw new Error('Not authenticated');
+    const response = await ExchangeData.getPortfolioHistory(token, range, connId);
+    return response.data;
+  }
 }

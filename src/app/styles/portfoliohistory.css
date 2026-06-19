@@ -1,0 +1,144 @@
+/* Portfolio panel: allocation doughnut beside the value-over-time chart. */
+.portfolio-body {
+  display: grid;
+  grid-template-columns: minmax(0, 360px) minmax(0, 1fr);
+  gap: 1.5rem;
+  align-items: stretch;
+}
+
+@media (max-width: 900px) {
+  .portfolio-body {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Value-over-time chart ───────────────────────────────────────── */
+.pfh {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.pfh-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 0.5rem;
+}
+
+.pfh-range {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
+  border-radius: 8px;
+  padding: 0.2rem;
+}
+
+.pfh-range-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.3rem 0.55rem;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+
+.pfh-range-btn:hover:not(:disabled) {
+  color: var(--accent-cyan);
+  background: rgba(6, 182, 212, 0.08);
+}
+
+.pfh-range-btn.active {
+  background: var(--accent-cyan);
+  color: #06121a;
+}
+
+.pfh-range-btn:disabled {
+  opacity: 0.32;
+  cursor: not-allowed;
+}
+
+.pfh-chart {
+  width: 100%;
+  height: 300px;
+  position: relative;
+}
+
+.pfh-empty {
+  height: 100%;
+  min-height: 240px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  color: var(--text-secondary);
+  text-align: center;
+  padding: 1rem;
+}
+
+.pfh-empty i {
+  font-size: 1.8rem;
+  opacity: 0.5;
+}
+
+.pfh-empty p {
+  margin: 0;
+  font-size: 0.85rem;
+  max-width: 320px;
+}
+
+.pfh-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.6rem;
+}
+
+.pfh-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
+  border-radius: 999px;
+  padding: 0.2rem 0.6rem;
+  font-size: 0.74rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.pfh-legend-item.off {
+  opacity: 0.4;
+}
+
+.pfh-legend-item.off .pfh-legend-name {
+  text-decoration: line-through;
+}
+
+.pfh-legend-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.pfh-note {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  opacity: 0.85;
+}
+
+.pfh-note i {
+  color: var(--accent-cyan);
+}

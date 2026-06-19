@@ -75,6 +75,27 @@ class ExchangeData {
       token
     );
   }
+
+  static async getPortfolioHistory(token: string, range: string, connId?: number | 'all'): Promise<ApiResponse<PortfolioHistory>> {
+    const params = new URLSearchParams({ range });
+    if (connId !== undefined && connId !== 'all') params.set('conn_id', String(connId));
+    return DataAccess.get<PortfolioHistory>(
+      `${AppConfig.API_BASE}/exchange/portfolio/history?${params.toString()}`,
+      token
+    );
+  }
+}
+
+interface PortfolioHistoryPoint {
+  time: number;
+  value: number;
+  estimated?: number;
+}
+
+interface PortfolioHistory {
+  total: PortfolioHistoryPoint[];
+  assets: Array<{ asset: string; points: PortfolioHistoryPoint[] }>;
+  earliest: number | null;
 }
 
 interface PortfolioPosition {
