@@ -43,6 +43,7 @@ class CommandsController {
     this.attachEventListeners();
     this.onTriggerTypeChanged();
     this.initExchangeSelector();
+    this.initCapabilities();
     this.loadRules();
     this.loadLogs();
     HelpTooltip.init();
@@ -55,6 +56,78 @@ class CommandsController {
     });
     const content = document.getElementById('app-content');
     if (content) observer.observe(content, { childList: true });
+  }
+
+  /** Build the "Supported Automations by Exchange" reference table. */
+  private async initCapabilities(): Promise<void> {
+    if (!ExchangeStore.supportedExchanges || ExchangeStore.supportedExchanges.length === 0) {
+      try {
+        ExchangeStore.supportedExchanges = await ExchangeController.getSupportedExchanges();
+      } catch {
+        /* leave empty — render shows a fallback */
+      }
+    }
+    this.renderCapabilities();
+
+    const header = document.getElementById('capabilities-toggle');
+    const section = header?.closest('.capabilities-section') as HTMLElement | null;
+    if (header && section) {
+      const KEY = 'cyrus-cap-collapsed';
+      if (sessionStorage.getItem(KEY) === '1') section.classList.add('collapsed');
+      header.addEventListener('click', () => {
+        const collapsed = section.classList.toggle('collapsed');
+        sessionStorage.setItem(KEY, collapsed ? '1' : '0');
+      });
+    }
+  }
+
+  private renderCapabilities(): void {
+    const head = document.getElementById('capabilities-head');
+    const tbody = document.getElementById('capabilities-tbody');
+    if (!head || !tbody) return;
+
+    const exchanges: any[] = ExchangeStore.supportedExchanges || [];
+    if (exchanges.length === 0) {
+      head.innerHTML = '<th>Automation</th>';
+      tbody.innerHTML = '<tr class="empty-row"><td>Exchange info unavailable.</td></tr>';
+      return;
+    }
+
+    // needsWithdraw rows are only supported where the exchange's API allows
+    // withdrawals; everything else (convert/market) works everywhere.
+    const rows = [
+      { icon: 'fa-chart-line', name: 'Take profit at a price',
+        desc: 'Sell into a stablecoin or coin when a price target is hit', needsWithdraw: false },
+      { icon: 'fa-arrows-rotate', name: 'Convert when a balance builds up',
+        desc: 'Swap an asset once it reaches a set amount', needsWithdraw: false },
+      { icon: 'fa-arrows-rotate', name: 'Convert after an order fills',
+        desc: 'Swap the proceeds into another coin when an order completes', needsWithdraw: false },
+      { icon: 'fa-arrow-right-from-bracket', name: 'Auto-withdraw after an order fills',
+        desc: 'Send funds to a saved address when an order completes', needsWithdraw: true },
+      { icon: 'fa-arrow-right-from-bracket', name: 'Auto-withdraw at a balance threshold',
+        desc: 'Send funds out once a balance builds up', needsWithdraw: true },
+    ];
+
+    head.innerHTML = '<th>Automation</th>' +
+      exchanges.map((e: any) => `<th class="cap-ex-col">${this.escapeHtml(e.name)}</th>`).join('');
+
+    tbody.innerHTML = rows.map((r) => {
+      const cells = exchanges.map((e: any) => {
+        const ok = !r.needsWithdraw || e.supports_withdraw === true;
+        const icon = ok
+          ? '<i class="fa-solid fa-circle-check cap-yes" title="Supported"></i>'
+          : '<i class="fa-solid fa-minus cap-no" title="Not available"></i>';
+        return `<td class="cap-cell">${icon}</td>`;
+      }).join('');
+      return `<tr>
+        <td class="cap-rule-cell">
+          <span class="cap-rule-icon"><i class="fa-solid ${r.icon}"></i></span>
+          <span class="cap-rule-text">
+            <span class="cap-rule-name">${this.escapeHtml(r.name)}</span>
+            <span class="cap-rule-desc">${this.escapeHtml(r.desc)}</span>
+          </span>
+        </td>${cells}</tr>`;
+    }).join('');
   }
 
   private initExchangeSelector(): void {
@@ -449,10 +522,20 @@ class CommandsController {
 
     this.populateAddressDropdown();
 
-    // Show minimum withdrawal hint
-    this.updateMinWithdrawalHint(receivedAsset);
+    const actionType = (document.getElementById('action-type') as HTMLSelectElement)?.value;
 
-    // Check if max amount is below the minimum withdrawal
+    // Converting the proceeds: the withdrawal-minimum rules don't apply, so the
+    // create button must NOT be disabled by them. Set up the convert fields.
+    if (actionType === 'convert_crypto') {
+      this.clearMinWarning();
+      this.setCreateButtonEnabled(true);
+      this.onActionTypeChanged();
+      this.updateRuleSummary();
+      return;
+    }
+
+    // Withdraw path: enforce minimum-withdrawal on the received amount.
+    this.updateMinWithdrawalHint(receivedAsset);
     const minWithdrawal = this.getMinForAsset(receivedAsset);
     if (minWithdrawal > 0 && this.maxAmount < minWithdrawal) {
       this.showMinWarning(`Maximum possible amount (${this.maxAmount.toFixed(6)} ${receivedAsset}) is below the minimum withdrawal of ${this.formatMin(minWithdrawal)} ${receivedAsset}`);
@@ -541,7 +624,7 @@ class CommandsController {
       return;
     }
 
-    if (actionType === 'convert_crypto' && triggerType === 'balance_threshold') {
+    if (actionType === 'convert_crypto' && (triggerType === 'balance_threshold' || triggerType === 'order_filled')) {
       withdrawFields?.classList.add('d-none');
       document.getElementById('withdraw-unsupported-notice')?.classList.add('d-none');
       convertFields?.classList.remove('d-none');
@@ -549,12 +632,21 @@ class CommandsController {
       convertAmountSection?.classList.remove('d-none');
       this.populateConvertDropdowns();
       this.updateConvertAmountHint();
+      // Convert has no withdrawal-minimum constraint — never leave the button
+      // stuck disabled when switching over from Withdraw.
+      this.clearMinWarning();
+      this.setCreateButtonEnabled(true);
     } else {
       convertFields?.classList.add('d-none');
       convertAmountSection?.classList.add('d-none');
       withdrawFields?.classList.remove('d-none');
       if (triggerType !== 'balance_threshold') {
         amountModeSection?.classList.remove('d-none');
+      }
+      // Returning to Withdraw with an order already chosen: restore its amount
+      // fields and re-check the withdrawal minimum.
+      if (triggerType === 'order_filled' && this.selectedOrder) {
+        this.onOrderSelected();
       }
     }
     this.updateRuleSummary();
@@ -608,14 +700,25 @@ class CommandsController {
   //   }
   // }
 
+  /** Asset being converted FROM: the monitored asset for a balance trigger,
+   *  or the order's received asset for an order-filled trigger. */
+  private getConvertFromAsset(): string {
+    const triggerType = (document.getElementById('trigger-type') as HTMLSelectElement)?.value;
+    if (triggerType === 'order_filled' && this.selectedOrder) {
+      const { base, quote } = this.parsePair(this.selectedOrder.pair);
+      return this.selectedOrder.side === 'sell' ? quote : base;
+    }
+    return (document.getElementById('trigger-asset') as HTMLSelectElement)?.value || '';
+  }
+
   private populateConvertDropdowns(): void {
     const fromSelect = document.getElementById('convert-from-asset') as HTMLSelectElement;
     const toSelect = document.getElementById('convert-to-asset') as HTMLSelectElement;
     if (!fromSelect || !toSelect) return;
 
-    const triggerAsset = (document.getElementById('trigger-asset') as HTMLSelectElement)?.value;
+    const triggerAsset = this.getConvertFromAsset();
 
-    // From asset locked to trigger asset
+    // From asset locked to the source asset
     fromSelect.innerHTML = '';
     if (triggerAsset) {
       const opt = document.createElement('option');
@@ -680,7 +783,7 @@ class CommandsController {
 
   private updateConvertAmountHint(): void {
     const hint = document.getElementById('convert-amount-hint');
-    const triggerAsset = (document.getElementById('trigger-asset') as HTMLSelectElement)?.value;
+    const triggerAsset = this.getConvertFromAsset();
     const balance = triggerAsset ? this.balances[triggerAsset] : null;
     if (hint && balance) {
       hint.textContent = `Available: ${parseFloat(balance).toFixed(8)} ${triggerAsset}`;
@@ -773,20 +876,16 @@ class CommandsController {
       document.getElementById('action-type-divider')?.classList.remove('d-none');
       document.getElementById('action-type-row')?.classList.remove('d-none');
 
-      // Disable and deselect Convert Crypto option
+      // Order-filled supports BOTH actions: Withdraw or Convert the proceeds.
       const actionTypeSelectOF = document.getElementById('action-type') as HTMLSelectElement;
       const convertOptionOF = actionTypeSelectOF?.querySelector('option[value="convert_crypto"]') as HTMLOptionElement;
-      if (convertOptionOF) convertOptionOF.disabled = true;
+      if (convertOptionOF) convertOptionOF.disabled = false;
       const withdrawOptionOF = actionTypeSelectOF?.querySelector('option[value="withdraw_crypto"]') as HTMLOptionElement;
       if (withdrawOptionOF) withdrawOptionOF.disabled = false;
-      if (actionTypeSelectOF && actionTypeSelectOF.value === 'convert_crypto') {
-        actionTypeSelectOF.value = 'withdraw_crypto';
-        this.onActionTypeChanged();
-      }
 
       this.resetDependentFields();
 
-      // Re-enable trigger-asset and threshold
+      // trigger-asset/threshold belong to the balance trigger; keep them inert here.
       const triggerAssetSelect = document.getElementById('trigger-asset') as HTMLSelectElement;
       if (triggerAssetSelect) {
         triggerAssetSelect.disabled = true;
@@ -797,6 +896,8 @@ class CommandsController {
         thresholdInput.disabled = true;
         thresholdInput.value = '';
       }
+
+      this.onActionTypeChanged();
     }
 
     this.updateRuleSummary();
@@ -1079,6 +1180,10 @@ class CommandsController {
         hint.textContent = `Est. max ${this.maxAmount.toFixed(6)} ${receivedAsset}`;
       }
       if (modeHint) modeHint.textContent = 'Withdraws the actual filled amount when the order completes';
+      // Filled mode defers the amount to execution time, so the max/min
+      // pre-check no longer applies — never leave the create button stuck disabled.
+      this.clearMinWarning();
+      this.setCreateButtonEnabled(true);
     } else {
       if (this.selectedOrder) {
         const actionAsset = (document.getElementById('action-asset') as HTMLSelectElement)?.value || '';
@@ -1099,6 +1204,14 @@ class CommandsController {
           const { base, quote } = this.parsePair(this.selectedOrder.pair);
           const receivedAsset = this.selectedOrder.side === 'sell' ? quote : base;
           hint.textContent = `Max ${this.maxAmount.toFixed(6)} ${receivedAsset}`;
+        }
+        // Fixed mode: re-evaluate the withdrawal minimum against the available max.
+        if (minW > 0 && this.maxAmount < minW) {
+          this.showMinWarning(`Maximum possible amount (${this.maxAmount.toFixed(6)} ${actionAsset}) is below the minimum withdrawal of ${this.formatMin(minW)} ${actionAsset}`);
+          this.setCreateButtonEnabled(false);
+        } else {
+          this.clearMinWarning();
+          this.setCreateButtonEnabled(true);
         }
       }
       if (modeHint) modeHint.textContent = '';
@@ -1348,14 +1461,40 @@ class CommandsController {
       payload.use_filled_amount = false;
     } else {
       const triggerOrderId = (document.getElementById('trigger-order-id') as HTMLSelectElement).value;
-      const actionAmount = (document.getElementById('action-amount') as HTMLInputElement).value.trim();
-      const amountMode = (document.querySelector('input[name="amount-mode"]:checked') as HTMLInputElement)?.value;
-      const useFilledAmount = amountMode === 'filled';
-
       if (!triggerOrderId) {
         this.showError('Please select an order');
         return;
       }
+      payload.trigger_order_id = triggerOrderId;
+
+      if (isConvert) {
+        const convertTo = (document.getElementById('convert-to-asset') as HTMLSelectElement).value;
+        if (!actionAsset) {
+          this.showError('Select an order so the received asset is known');
+          return;
+        }
+        if (!convertTo) {
+          this.showError('Please select a target asset to convert to');
+          return;
+        }
+        if (convertTo === actionAsset) {
+          this.showError('Target asset must be different from the received asset');
+          return;
+        }
+        const convertAmount = (document.getElementById('convert-amount') as HTMLInputElement).value.trim();
+        if (convertAmount && parseFloat(convertAmount) <= 0) {
+          this.showError('Convert amount must be a positive number');
+          return;
+        }
+        payload.action_asset = actionAsset;
+        payload.convert_to_asset = convertTo;
+        payload.action_address_key = '';
+        payload.action_amount = (convertAmount && parseFloat(convertAmount) > 0) ? convertAmount : '';
+        payload.use_filled_amount = false;
+      } else {
+      const actionAmount = (document.getElementById('action-amount') as HTMLInputElement).value.trim();
+      const amountMode = (document.querySelector('input[name="amount-mode"]:checked') as HTMLInputElement)?.value;
+      const useFilledAmount = amountMode === 'filled';
 
       if (!useFilledAmount) {
         if (!actionAmount) {
@@ -1391,9 +1530,9 @@ class CommandsController {
         }
       }
 
-      payload.trigger_order_id = triggerOrderId;
       payload.action_amount = useFilledAmount ? '' : actionAmount;
       payload.use_filled_amount = useFilledAmount;
+      }
     }
 
     try {

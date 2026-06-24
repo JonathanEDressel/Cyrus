@@ -207,3 +207,109 @@ class PortfolioDbContext:
             'earliest': PortfolioDbContext.get_earliest_time(user_id, conn_id),
             'count': count or 0,
         }
+
+    @staticmethod
+    def _snapshot_at(user_id: int, captured_at: int, conn_id: int | None):
+        """Aggregate total + per-asset holdings at one captured_at (across conns)."""
+        params: list = [user_id, captured_at]
+        extra = ''
+        if conn_id is not None:
+            extra = ' AND exchange_connection_id = ?'
+            params.append(conn_id)
+        total = execute_scalar(
+            f'SELECT SUM(total_usd) FROM portfolio_snapshots '
+            f'WHERE user_id = ? AND captured_at = ?{extra}',
+            tuple(params)
+        ) or 0.0
+
+        a_params: list = [user_id, captured_at]
+        a_extra = ''
+        if conn_id is not None:
+            a_extra = ' AND s.exchange_connection_id = ?'
+            a_params.append(conn_id)
+        rows = execute_query_all(
+            f'''SELECT a.asset AS asset, SUM(a.amount) AS amount, SUM(a.usd_value) AS usd_value
+                FROM portfolio_snapshots s
+                JOIN portfolio_snapshot_assets a ON a.snapshot_id = s.id
+                WHERE s.user_id = ? AND s.captured_at = ?{a_extra}
+                GROUP BY a.asset''',
+            tuple(a_params)
+        )
+        assets = {r['asset']: {'amount': r['amount'] or 0, 'usd_value': r['usd_value'] or 0}
+                  for r in rows}
+        return float(total), assets
+
+    @staticmethod
+    def _pick_time(user_id: int, conn_id: int | None, op: str, ts: int) -> int | None:
+        """Latest (op='<') or earliest (op='>=') captured_at relative to ts."""
+        params: list = [user_id, ts]
+        extra = ''
+        if conn_id is not None:
+            extra = ' AND exchange_connection_id = ?'
+            params.append(conn_id)
+        agg = 'MAX' if op == '<' else 'MIN'
+        return execute_scalar(
+            f'SELECT {agg}(captured_at) FROM portfolio_snapshots '
+            f'WHERE user_id = ? AND captured_at {op} ?{extra}',
+            tuple(params)
+        )
+
+    @staticmethod
+    def get_month_change(user_id: int, start_ts: int, end_ts: int,
+                         conn_id: int | None = None) -> dict:
+        """Month-over-month change in holdings, value, and allocation.
+
+        Baseline = the snapshot entering the month (latest before ``start_ts``,
+        else the earliest within the month). Final = the latest snapshot before
+        ``end_ts``. Returns per-asset deltas (amount, USD, allocation pp) plus
+        the total-value change.
+        """
+        final_ts = PortfolioDbContext._pick_time(user_id, conn_id, '<', end_ts)
+        base_ts = PortfolioDbContext._pick_time(user_id, conn_id, '<', start_ts)
+        if base_ts is None:
+            base_ts = PortfolioDbContext._pick_time(user_id, conn_id, '>=', start_ts)
+
+        if final_ts is None:
+            return {'total': {'current': 0, 'previous': 0, 'change_usd': 0, 'change_pct': 0},
+                    'assets': [], 'has_baseline': False}
+
+        final_total, final_assets = PortfolioDbContext._snapshot_at(user_id, final_ts, conn_id)
+        has_baseline = base_ts is not None and base_ts != final_ts
+        if has_baseline:
+            base_total, base_assets = PortfolioDbContext._snapshot_at(user_id, base_ts, conn_id)
+        else:
+            base_total, base_assets = 0.0, {}
+
+        def alloc(value: float, total: float) -> float:
+            return (value / total * 100) if total > 0 else 0.0
+
+        out_assets = []
+        for asset in set(final_assets) | set(base_assets):
+            f = final_assets.get(asset, {'amount': 0, 'usd_value': 0})
+            b = base_assets.get(asset, {'amount': 0, 'usd_value': 0})
+            f_pct = alloc(f['usd_value'], final_total)
+            b_pct = alloc(b['usd_value'], base_total) if has_baseline else f_pct
+            out_assets.append({
+                'asset': asset,
+                'amount': round(f['amount'], 8),
+                'amount_change': round(f['amount'] - b['amount'], 8),
+                'usd_value': round(f['usd_value'], 2),
+                'usd_change': round(f['usd_value'] - b['usd_value'], 2),
+                'pct': round(f_pct, 1),
+                'pct_change': round(f_pct - b_pct, 1),
+            })
+        out_assets.sort(key=lambda a: a['usd_value'], reverse=True)
+
+        change_usd = final_total - base_total if has_baseline else 0.0
+        change_pct = (change_usd / base_total * 100) if (has_baseline and base_total > 0) else 0.0
+
+        return {
+            'total': {
+                'current': round(final_total, 2),
+                'previous': round(base_total, 2),
+                'change_usd': round(change_usd, 2),
+                'change_pct': round(change_pct, 1),
+            },
+            'assets': out_assets,
+            'has_baseline': has_baseline,
+        }

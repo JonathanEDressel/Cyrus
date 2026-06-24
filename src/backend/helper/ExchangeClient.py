@@ -66,6 +66,35 @@ def get_balance(exchange: ccxt.Exchange) -> dict:
 _USD_STABLES = {'USD', 'USDT', 'USDC', 'DAI', 'USDD', 'TUSD', 'PYUSD', 'ZUSD'}
 
 
+def _ticker_price(ticker: dict | None) -> float | None:
+    """Best available price from a CCXT ticker.
+
+    Some exchanges (notably Coinbase Advanced) return ``last`` as null and only
+    populate ``close`` or bid/ask — which used to make those holdings unpriceable
+    and silently dropped from the portfolio. Fall back through
+    last → close → mid(bid, ask) → bid/ask.
+    """
+    if not ticker:
+        return None
+
+    def _num(v):
+        try:
+            f = float(v)
+            return f if f > 0 else None
+        except (TypeError, ValueError):
+            return None
+
+    for key in ('last', 'close'):
+        p = _num(ticker.get(key))
+        if p is not None:
+            return p
+
+    bid, ask = _num(ticker.get('bid')), _num(ticker.get('ask'))
+    if bid is not None and ask is not None:
+        return (bid + ask) / 2.0
+    return bid if bid is not None else ask
+
+
 def get_portfolio(exchange: ccxt.Exchange) -> dict:
     """Value every non-zero holding in USD.
 
@@ -87,9 +116,9 @@ def get_portfolio(exchange: ccxt.Exchange) -> dict:
             return 1.0
         # Prefer the bulk tickers we already fetched.
         for quote in ('USD', 'USDT', 'USDC'):
-            t = tickers.get(f"{asset}/{quote}")
-            if t and t.get('last'):
-                return float(t['last'])
+            p = _ticker_price(tickers.get(f"{asset}/{quote}"))
+            if p is not None:
+                return p
         # Fall back to a direct/inverse lookup (handles stablecoin equivalents).
         try:
             return get_market_price(exchange, asset, 'USD')
@@ -232,11 +261,10 @@ def _fetch_price_for_symbol(exchange: ccxt.Exchange, symbol: str, inverse: bool 
     """Fetch last price for a symbol. Returns None if unavailable. Inverts if inverse=True."""
     if symbol not in exchange.markets:
         return None
-    ticker = exchange.fetch_ticker(symbol)
-    price = ticker.get('last')
-    if price is None or (inverse and float(price) <= 0):
+    price = _ticker_price(exchange.fetch_ticker(symbol))
+    if price is None or price <= 0:
         return None
-    return (1.0 / float(price)) if inverse else float(price)
+    return (1.0 / price) if inverse else price
 
 
 def get_market_price(exchange: ccxt.Exchange, base_asset: str, quote_asset: str) -> float:
@@ -272,13 +300,14 @@ def get_market_price(exchange: ccxt.Exchange, base_asset: str, quote_asset: str)
 
 
 def get_ohlcv_price_map(exchange: ccxt.Exchange, base_asset: str,
-                        since_ts_sec: int, timeframe: str = '30m') -> dict:
+                        since_ts_sec: int, timeframe: str = '30m',
+                        bucket_seconds: int = 1800) -> dict:
     """Return ``{bucket_epoch_sec: close_price_usd}`` for an asset from ``since``.
 
     Used to value historical holdings when backfilling gaps. Each candle's
-    timestamp is floored to its 30-minute bucket so it lines up with stored
-    snapshots. Returns an empty dict if no USD-ish pair exists or the exchange
-    doesn't support OHLCV.
+    timestamp is floored to a ``bucket_seconds`` bucket so it lines up with
+    stored snapshots. Returns an empty dict if no USD-ish pair exists or the
+    exchange doesn't support OHLCV.
     """
     exchange.load_markets()
     since_ms = int(since_ts_sec * 1000)
@@ -294,7 +323,7 @@ def get_ohlcv_price_map(exchange: ccxt.Exchange, base_asset: str,
         out: dict = {}
         for c in candles:
             ts = int(c[0] // 1000)
-            bucket = ts - (ts % 1800)
+            bucket = ts - (ts % bucket_seconds)
             out[bucket] = float(c[4])
         return out
     return {}

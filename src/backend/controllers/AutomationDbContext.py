@@ -204,6 +204,24 @@ class AutomationDbContext:
         return [AutomationLog.from_row(r) for r in rows]
 
     @staticmethod
+    def get_logs_between(user_id: int, start: str, end: str) -> list:
+        """Execution logs in ``[start, end)`` (UTC 'YYYY-MM-DD HH:MM:SS' bounds).
+
+        Returns raw dicts with the joined ``rule_name`` so reports can label
+        each entry even if the rule was later deleted.
+        """
+        return execute_query_all(
+            '''SELECT l.id, l.rule_id, l.trigger_event, l.action_executed,
+                      l.action_result, l.status, l.created_at,
+                      r.rule_name AS rule_name
+               FROM automation_log l
+               LEFT JOIN automation_rules r ON r.id = l.rule_id
+               WHERE l.user_id = ? AND l.created_at >= ? AND l.created_at < ?
+               ORDER BY l.created_at DESC''',
+            (user_id, start, end)
+        )
+
+    @staticmethod
     def get_logs_by_rule(rule_id: int, user_id: int, limit: int = 20) -> list:
         rows = execute_query_all(
             '''SELECT * FROM automation_log 

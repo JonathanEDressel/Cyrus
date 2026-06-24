@@ -86,6 +86,48 @@ def send_email(to_addr: str, subject: str, body: str,
         server.send_message(msg)
 
 
+def send_html_email(to_addr: str, subject: str, html_body: str,
+                    smtp_user: str, smtp_password: str,
+                    text_body: Optional[str] = None,
+                    inline_images: Optional[dict] = None,
+                    smtp_host: Optional[str] = None,
+                    smtp_port: Optional[int] = None,
+                    timeout: int = 30) -> None:
+    """Send an HTML email, optionally with inline (CID-referenced) PNG images.
+
+    ``inline_images`` maps a content-id (referenced in the HTML as
+    ``cid:<id>``) to raw PNG bytes. A plaintext ``text_body`` is included as a
+    fallback for clients that don't render HTML. Raises on failure.
+    """
+    if not to_addr or not smtp_user or not smtp_password:
+        raise ValueError("Email address and SMTP app password are required")
+
+    host, port = resolve_smtp(smtp_user, smtp_host, smtp_port)
+
+    msg = EmailMessage()
+    msg['From'] = smtp_user
+    msg['To'] = to_addr
+    msg['Subject'] = subject
+    msg.set_content(text_body or "This email requires an HTML-capable client.")
+    msg.add_alternative(html_body, subtype='html')
+
+    if inline_images:
+        # The HTML alternative is the last payload; attach images to it so they
+        # nest as multipart/related and resolve via cid: references.
+        html_part = msg.get_payload()[-1]
+        for cid, img_bytes in inline_images.items():
+            if not img_bytes:
+                continue
+            subtype = 'jpeg' if img_bytes[:3] == b'\xff\xd8\xff' else 'png'
+            html_part.add_related(img_bytes, maintype='image', subtype=subtype,
+                                  cid=f"<{cid}>")
+
+    with smtplib.SMTP(host, port, timeout=timeout) as server:
+        server.starttls()
+        server.login(smtp_user, smtp_password)
+        server.send_message(msg)
+
+
 def send_email_async(to_addr: str, subject: str, body: str,
                      smtp_user: str, smtp_password: str,
                      smtp_host: Optional[str] = None,

@@ -48,18 +48,17 @@ SUPPORTED_EXCHANGES: dict[str, dict] = {
         'api_key_url': 'https://www.binance.com/en/my/settings/api-management',
         'guide_url': 'https://www.binance.com/en/support/faq/how-to-create-api-keys-on-binance-360002502072',
     },
-    # Not supported yet
-    # 'robinhood': {
-    #     'name': 'Robinhood (Beta)',
-    #     'ccxt_id': None,  # Direct API — not CCXT-based
-    #     'requires_passphrase': False,
-    #     'has_withdrawal_addresses': False,
-    #     'supports_withdraw': False,
-    #     'has_sandbox': False,
-    #     'website': 'https://robinhood.com',
-    #     'api_key_url': 'https://robinhood.com/account/crypto',
-    #     'guide_url': 'https://docs.robinhood.com/crypto/trading/',
-    # },
+    'robinhood': {
+        'name': 'Robinhood (Beta)',
+        'ccxt_id': None,  # Direct API via RobinhoodAdapter — not CCXT-based
+        'requires_passphrase': False,
+        'has_withdrawal_addresses': False,  # no withdrawal API
+        'supports_withdraw': False,         # market-order (convert) only
+        'has_sandbox': False,
+        'website': 'https://robinhood.com',
+        'api_key_url': 'https://robinhood.com/account/crypto',
+        'guide_url': 'https://docs.robinhood.com/crypto/trading/',
+    },
 }
 
 # Minimum withdrawal amounts per exchange per asset (with a 10% safety cushion).

@@ -120,6 +120,25 @@ ipcMain.handle('get-backend-port', async () => {
   return backendPortReady;
 });
 
+// Capture a region of the rendered window as a PNG data URL. Used by the
+// monthly-report builder to snapshot charts with full fidelity (the renderer
+// briefly shows each chart on-screen, then asks us to grab its rect).
+ipcMain.handle('capture-region', async (_event, rect: { x: number; y: number; width: number; height: number }) => {
+  if (!mainWindow) return null;
+  try {
+    const image = await mainWindow.webContents.capturePage({
+      x: Math.max(0, Math.round(rect.x)),
+      y: Math.max(0, Math.round(rect.y)),
+      width: Math.max(1, Math.round(rect.width)),
+      height: Math.max(1, Math.round(rect.height)),
+    });
+    return image.toDataURL();
+  } catch (err) {
+    console.error('[CAPTURE] capturePage failed:', err);
+    return null;
+  }
+});
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1200,

@@ -160,8 +160,8 @@ def create_rule():
                     pass
 
         elif action_type == 'convert_crypto':
-            if trigger_type not in ('balance_threshold', 'price_threshold'):
-                return bad_request("Convert Crypto is only available with the Balance Threshold or Price Threshold trigger")
+            if trigger_type not in ('balance_threshold', 'price_threshold', 'order_filled'):
+                return bad_request("Convert Crypto is not available for this trigger")
             if not action_asset:
                 return bad_request("Source asset is required for convert action")
             if not convert_to_asset:
@@ -189,7 +189,7 @@ def create_rule():
                         return bad_request("Percent amount must be between 0 and 100")
                 except (ValueError, TypeError):
                     return bad_request("Convert amount must be a valid number")
-            elif action_amount and trigger_type == 'balance_threshold':
+            elif action_amount and trigger_type in ('balance_threshold', 'order_filled'):
                 try:
                     amount_val = float(action_amount)
                     if amount_val <= 0:

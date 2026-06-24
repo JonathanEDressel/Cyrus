@@ -36,6 +36,11 @@ class RobinhoodAdapter:
     #: work correctly throughout the codebase.
     id = "robinhood"
 
+    #: Mirrors ccxt.Exchange.has — Robinhood exposes no bulk-ticker or OHLCV
+    #: endpoints, so capability probes (e.g. ``exchange.has.get('fetchTickers')``)
+    #: resolve to falsy and callers fall back to per-asset pricing.
+    has: dict = {}
+
     def __init__(self, api_key: str, private_key_b64: str) -> None:
         self._client = RobinhoodClient(api_key=api_key, private_key_b64=private_key_b64)
         self._markets: dict | None = None
@@ -155,6 +160,17 @@ class RobinhoodAdapter:
     # ------------------------------------------------------------------
     # Unsupported operations
     # ------------------------------------------------------------------
+
+    def fetch_ohlcv(self, *args, **kwargs):
+        """Not supported — Robinhood's crypto API has no OHLCV/candles endpoint.
+
+        Charts in the app use public Kraken data, so this never affects them;
+        callers that probe history (e.g. report gap-fill) catch this and fall
+        back gracefully.
+        """
+        raise RobinhoodNotSupportedError(
+            "Robinhood does not provide historical OHLCV candle data."
+        )
 
     def withdraw(self, *args, **kwargs):
         """Not supported — Robinhood does not expose a crypto withdrawal API."""

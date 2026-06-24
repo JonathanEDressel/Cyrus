@@ -41,6 +41,7 @@ class ProfileController {
 
     document.getElementById('save-email-btn')?.addEventListener('click', () => this.saveEmailSettings());
     document.getElementById('test-email-btn')?.addEventListener('click', () => this.sendTestEmail());
+    document.getElementById('test-report-btn')?.addEventListener('click', () => this.sendTestReport());
 
     document.getElementById('new-exchange-name')?.addEventListener('change', () => {
       const select = document.getElementById('new-exchange-name') as HTMLSelectElement;
@@ -389,6 +390,26 @@ class ProfileController {
       this.showSuccess('email', msg || 'Test email sent');
     } catch (error: any) {
       this.showError('email', error.message || 'Failed to send test email');
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        if (original) btn.innerHTML = original;
+      }
+    }
+  }
+
+  private async sendTestReport(): Promise<void> {
+    const btn = document.getElementById('test-report-btn') as HTMLButtonElement;
+    const original = btn?.innerHTML;
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Building &amp; sending...';
+    }
+    try {
+      const msg = await MonthlyReport.sendTest();
+      this.showSuccess('report', msg || 'Test report sent');
+    } catch (error: any) {
+      this.showError('report', error.message || 'Failed to send test report');
     } finally {
       if (btn) {
         btn.disabled = false;

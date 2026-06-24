@@ -59,6 +59,7 @@
     "typescript": "^5.3.3"
   },
   "dependencies": {
+    "html-to-image": "^1.11.13",
     "lightweight-charts": "^5.1.0"
   }
 }

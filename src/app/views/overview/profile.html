@@ -162,6 +162,11 @@
             <small class="form-text text-muted">
               Use an app password from your email provider (e.g. Gmail / Outlook), not your normal login password.
               Leave blank to keep the one already saved.
+              <br>
+              <a href="https://support.google.com/accounts/answer/185833" target="_blank" rel="noopener noreferrer"
+                 class="email-connect-link" style="color: var(--accent-cyan); display:inline-block; margin-top:6px;">
+                <i class="fa-solid fa-arrow-up-right-from-square"></i> How to connect your email account
+              </a>
             </small>
           </div>
           <div class="form-group">
@@ -184,6 +189,24 @@
             </button>
           </div>
         </form>
+      </div>
+    </section>
+
+    <section class="profile-section">
+      <div class="section-header">
+        <h2 class="section-title"><i class="fa-solid fa-file-invoice me-2"></i>Monthly Report</h2>
+      </div>
+      <div class="alert alert-success d-none" data-alert="report-success"><i class="fa-solid fa-circle-check me-2"></i><span></span></div>
+      <div class="alert alert-warning d-none" data-alert="report-error"><span></span></div>
+      <div class="profile-card">
+        <p class="text-muted" style="margin-top:0;">
+          At the end of each month, Cyrus emails you a portfolio report — your allocation chart, holdings
+          and percentages, automation &amp; open-order flow charts, and that month's execution log. This uses
+          the email account configured above, and is delivered the next time Cyrus runs after month-end.
+        </p>
+        <button type="button" class="btn btn-secondary" id="test-report-btn">
+          Send Test Report <i class="fa-solid fa-paper-plane ms-2"></i>
+        </button>
       </div>
     </section>
 

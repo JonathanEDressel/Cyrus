@@ -41,6 +41,8 @@ class HomeController {
       this.renderFromStore();
       this.loadCommandsCount();
       this.refreshPortfolio();
+      // If last month's report is owed, send it now (once per session).
+      MonthlyReport.runScheduledIfDue();
     });
 
     this.tickerTimer = setInterval(() => this.refreshAllTickers(), 5_000);

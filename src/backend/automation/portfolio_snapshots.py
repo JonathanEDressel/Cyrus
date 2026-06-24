@@ -16,10 +16,9 @@ import time
 import traceback
 
 
-# TEMP (testing): snapshot every 10 seconds. Switch back to 1800 (30 minutes)
-# for normal use.
-BUCKET_SECONDS = 10
-MAX_BACKFILL_BUCKETS = 14 * 24 * 2        # cap gap-fill at ~14 days
+# Snapshot once per day (UTC-midnight aligned), feeding the monthly report.
+BUCKET_SECONDS = 86400
+MAX_BACKFILL_BUCKETS = 370                 # cap gap-fill at ~1 year of days
 _STABLE = {'USD', 'USDT', 'USDC', 'DAI', 'BUSD', 'TUSD', 'USDP', 'FDUSD', 'PYUSD', 'USDD'}
 
 
@@ -123,7 +122,8 @@ class PortfolioSnapshotter:
             amount = a['amount'] or 0
             last_price = (a['usd_value'] / amount) if amount else 0.0
             try:
-                pm = get_ohlcv_price_map(exchange, sym, buckets[0], '30m')
+                pm = get_ohlcv_price_map(exchange, sym, buckets[0], '1d',
+                                         bucket_seconds=BUCKET_SECONDS)
             except Exception:
                 pm = {}
             price_maps[sym] = (pm, last_price)

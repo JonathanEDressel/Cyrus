@@ -141,6 +141,19 @@ def setup_database():
             )
         ''')
 
+        # Tracks which monthly report periods have already been emailed, so the
+        # end-of-month report is sent at most once per user per month.
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS report_sends (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                period TEXT NOT NULL,
+                sent_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(user_id, period),
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            )
+        ''')
+
         conn.execute('CREATE INDEX IF NOT EXISTS idx_username ON users(username)')
         conn.execute('CREATE INDEX IF NOT EXISTS idx_user_active ON automation_rules(user_id, is_active)')
         conn.execute('CREATE INDEX IF NOT EXISTS idx_user_log ON automation_log(user_id, created_at)')

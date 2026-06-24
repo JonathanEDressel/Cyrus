@@ -862,3 +862,101 @@
 .wizard-footer #create-rule-btn {
   margin-left: auto;
 }
+
+/* ─── Supported automations by exchange ─────────────────────────── */
+.capabilities-header {
+  cursor: pointer;
+  user-select: none;
+}
+
+.capabilities-chevron {
+  color: var(--text-muted);
+  transition: transform 0.2s ease;
+  font-size: 0.85rem;
+}
+
+.capabilities-section.collapsed .capabilities-chevron {
+  transform: rotate(-90deg);
+}
+
+.capabilities-section.collapsed .capabilities-body {
+  display: none;
+}
+
+.capabilities-intro {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  margin: 0 0 1rem;
+}
+
+.capabilities-table th.cap-ex-col {
+  text-align: center;
+  white-space: nowrap;
+}
+
+.capabilities-table .cap-cell {
+  text-align: center;
+  font-size: 1rem;
+}
+
+.cap-rule-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  min-width: 240px;
+}
+
+.cap-rule-icon {
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(6, 182, 212, 0.12);
+  color: var(--accent-cyan);
+  font-size: 0.8rem;
+}
+
+.cap-rule-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+}
+
+.cap-rule-name {
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 0.88rem;
+}
+
+.cap-rule-desc {
+  color: var(--text-muted);
+  font-size: 0.76rem;
+}
+
+.cap-yes {
+  color: #22c55e;
+}
+
+.cap-no {
+  color: var(--text-muted);
+  opacity: 0.45;
+}
+
+.capabilities-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+  margin-top: 0.9rem;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+
+.cap-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}

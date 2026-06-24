@@ -45,8 +45,9 @@ class AutomationWorker:
         while not self._stop_event.is_set():
             try:
                 with self.app.app_context():
-                    # Portfolio snapshots paused for now.
-                    # self._snapshotter.run(self._stop_event)
+                    # Daily portfolio snapshots (feeds the monthly report's
+                    # month-over-month change). Cheap no-op until a new day bucket.
+                    self._snapshotter.run(self._stop_event)
                     self._poll_cycle()
             except Exception as e:
                 print(f"[WORKER ERROR] {e}")
@@ -154,7 +155,8 @@ class AutomationWorker:
                             if self._rule_matches_order(rule, order_id, snapshot):
                                 self._execute_rule(rule, user_id, conn_id,
                                                    order_id, snapshot, AutomationDbContext,
-                                                   get_user_exchange, get_minimum_withdrawal, withdraw)
+                                                   get_user_exchange, get_minimum_withdrawal, withdraw,
+                                                   get_balance, convert)
 
                     AutomationDbContext.delete_order_snapshot(user_id, order_id)
 
@@ -384,28 +386,63 @@ class AutomationWorker:
     
     def _execute_rule(self, rule, user_id, trigger_conn_id,
                       order_id: str, snapshot: dict, AutomationDbContext,
-                      get_user_exchange, get_minimum_withdrawal, withdraw_fn):
+                      get_user_exchange, get_minimum_withdrawal, withdraw_fn,
+                      get_balance_fn, convert_fn):
         trigger_event = f"Order {order_id} filled ({snapshot.get('pair', '')} {snapshot.get('side', '')})"
-        
+
         # Mark as triggered BEFORE executing to prevent duplicate executions
         AutomationDbContext.mark_rule_triggered(rule.id)
-        
-        try:
-            if rule.action_type == 'withdraw_crypto':
-                withdraw_amount = self._resolve_amount(rule, snapshot)
 
-                # Check minimum withdrawal on action exchange
+        try:
             from helper.ExchangeRegistry import get_connection_row, SUPPORTED_EXCHANGES
             action_conn_row = get_connection_row(user_id, rule.action_exchange_id)
             action_exchange_name = action_conn_row['exchange_name'] if action_conn_row else 'kraken'
-
-            # Capability guard: skip if exchange doesn't support withdrawals
             action_exchange_meta = SUPPORTED_EXCHANGES.get(action_exchange_name, {})
+
+            action_exchange = get_user_exchange(user_id, rule.action_exchange_id)
+            if not action_exchange:
+                raise Exception("Action exchange connection not available")
+
+            # ── Convert the proceeds into another asset ───────────────────
+            if rule.action_type == 'convert_crypto':
+                balances = get_balance_fn(action_exchange)
+                available = float(balances.get(rule.action_asset, 0) or 0)
+                if rule.action_amount and float(rule.action_amount) > 0:
+                    amount = min(float(rule.action_amount), available)
+                else:
+                    amount = available
+
+                if amount <= 0:
+                    AutomationDbContext.create_log(
+                        rule_id=rule.id, user_id=rule.user_id, trigger_event=trigger_event,
+                        action_executed=f"Convert {rule.action_asset} → {rule.convert_to_asset}",
+                        action_result=f"No {rule.action_asset} available to convert",
+                        status='skipped',
+                    )
+                    print(f"[WORKER] Convert rule '{rule.rule_name}' skipped — no {rule.action_asset}")
+                    return
+
+                result = convert_fn(
+                    exchange=action_exchange,
+                    from_asset=rule.action_asset,
+                    to_asset=rule.convert_to_asset,
+                    amount=amount,
+                )
+                action_desc = f"Convert {amount:.10g} {rule.action_asset} → {rule.convert_to_asset}"
+                AutomationDbContext.create_log(
+                    rule_id=rule.id, user_id=rule.user_id, trigger_event=trigger_event,
+                    action_executed=action_desc, action_result=str(result), status='success',
+                )
+                self._on_rule_success(rule, AutomationDbContext)
+                self._notify_execution(rule.user_id, rule, trigger_event, action_desc, result)
+                print(f"[WORKER] Convert rule '{rule.rule_name}' executed for user {rule.user_id}")
+                return
+
+            # ── Withdraw the proceeds to a saved address ──────────────────
+            # Capability guard: skip if the exchange has no withdrawal API.
             if not action_exchange_meta.get('supports_withdraw', False):
                 AutomationDbContext.create_log(
-                    rule_id=rule.id,
-                    user_id=rule.user_id,
-                    trigger_event=trigger_event,
+                    rule_id=rule.id, user_id=rule.user_id, trigger_event=trigger_event,
                     action_executed="Withdraw (skipped — not supported)",
                     action_result=(
                         f"Withdraw Crypto is not supported for "
@@ -416,58 +453,40 @@ class AutomationWorker:
                 print(f"[WORKER] Withdraw not supported for {action_exchange_name}, rule '{rule.rule_name}' skipped")
                 return
 
-                min_withdrawal = get_minimum_withdrawal(action_exchange_name, rule.action_asset)
-                if min_withdrawal > 0 and float(withdraw_amount) < min_withdrawal:
-                    skip_msg = (f"Amount {withdraw_amount} {rule.action_asset} is below minimum "
-                                f"withdrawal of {min_withdrawal} (skipped)")
-                    print(f"[WORKER] {skip_msg}")
-                    AutomationDbContext.create_log(
-                        rule_id=rule.id,
-                        user_id=rule.user_id,
-                        trigger_event=trigger_event,
-                        action_executed=f"Withdraw {withdraw_amount} {rule.action_asset} to {rule.action_address_key}",
-                        action_result=skip_msg,
-                        status='skipped',
-                    )
-                    return
-
-                action_exchange = get_user_exchange(user_id, rule.action_exchange_id)
-                if not action_exchange:
-                    raise Exception("Action exchange connection not available")
-
-                result = withdraw_fn(
-                    exchange=action_exchange,
-                    asset=rule.action_asset,
-                    amount=float(withdraw_amount),
-                    address=rule.action_address_key,
-                )
-                
-                amount_note = " (filled amount)" if rule.use_filled_amount else ""
+            withdraw_amount = self._resolve_amount(rule, snapshot)
+            min_withdrawal = get_minimum_withdrawal(action_exchange_name, rule.action_asset)
+            if min_withdrawal > 0 and float(withdraw_amount) < min_withdrawal:
+                skip_msg = (f"Amount {withdraw_amount} {rule.action_asset} is below minimum "
+                            f"withdrawal of {min_withdrawal} (skipped)")
+                print(f"[WORKER] {skip_msg}")
                 AutomationDbContext.create_log(
-                    rule_id=rule.id,
-                    user_id=rule.user_id,
-                    trigger_event=trigger_event,
-                    action_executed=f"Withdraw {withdraw_amount} {rule.action_asset} to {rule.action_address_key}{amount_note}",
-                    action_result=str(result),
-                    status='success',
+                    rule_id=rule.id, user_id=rule.user_id, trigger_event=trigger_event,
+                    action_executed=f"Withdraw {withdraw_amount} {rule.action_asset} to {rule.action_address_key}",
+                    action_result=skip_msg, status='skipped',
                 )
-                self._on_rule_success(rule, AutomationDbContext)
-                self._notify_execution(
-                    rule.user_id, rule, trigger_event,
-                    f"Withdraw {withdraw_amount} {rule.action_asset} to {rule.action_address_key}{amount_note}",
-                    result,
-                )
+                return
 
+            result = withdraw_fn(
+                exchange=action_exchange,
+                asset=rule.action_asset,
+                amount=float(withdraw_amount),
+                address=rule.action_address_key,
+            )
+            amount_note = " (filled amount)" if rule.use_filled_amount else ""
+            action_desc = f"Withdraw {withdraw_amount} {rule.action_asset} to {rule.action_address_key}{amount_note}"
+            AutomationDbContext.create_log(
+                rule_id=rule.id, user_id=rule.user_id, trigger_event=trigger_event,
+                action_executed=action_desc, action_result=str(result), status='success',
+            )
+            self._on_rule_success(rule, AutomationDbContext)
+            self._notify_execution(rule.user_id, rule, trigger_event, action_desc, result)
             print(f"[WORKER] Rule '{rule.rule_name}' executed for user {rule.user_id}")
-            
+
         except Exception as e:
             AutomationDbContext.create_log(
-                rule_id=rule.id,
-                user_id=rule.user_id,
-                trigger_event=trigger_event,
-                action_executed=f"Withdraw {rule.action_asset} to {rule.action_address_key}",
-                action_result=str(e),
-                status='error',
+                rule_id=rule.id, user_id=rule.user_id, trigger_event=trigger_event,
+                action_executed=f"{rule.action_type} {rule.action_asset or ''}".strip(),
+                action_result=str(e), status='error',
             )
             print(f"[WORKER] Rule '{rule.rule_name}' failed: {e}")
 

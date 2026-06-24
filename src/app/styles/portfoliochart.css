@@ -22,9 +22,9 @@
 }
 
 .pf-leader {
-  stroke: var(--border-primary);
-  stroke-width: 1;
-  opacity: 0.7;
+  stroke: var(--text-muted);
+  stroke-width: 2;
+  opacity: 0.95;
 }
 
 .pf-label {
