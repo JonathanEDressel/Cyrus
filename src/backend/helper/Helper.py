@@ -70,4 +70,3 @@ def execute_scalar(sql: str, params: Optional[Tuple] = None) -> Any:
         return row[0] if row else None
     finally:
         conn.close()
-        conn.close()

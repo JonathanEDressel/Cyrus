@@ -85,12 +85,23 @@ function startBackend() {
     windowsHide: false
   });
 
+  // stdout 'data' events are not line-buffered — accumulate and only parse the
+  // port from a complete, newline-terminated line, otherwise a chunk boundary
+  // in the middle of the number (e.g. "CYRUS_PORT=512" then "34\n") would match
+  // "\d+" = 512 and lock in a wrong, dead port permanently.
+  let stdoutBuffer = '';
   backendProcess.stdout?.on('data', (data) => {
     const text = data.toString();
     console.log(`[BACKEND] ${text}`);
-    const match = text.match(/CYRUS_PORT=(\d+)/);
-    if (match) {
-      setBackendPort(parseInt(match[1], 10));
+    stdoutBuffer += text;
+    let nl: number;
+    while ((nl = stdoutBuffer.indexOf('\n')) !== -1) {
+      const line = stdoutBuffer.slice(0, nl);
+      stdoutBuffer = stdoutBuffer.slice(nl + 1);
+      const match = line.match(/CYRUS_PORT=(\d+)/);
+      if (match) {
+        setBackendPort(parseInt(match[1], 10));
+      }
     }
   });
 

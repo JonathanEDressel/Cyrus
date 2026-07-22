@@ -19,6 +19,7 @@
 
 class CommandsController {
   private unsubscribe: (() => void) | null = null;
+  private keydownHandler: ((e: KeyboardEvent) => void) | null = null;
   private selectedOrder: any = null;
   private maxAmount: number = 0;
   private ruleOrderIds: Set<string> = new Set();
@@ -51,6 +52,13 @@ class CommandsController {
     const observer = new MutationObserver(() => {
       if (!document.getElementById('create-rule-form')) {
         if (this.unsubscribe) this.unsubscribe();
+        // Remove the document-level keydown listener; otherwise a new one
+        // stacks on `document` (which survives navigation) every time this
+        // route is opened, leaking handlers bound to dead controllers.
+        if (this.keydownHandler) {
+          document.removeEventListener('keydown', this.keydownHandler);
+          this.keydownHandler = null;
+        }
         observer.disconnect();
       }
     });
@@ -424,14 +432,15 @@ class CommandsController {
       });
     });
 
-    document.addEventListener('keydown', (e) => {
+    this.keydownHandler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         const editOverlay = document.getElementById('edit-rule-overlay');
         if (editOverlay && !editOverlay.classList.contains('d-none')) { this.closeEditModal(); return; }
         const createOverlay = document.getElementById('create-rule-overlay');
         if (createOverlay && !createOverlay.classList.contains('d-none')) this.closeCreateModal();
       }
-    });
+    };
+    document.addEventListener('keydown', this.keydownHandler);
   }
 
   private populateOrderDropdown(): void {
@@ -1608,9 +1617,9 @@ class CommandsController {
       const toggleTitle = r.is_active ? 'Pause' : 'Resume';
       const triggerText = this.formatTrigger(r);
       const actionText = this.formatAction(r);
-      let triggered = r.trigger_count > 0
+      let triggered = r.trigger_count > 0 && r.last_triggered_at
         ? `${r.trigger_count}x (${new Date(r.last_triggered_at.endsWith('Z') ? r.last_triggered_at : r.last_triggered_at + 'Z').toLocaleString()})`
-        : 'Never';
+        : r.trigger_count > 0 ? `${r.trigger_count}x` : 'Never';
 
       if (r.trigger_type === 'price_threshold') {
         const done = Number(r.execution_count || 0);
@@ -1737,6 +1746,9 @@ class CommandsController {
       this.allLogs = logs;
       this.applyLogsFilter();
     } catch (error: any) {
+      if (tbody) {
+        tbody.innerHTML = `<tr class="empty-row"><td colspan="5">${this.escapeHtml(error?.message || 'Failed to load logs')}</td></tr>`;
+      }
     }
   }
 

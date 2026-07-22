@@ -40,7 +40,13 @@ class AuthController {
 
   static getUser(): UserModel | null {
     const raw = localStorage.getItem(AppConfig.USER_KEY);
-    return raw ? JSON.parse(raw) : null;
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw);
+    } catch {
+      // Corrupted/partial value — treat as logged-out rather than throwing.
+      return null;
+    }
   }
 
   static isAuthenticated(): boolean {

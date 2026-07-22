@@ -131,7 +131,9 @@ class AutomationDbContext:
             return True
         from datetime import datetime, timedelta
         last = datetime.fromisoformat(row['last_executed_at'])
-        cooldown = int(row.get('cooldown_minutes', 1440))
+        # `.get(..., 1440)` returns None (not the default) when the column is
+        # present but NULL, and int(None) would raise — coalesce explicitly.
+        cooldown = int(row.get('cooldown_minutes') or 1440)
         return datetime.utcnow() >= last + timedelta(minutes=cooldown)
 
     # ---- All active rules (for worker) ----

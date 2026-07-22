@@ -67,9 +67,10 @@ TIMEFRAME_MAP = {
 
 
 def _ytd_since() -> int:
-    """Millisecond timestamp of Jan 1 of the current year."""
+    """Millisecond timestamp of Jan 1 (UTC) of the current year."""
     import datetime
-    jan1 = datetime.datetime(datetime.datetime.utcnow().year, 1, 1)
+    year = datetime.datetime.now(datetime.timezone.utc).year
+    jan1 = datetime.datetime(year, 1, 1, tzinfo=datetime.timezone.utc)
     return int(jan1.timestamp() * 1000)
 
 

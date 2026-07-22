@@ -108,18 +108,28 @@ def run_migrations():
             print("[MIGRATION] Back-filled order_snapshots exchange IDs")
 
         # 5. Rebuild users table without legacy columns
+        # Keep notifications_enabled / donation_modal_enabled on the rebuilt
+        # table — setup_database() adds them before this migration runs, and
+        # run_column_migrations() never re-adds them, so omitting them here would
+        # silently drop the columns (and break every notifications/donation-modal
+        # write) after a legacy upgrade.
         conn.execute('''
             CREATE TABLE IF NOT EXISTS users_new (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 username TEXT UNIQUE NOT NULL,
                 password_hash TEXT NOT NULL,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                last_login DATETIME NULL
+                last_login DATETIME NULL,
+                notifications_enabled INTEGER NOT NULL DEFAULT 1,
+                donation_modal_enabled INTEGER NOT NULL DEFAULT 1
             )
         ''')
         conn.execute('''
-            INSERT OR IGNORE INTO users_new (id, username, password_hash, created_at, last_login)
-            SELECT id, username, password_hash, created_at, last_login FROM users
+            INSERT OR IGNORE INTO users_new
+                (id, username, password_hash, created_at, last_login,
+                 notifications_enabled, donation_modal_enabled)
+            SELECT id, username, password_hash, created_at, last_login,
+                   notifications_enabled, donation_modal_enabled FROM users
         ''')
         conn.execute('DROP TABLE users')
         conn.execute('ALTER TABLE users_new RENAME TO users')

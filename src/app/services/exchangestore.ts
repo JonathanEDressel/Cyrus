@@ -102,7 +102,13 @@ class ExchangeStore {
     ExchangeStore.start(mode);
   }
 
-  /** Full stop — clears everything including listeners. */
+  /** Full stop — stops polling and clears cached data (e.g. on logout).
+   *
+   * Subscriptions (listeners/connectionListeners) are intentionally NOT
+   * cleared: they're owned by their subscribers via the unsubscribe closure
+   * returned from onUpdate/onConnectionsChange. Some are registered once for
+   * the app's lifetime (e.g. the header exchange selector in app.ts), so
+   * wiping them here would silently break them after the first logout. */
   static stop(): void {
     ExchangeStore.stopPolling();
     ExchangeStore.activeMode = null;
@@ -114,8 +120,6 @@ class ExchangeStore {
     ExchangeStore.exchangeDataCache.clear();
     ExchangeStore.lastUpdated = null;
     ExchangeStore.error = null;
-    ExchangeStore.listeners = [];
-    ExchangeStore.connectionListeners = [];
   }
 
   private static stopPolling(): void {
@@ -173,21 +177,27 @@ class ExchangeStore {
   // ---------------------------------------------------------------------------
 
   static async refreshOrders(): Promise<void> {
-    if (ExchangeStore.activeMode === null) return;
+    // Capture the mode this refresh is for. If the user switches exchange/mode
+    // while a fetch is in flight, a late response must not overwrite or
+    // mislabel the current mode's data — bail whenever activeMode has moved on.
+    const mode = ExchangeStore.activeMode;
+    if (mode === null) return;
 
-    if (typeof ExchangeStore.activeMode === 'number') {
+    if (typeof mode === 'number') {
       // Single connection
       try {
-        const orders = await ExchangeController.getOpenOrders(ExchangeStore.activeMode);
-        const name = ExchangeStore.getExchangeName(ExchangeStore.activeMode);
+        const orders = await ExchangeController.getOpenOrders(mode);
+        if (ExchangeStore.activeMode !== mode) return;
+        const name = ExchangeStore.getExchangeName(mode);
         ExchangeStore.openOrders = orders.map((o: any) => ({
           ...o,
-          connectionId: ExchangeStore.activeMode,
+          connectionId: mode,
           exchangeName: name,
         }));
         ExchangeStore.lastUpdated = new Date();
         ExchangeStore.error = null;
       } catch (err: any) {
+        if (ExchangeStore.activeMode !== mode) return;
         ExchangeStore.error = err.message || 'Failed to fetch exchange data';
       }
     } else {
@@ -197,14 +207,17 @@ class ExchangeStore {
       for (const conn of ExchangeStore.connections) {
         try {
           const orders = await ExchangeController.getOpenOrders(conn.id);
+          if (ExchangeStore.activeMode !== mode) return;
           const name = ExchangeStore.getExchangeName(conn.id);
           const tagged = orders.map((o: any) => ({ ...o, connectionId: conn.id, exchangeName: name }));
           ExchangeStore.ordersByConn.set(conn.id, tagged);
           results.push(...tagged);
         } catch (err: any) {
+          if (ExchangeStore.activeMode !== mode) return;
           anyError = anyError || (err.message || `Failed to fetch orders for ${conn.exchange_name}`);
         }
       }
+      if (ExchangeStore.activeMode !== mode) return;
       ExchangeStore.openOrders = results;
       ExchangeStore.lastUpdated = new Date();
       ExchangeStore.error = anyError;
@@ -213,19 +226,22 @@ class ExchangeStore {
   }
 
   static async refreshAddresses(): Promise<void> {
-    if (ExchangeStore.activeMode === null) return;
+    const mode = ExchangeStore.activeMode;
+    if (mode === null) return;
 
-    if (typeof ExchangeStore.activeMode === 'number') {
+    if (typeof mode === 'number') {
       try {
-        const addresses = await ExchangeController.getWithdrawalAddresses(ExchangeStore.activeMode);
-        const name = ExchangeStore.getExchangeName(ExchangeStore.activeMode);
+        const addresses = await ExchangeController.getWithdrawalAddresses(mode);
+        if (ExchangeStore.activeMode !== mode) return;
+        const name = ExchangeStore.getExchangeName(mode);
         ExchangeStore.withdrawalAddresses = addresses.map((a: any) => ({
           ...a,
-          connectionId: ExchangeStore.activeMode,
+          connectionId: mode,
           exchangeName: name,
         }));
         ExchangeStore.error = null;
       } catch (err: any) {
+        if (ExchangeStore.activeMode !== mode) return;
         ExchangeStore.error = err.message || 'Failed to fetch withdrawal addresses';
       }
     } else {
@@ -234,14 +250,17 @@ class ExchangeStore {
       for (const conn of ExchangeStore.connections) {
         try {
           const addresses = await ExchangeController.getWithdrawalAddresses(conn.id);
+          if (ExchangeStore.activeMode !== mode) return;
           const name = ExchangeStore.getExchangeName(conn.id);
           const tagged = addresses.map((a: any) => ({ ...a, connectionId: conn.id, exchangeName: name }));
           ExchangeStore.addressesByConn.set(conn.id, tagged);
           results.push(...tagged);
         } catch (err: any) {
+          if (ExchangeStore.activeMode !== mode) return;
           anyError = anyError || (err.message || `Failed to fetch addresses for ${conn.exchange_name}`);
         }
       }
+      if (ExchangeStore.activeMode !== mode) return;
       ExchangeStore.withdrawalAddresses = results;
       ExchangeStore.error = anyError;
     }

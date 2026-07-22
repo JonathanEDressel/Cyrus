@@ -28,7 +28,10 @@ SUPPORTED_EXCHANGES: dict[str, dict] = {
     },
     'coinbase': {
         'name': 'Coinbase Advanced (Beta)',
-        'ccxt_id': 'coinbaseadvanced',
+        # CCXT serves the Coinbase Advanced Trade API through the 'coinbase'
+        # class; 'coinbaseadvanced' is not a registered ccxt id (getattr would
+        # return None and every Coinbase connection would fail to build).
+        'ccxt_id': 'coinbase',
         'requires_passphrase': False,
         'has_withdrawal_addresses': False,
         'supports_withdraw': False,
@@ -65,7 +68,10 @@ SUPPORTED_EXCHANGES: dict[str, dict] = {
 # Not all of these are available through CCXT, so we maintain them manually.
 WITHDRAWAL_MINIMUMS: dict[str, dict[str, float]] = {
     'kraken': {
-        'XBT': 0.00022,    'ETH': 0.00022,    'SOL': 0.011,
+        # CCXT normalizes Kraken's XXBT to the unified code 'BTC' (balances and
+        # rules use 'BTC'), so this key must be 'BTC' or the minimum-withdrawal
+        # guard never matches for Bitcoin.
+        'BTC': 0.00022,    'ETH': 0.00022,    'SOL': 0.011,
         'ADA': 5,           'DOT': 1,           'POL': 7,
         'AVAX': 0.50,       'ATOM': 1.00,       'LINK': 0.060,
         'XRP': 12,          'XLM': 25,          'LTC': 0.0100,

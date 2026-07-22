@@ -152,11 +152,21 @@ class AutomationWorker:
 
                     if closed_order and closed_order.get('status') == 'closed':
                         for rule in conn_rules:
-                            if self._rule_matches_order(rule, order_id, snapshot):
-                                self._execute_rule(rule, user_id, conn_id,
-                                                   order_id, snapshot, AutomationDbContext,
-                                                   get_user_exchange, get_minimum_withdrawal, withdraw,
-                                                   get_balance, convert)
+                            # Skip rules deactivated earlier in this same cycle:
+                            # _on_rule_success/_deactivate flip rule.is_active in
+                            # memory, and without this a rule with max_executions
+                            # set would fire again for the next matching order in
+                            # disappeared_ids (moving money beyond the limit).
+                            if not rule.is_active:
+                                continue
+                            if not self._rule_matches_order(rule, order_id, snapshot):
+                                continue
+                            if self._deactivate_if_limit_reached(rule, AutomationDbContext):
+                                continue
+                            self._execute_rule(rule, user_id, conn_id,
+                                               order_id, snapshot, AutomationDbContext,
+                                               get_user_exchange, get_minimum_withdrawal, withdraw,
+                                               get_balance, convert, closed_order)
 
                     AutomationDbContext.delete_order_snapshot(user_id, order_id)
 
@@ -387,7 +397,7 @@ class AutomationWorker:
     def _execute_rule(self, rule, user_id, trigger_conn_id,
                       order_id: str, snapshot: dict, AutomationDbContext,
                       get_user_exchange, get_minimum_withdrawal, withdraw_fn,
-                      get_balance_fn, convert_fn):
+                      get_balance_fn, convert_fn, closed_order: dict = None):
         trigger_event = f"Order {order_id} filled ({snapshot.get('pair', '')} {snapshot.get('side', '')})"
 
         # Mark as triggered BEFORE executing to prevent duplicate executions
@@ -453,7 +463,7 @@ class AutomationWorker:
                 print(f"[WORKER] Withdraw not supported for {action_exchange_name}, rule '{rule.rule_name}' skipped")
                 return
 
-            withdraw_amount = self._resolve_amount(rule, snapshot)
+            withdraw_amount = self._resolve_amount(rule, snapshot, closed_order)
             min_withdrawal = get_minimum_withdrawal(action_exchange_name, rule.action_asset)
             if min_withdrawal > 0 and float(withdraw_amount) < min_withdrawal:
                 skip_msg = (f"Amount {withdraw_amount} {rule.action_asset} is below minimum "
@@ -613,16 +623,23 @@ class AutomationWorker:
                 )
                 print(f"[WORKER] Price rule '{rule.rule_name}' failed: {e}")
     
-    def _resolve_amount(self, rule, snapshot: dict) -> str:
+    def _resolve_amount(self, rule, snapshot: dict, closed_order: dict = None) -> str:
         if not rule.use_filled_amount:
             return rule.action_amount
-        
-        filled = snapshot.get('filled', '0')
-        filled_float = float(filled)
-        
+
+        # Prefer the authoritative filled amount from the confirmed closed order.
+        # The snapshot's 'filled' is only what was seen the last time the order
+        # was still open — typically 0 for an order that fills between polls —
+        # so relying on it made use_filled_amount withdrawals fail or understate.
+        filled = closed_order.get('filled') if closed_order else None
+        if filled in (None, '', 0, 0.0, '0'):
+            filled = snapshot.get('filled', '0')
+
+        filled_float = float(filled or 0)
+
         if filled_float <= 0:
             raise Exception("Order filled amount is zero or unavailable")
-        
+
         return str(filled_float)
 
     def _resolve_price_rule_amount(self, rule, current_balance: float) -> float:
