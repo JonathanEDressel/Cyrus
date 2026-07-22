@@ -1,6 +1,6 @@
 {
   "name": "cyrus",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "author": "Jonathan Dressel <jonathanedressel@gmail.com>",
   "description": "Automated trades and transfers for crypto exchanges",
   "main": "dist/main.js",
