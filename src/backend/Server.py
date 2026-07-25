@@ -39,9 +39,13 @@ def _port_available(host: str, port: int) -> bool:
 
 if __name__ == '__main__':
     from werkzeug.serving import make_server
+    from helper.Logging import setup_logging, redirect_std_streams
+    from helper.ProcessWatchdog import watch_parent_process
+
+    log_path = setup_logging()
+    watch_parent_process()
 
     app = create_app()
-    start_worker(app)
 
     requested_port = int(os.getenv('API_PORT', 5000))
     # werkzeug's make_server calls sys.exit(1) (not a catchable OSError) when a
@@ -54,4 +58,14 @@ if __name__ == '__main__':
     # The Electron main process parses this line from stdout to learn which
     # port to point the frontend at. Keep the format stable.
     print(f'CYRUS_PORT={actual_port}', flush=True)
+
+    # Handshake done — get off the inherited stdout pipe before anything else
+    # writes to it. Electron stops draining that pipe when it exits, and a full
+    # pipe makes the next print() block forever, which is what silently froze
+    # the automation worker. No-op when running from a terminal in dev.
+    redirect_std_streams()
+    print(f'[SERVER] Listening on 127.0.0.1:{actual_port} — logging to {log_path}')
+
+    # Started after the redirect so the worker never touches the pipe at all.
+    start_worker(app)
     server.serve_forever()

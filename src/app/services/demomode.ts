@@ -484,6 +484,12 @@ class DemoMode {
       [AutomationController, 'getRules', async () => DemoData.rules()],
       [AutomationController, 'getLogs', async (limit?: number) => DemoData.logs().slice(0, limit ?? 100)],
       [AutomationController, 'getWithdrawalMinimums', async () => DemoData.withdrawalMinimums()],
+      [AutomationController, 'getWorkerStatus', async () => ({
+        state: 'healthy', healthy: true, running: true, poll_interval: 60,
+        started_at: Date.now() / 1000 - 3600,
+        last_cycle_completed_at: Date.now() / 1000 - 5,
+        age_seconds: 5, cycle_count: 60, last_error: null,
+      })],
 
       [UserController, 'getProfile', async () => DemoData.profile()],
 

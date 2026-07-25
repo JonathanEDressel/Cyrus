@@ -36,6 +36,12 @@ class CommandsController {
   private wizardStep: 1 | 2 | 3 = 1;
   private filteredRules: any[] = [];
 
+  // Automation engine heartbeat
+  private static readonly WORKER_STATUS_REFRESH = 15; // seconds between fetches
+  private workerStatusTimer: number | null = null;
+  private workerStatus: any = null;
+  private workerAgeSeconds: number | null = null;
+
   constructor() {
     this.init();
   }
@@ -47,6 +53,7 @@ class CommandsController {
     this.initCapabilities();
     this.loadRules();
     this.loadLogs();
+    this.initWorkerStatus();
     HelpTooltip.init();
 
     const observer = new MutationObserver(() => {
@@ -59,6 +66,7 @@ class CommandsController {
           document.removeEventListener('keydown', this.keydownHandler);
           this.keydownHandler = null;
         }
+        this.stopWorkerStatus();
         observer.disconnect();
       }
     });
@@ -137,6 +145,145 @@ class CommandsController {
         </td>${cells}</tr>`;
     }).join('');
   }
+
+  // ─── Automation engine heartbeat ───────────────────────────────────────────
+  // Rules are evaluated by a background worker thread in the backend. The API
+  // is served by separate threads, so if that worker dies or wedges the app
+  // stays fully responsive while nothing is ever triggered. This surfaces the
+  // worker's last completed cycle so "nothing happened" is never a mystery.
+
+  private initWorkerStatus(): void {
+    // The viewmodel IIFE re-runs on every navigation to this route, but the
+    // MutationObserver cleanup only fires when the view is replaced by a
+    // *different* page. Clear any prior instance's timer via a window-scoped
+    // handle so repeat visits can't stack 1s intervals.
+    const prior = (window as any).__cyrusWorkerStatusTimer;
+    if (prior) window.clearInterval(prior);
+
+    this.refreshWorkerStatus();
+
+    let tick = 0;
+    this.workerStatusTimer = window.setInterval(() => {
+      tick++;
+      // Age is ticked locally between fetches so the readout visibly counts
+      // up — a frozen "checked 0s ago" would undermine the whole point.
+      if (this.workerAgeSeconds !== null) this.workerAgeSeconds++;
+      if (tick % CommandsController.WORKER_STATUS_REFRESH === 0) {
+        this.refreshWorkerStatus();
+      } else {
+        this.renderWorkerStatus();
+      }
+    }, 1000);
+    (window as any).__cyrusWorkerStatusTimer = this.workerStatusTimer;
+  }
+
+  private stopWorkerStatus(): void {
+    if (this.workerStatusTimer !== null) {
+      window.clearInterval(this.workerStatusTimer);
+      if ((window as any).__cyrusWorkerStatusTimer === this.workerStatusTimer) {
+        delete (window as any).__cyrusWorkerStatusTimer;
+      }
+      this.workerStatusTimer = null;
+    }
+  }
+
+  private async refreshWorkerStatus(): Promise<void> {
+    try {
+      const status = await AutomationController.getWorkerStatus();
+      this.workerStatus = status;
+      this.workerAgeSeconds = typeof status?.age_seconds === 'number'
+        ? Math.round(status.age_seconds)
+        : null;
+    } catch {
+      this.workerStatus = null;
+      this.workerAgeSeconds = null;
+    }
+    this.renderWorkerStatus();
+  }
+
+  /** Re-derive the state from the locally-ticked age so a worker that dies
+   *  between fetches degrades on screen instead of sitting on a stale OK. */
+  private deriveWorkerState(status: any, age: number | null, interval: number): string {
+    if (status.state === 'not_started' || status.state === 'stopped') return status.state;
+    if (age === null) return status.state; // server already decided (starting / stalled)
+    if (age <= interval * 2.5) return 'healthy';
+    if (age <= interval * 5) return 'late';
+    return 'stalled';
+  }
+
+  private renderWorkerStatus(): void {
+    const el = document.getElementById('worker-status');
+    const textEl = document.getElementById('worker-status-text');
+    if (!el || !textEl) return;
+
+    const status = this.workerStatus;
+    const age = this.workerAgeSeconds;
+
+    let cls = 'worker-status-unknown';
+    let text = 'Engine status unavailable';
+    let title = 'Could not reach the backend to check the automation engine.';
+
+    if (status) {
+      const interval = Number(status.poll_interval) || 60;
+      const cycles = Number(status.cycle_count || 0);
+
+      switch (this.deriveWorkerState(status, age, interval)) {
+        case 'healthy':
+          if (status.last_error) {
+            // Looping, but the last pass failed. A persistent exchange error can
+            // run for weeks otherwise — plain green would hide exactly the kind
+            // of failure this indicator exists to expose.
+            cls = 'worker-status-late';
+            text = `Automations running · last check errored`;
+            title = `The engine is still cycling every ${interval}s, but its last pass hit an error. Some rules may not have been evaluated.`;
+          } else {
+            cls = 'worker-status-healthy';
+            text = `Automations running · checked ${this.formatAge(age)}`;
+            title = `The engine checks your rules every ${interval}s.\n${cycles} checks since it started.`;
+          }
+          break;
+        case 'starting':
+          cls = 'worker-status-unknown';
+          text = 'Automations starting…';
+          title = 'The engine started but has not finished its first check yet.';
+          break;
+        case 'late':
+          cls = 'worker-status-late';
+          text = `Automations delayed · last checked ${this.formatAge(age)}`;
+          title = `A check was expected every ${interval}s. The engine may be busy or rate-limited by an exchange.`;
+          break;
+        case 'stalled':
+          cls = 'worker-status-down';
+          text = `Automations STOPPED · last checked ${this.formatAge(age)}`;
+          title = 'The engine has stopped checking your rules. Nothing will trigger until you restart Cyrus.';
+          break;
+        default: // 'stopped' | 'not_started'
+          cls = 'worker-status-down';
+          text = 'Automations NOT running';
+          title = 'The automation engine is not running. Restart Cyrus to start it.';
+          break;
+      }
+
+      if (status.last_error) title += `\n\nLast error — ${status.last_error}`;
+    }
+
+    el.className = `worker-status ${cls}`;
+    el.setAttribute('title', title);
+    if (textEl.textContent !== text) textEl.textContent = text;
+  }
+
+  private formatAge(seconds: number | null): string {
+    if (seconds === null) return 'never';
+    if (seconds < 60) return `${seconds}s ago`;
+    const m = Math.floor(seconds / 60);
+    if (m < 60) return `${m}m ago`;
+    const h = Math.floor(m / 60);
+    if (h < 24) return `${h}h ${m % 60}m ago`;
+    const d = Math.floor(h / 24);
+    return `${d}d ${h % 24}h ago`;
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
 
   private initExchangeSelector(): void {
     const selector = document.getElementById('commands-exchange-selector') as HTMLSelectElement;
@@ -1763,7 +1910,12 @@ class CommandsController {
 
     tbody.innerHTML = logs.map((l: any) => {
       const time = l.created_at ? new Date(l.created_at.endsWith('Z') ? l.created_at : l.created_at + 'Z').toLocaleString() : '--';
-      const statusClass = l.status === 'success' ? 'status-success' : 'status-error';
+      // 'skipped' is an informational outcome (below threshold, below the
+      // exchange minimum, …) — showing it in error red would misrepresent a
+      // rule that is working exactly as configured.
+      const statusClass = l.status === 'success' ? 'status-success'
+        : l.status === 'skipped' ? 'status-skipped'
+        : 'status-error';
 
       return `<tr>
         <td>${this.escapeHtml(time)}</td>

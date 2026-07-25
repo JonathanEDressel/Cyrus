@@ -20,20 +20,176 @@ def create_worker_app() -> Flask:
     return app
 
 
+def _poll_interval_from_env() -> int:
+    """Seconds between rule checks. Override with CYRUS_POLL_INTERVAL.
+
+    Clamped to [10, 3600]: below ~10s exchange rate limits start to bite, and
+    anything over an hour makes the heartbeat's staleness thresholds meaningless.
+    """
+    try:
+        return max(10, min(3600, int(os.getenv('CYRUS_POLL_INTERVAL', '60'))))
+    except (TypeError, ValueError):
+        return 60
+
+
 class AutomationWorker:
-    POLL_INTERVAL = 60
-    
+    POLL_INTERVAL = _poll_interval_from_env()
+    SUPERVISOR_INTERVAL = 30   # how often to check that the poll thread lives
+    STALL_FACTOR = 10          # cycles-worth of silence before shouting about it
+
     def __init__(self, app: Flask):
         self.app = app
         self._stop_event = threading.Event()
         self._thread = None
         self._snapshotter = PortfolioSnapshotter()
-    
+        # Heartbeat state, read by GET /api/automation/worker-status.
+        # Flask serves requests on their own threads, so a dead or wedged worker
+        # is otherwise completely invisible: the app stays responsive, rules save
+        # fine, and nothing ever evaluates them. These let the UI prove liveness.
+        # Written only by the worker thread, read by request threads — plain
+        # attribute assignment is atomic enough under the GIL, no lock needed.
+        self._started_at = None
+        self._last_cycle_completed_at = None
+        self._cycle_count = 0
+        self._last_error = None
+        self._current_cycle_error = None
+        self._restart_count = 0
+        self._supervisor = None
+        # rule_id -> reason key of the last skip we logged, so a rule sitting
+        # under its threshold writes one log row instead of one per minute.
+        self._skip_state = {}
+
     def start(self):
         self._stop_event.clear()
+        self._started_at = time.time()
         self._thread = threading.Thread(target=self._run_loop, daemon=True, name="automation-worker")
         self._thread.start()
+        self._supervisor = threading.Thread(
+            target=self._supervise, daemon=True, name="automation-supervisor"
+        )
+        self._supervisor.start()
         print("[WORKER] Automation worker started")
+
+    def _supervise(self):
+        """Restart the poll thread if it ever dies; shout if it stalls.
+
+        _run_loop catches everything, so a dead thread 'can't happen' — which is
+        precisely how this worker managed to stop for three days unnoticed. A
+        wedged (as opposed to dead) thread can't be safely interrupted from
+        outside in Python, so stalls are reported rather than fixed; the
+        Automations page already surfaces them from the heartbeat.
+        """
+        while not self._stop_event.is_set():
+            for _ in range(self.SUPERVISOR_INTERVAL):
+                if self._stop_event.is_set():
+                    return
+                time.sleep(1)
+
+            thread = self._thread
+            if thread is not None and not thread.is_alive():
+                self._restart_count += 1
+                print(f"[WORKER] Poll thread died — restarting (restart #{self._restart_count})")
+                self._thread = threading.Thread(
+                    target=self._run_loop, daemon=True, name="automation-worker"
+                )
+                self._thread.start()
+                continue
+
+            last = self._last_cycle_completed_at
+            if last is not None:
+                stalled_for = time.time() - last
+                if stalled_for > self.POLL_INTERVAL * self.STALL_FACTOR:
+                    print(f"[WORKER] No completed cycle in {int(stalled_for)}s — poll thread appears stalled")
+
+    def _note_error(self, context: str, exc: Exception) -> None:
+        """Record the first error of the current cycle for the status endpoint.
+
+        The per-connection and per-rule handlers below deliberately swallow
+        exceptions so one bad exchange can't abort the whole cycle — which also
+        means a persistent failure can run for weeks with nothing but console
+        output. Keeping the first one per cycle gives the UI something to show.
+        """
+        if self._current_cycle_error is None:
+            self._current_cycle_error = f"{context}: {type(exc).__name__}: {exc}"
+
+    def _log_skip_once(self, rule, reason_key: str, AutomationDbContext,
+                       trigger_event: str, action_executed: str, action_result: str) -> None:
+        """Write a 'skipped' log row the first time a rule hits this condition.
+
+        Every non-execution path used to `continue` in silence, so a rule that
+        never fired was indistinguishable from a broken engine — you had to read
+        the database to find out the balance was simply under the threshold.
+
+        De-duplicated by reason: the row is written when the condition first
+        appears and not again until the reason changes or the rule executes.
+        Values in the message are those at the moment of the first skip.
+        """
+        if self._skip_state.get(rule.id) == reason_key:
+            return
+        self._skip_state[rule.id] = reason_key
+        try:
+            AutomationDbContext.create_log(
+                rule_id=rule.id,
+                user_id=rule.user_id,
+                trigger_event=trigger_event,
+                action_executed=action_executed,
+                action_result=action_result,
+                status='skipped',
+            )
+        except Exception as e:
+            print(f"[WORKER] Could not write skip log for rule {rule.id}: {e}")
+
+    def _clear_skip_state(self, rule_id: int) -> None:
+        """Forget a rule's last skip so the next one is logged again."""
+        self._skip_state.pop(rule_id, None)
+
+    @staticmethod
+    def _format_cooldown(minutes) -> str:
+        try:
+            minutes = int(minutes or 0)
+        except (TypeError, ValueError):
+            minutes = 0
+        if minutes < 60:
+            return f"{minutes}m"
+        hours, mins = divmod(minutes, 60)
+        return f"{hours}h {mins}m" if mins else f"{hours}h"
+
+    def status(self) -> dict:
+        """Liveness snapshot for the Automations page indicator."""
+        alive = bool(self._thread and self._thread.is_alive())
+        last = self._last_cycle_completed_at
+        interval = self.POLL_INTERVAL
+
+        # Before the first cycle finishes, measure from start so a worker that
+        # hangs on its very first pass still reports as stalled rather than
+        # sitting on "starting" forever.
+        reference = last if last is not None else self._started_at
+        since = (time.time() - reference) if reference is not None else None
+
+        if reference is None:
+            state = 'not_started'
+        elif not alive:
+            state = 'stopped'
+        elif since <= interval * 2.5:
+            state = 'starting' if last is None else 'healthy'
+        elif since <= interval * 5:
+            state = 'late'
+        else:
+            state = 'stalled'
+
+        return {
+            'state': state,
+            'healthy': state == 'healthy',
+            'running': alive,
+            'poll_interval': interval,
+            'started_at': self._started_at,
+            'last_cycle_completed_at': last,
+            # Server-computed so a client/server clock skew can't fake liveness.
+            'age_seconds': round(time.time() - last, 1) if last is not None else None,
+            'cycle_count': self._cycle_count,
+            'restart_count': self._restart_count,
+            'last_error': self._last_error,
+        }
     
     def stop(self):
         self._stop_event.set()
@@ -43,6 +199,7 @@ class AutomationWorker:
     
     def _run_loop(self):
         while not self._stop_event.is_set():
+            self._current_cycle_error = None
             try:
                 with self.app.app_context():
                     # Daily portfolio snapshots (feeds the monthly report's
@@ -50,9 +207,17 @@ class AutomationWorker:
                     self._snapshotter.run(self._stop_event)
                     self._poll_cycle()
             except Exception as e:
+                self._note_error('cycle', e)
                 print(f"[WORKER ERROR] {e}")
                 traceback.print_exc()
-            
+
+            # Stamp the heartbeat even when the cycle raised — this measures
+            # "the loop is still turning", which is exactly what the indicator
+            # is for. Failures surface separately through last_error.
+            self._last_cycle_completed_at = time.time()
+            self._cycle_count += 1
+            self._last_error = self._current_cycle_error
+
             for _ in range(self.POLL_INTERVAL):
                 if self._stop_event.is_set():
                     return
@@ -92,6 +257,7 @@ class AutomationWorker:
                                    get_open_orders, get_closed_orders, get_balance, withdraw, convert,
                                    get_market_price)
             except Exception as e:
+                self._note_error(f'user {user_id}', e)
                 print(f"[WORKER] Error processing user {user_id}: {e}")
                 traceback.print_exc()
             
@@ -184,10 +350,13 @@ class AutomationWorker:
                     )
 
             except (DDoSProtection, RateLimitExceeded) as e:
+                self._note_error(f'orders/conn {conn_id}', e)
                 print(f"[WORKER] Rate limited on connection {conn_id} for user {user_id}, will retry next cycle")
             except ExchangeNotAvailable as e:
+                self._note_error(f'orders/conn {conn_id}', e)
                 print(f"[WORKER] Exchange unavailable for connection {conn_id} user {user_id}, will retry next cycle")
             except Exception as e:
+                self._note_error(f'orders/conn {conn_id}', e)
                 print(f"[WORKER] Error processing connection {conn_id} for user {user_id}: {e}")
                 traceback.print_exc()
 
@@ -217,6 +386,13 @@ class AutomationWorker:
                 continue
 
             if not AutomationDbContext.is_cooldown_elapsed(rule.id):
+                self._log_skip_once(
+                    rule, 'cooldown', AutomationDbContext,
+                    trigger_event="Cooldown active",
+                    action_executed="Skipped",
+                    action_result=f"Waiting out the {self._format_cooldown(rule.cooldown_minutes)} "
+                                  f"cooldown since the last run before checking again.",
+                )
                 continue
 
             conn_id = rule.trigger_exchange_id
@@ -232,20 +408,30 @@ class AutomationWorker:
                         continue
                     conn_balances[conn_id] = get_balance(exchange)
                 except (DDoSProtection, RateLimitExceeded) as e:
+                    self._note_error(f'balance/conn {conn_id}', e)
                     print(f"[WORKER] Rate limited fetching balance for user {user_id} conn {conn_id}, will retry next cycle")
                     conn_balances[conn_id] = None
                     continue
                 except ExchangeNotAvailable as e:
+                    self._note_error(f'balance/conn {conn_id}', e)
                     print(f"[WORKER] Exchange unavailable for balance user {user_id} conn {conn_id}, will retry next cycle")
                     conn_balances[conn_id] = None
                     continue
                 except Exception as e:
+                    self._note_error(f'balance/conn {conn_id}', e)
                     print(f"[WORKER] Balance API error for user {user_id} conn {conn_id}: {e}")
                     conn_balances[conn_id] = None
                     continue
 
             balances = conn_balances.get(conn_id)
             if not balances:
+                self._log_skip_once(
+                    rule, 'balance_unavailable', AutomationDbContext,
+                    trigger_event="Balance check could not run",
+                    action_executed="Skipped",
+                    action_result="Could not read balances from the exchange this cycle. "
+                                  "Will retry automatically.",
+                )
                 continue
 
             asset = rule.trigger_asset
@@ -253,6 +439,13 @@ class AutomationWorker:
             current_balance = float(balances.get(asset, 0))
 
             if current_balance < threshold:
+                self._log_skip_once(
+                    rule, 'below_threshold', AutomationDbContext,
+                    trigger_event=f"Balance {asset} = {current_balance:.10g} (threshold {threshold:.10g})",
+                    action_executed="Skipped",
+                    action_result=f"Balance is below the threshold, so this rule did not run. "
+                                  f"Needs at least {threshold:.10g} {asset}.",
+                )
                 continue
 
             trigger_event = f"Balance {asset} = {current_balance} >= threshold {threshold}"
@@ -265,6 +458,9 @@ class AutomationWorker:
                     convert_amount = min(float(rule.action_amount), current_balance)
 
                 # Mark as triggered BEFORE executing to prevent duplicate executions
+                # The rule is acting, so any previously-logged skip no longer
+                # applies — forget it so the next one is recorded afresh.
+                self._clear_skip_state(rule.id)
                 AutomationDbContext.mark_rule_triggered(rule.id)
 
                 try:
@@ -335,12 +531,27 @@ class AutomationWorker:
             withdraw_amount = current_balance
 
             if min_withdrawal > 0 and withdraw_amount < min_withdrawal:
+                # Reachable whenever the threshold is set below the exchange's
+                # withdrawal minimum — the trigger fires but nothing can be sent,
+                # which looked identical to "rule never triggered" before this.
+                self._log_skip_once(
+                    rule, 'below_min_withdrawal', AutomationDbContext,
+                    trigger_event=f"Balance {asset} = {withdraw_amount:.10g} >= threshold {threshold:.10g}",
+                    action_executed=f"Withdraw {asset} (skipped)",
+                    action_result=f"Balance {withdraw_amount:.10g} {asset} is below the "
+                                  f"{action_exchange_name} minimum withdrawal of "
+                                  f"{min_withdrawal:.10g} {asset} (includes a 10% buffer). "
+                                  f"Raise the rule's threshold above that minimum.",
+                )
                 print(f"[WORKER] Balance {withdraw_amount} {asset} below minimum withdrawal {min_withdrawal}")
                 continue
 
             trigger_event = f"Balance {asset} = {current_balance} >= threshold {threshold}"
 
             # Mark as triggered BEFORE executing to prevent duplicate executions
+            # The rule is acting, so any previously-logged skip no longer
+            # applies — forget it so the next one is recorded afresh.
+            self._clear_skip_state(rule.id)
             AutomationDbContext.mark_rule_triggered(rule.id)
 
             try:
@@ -401,6 +612,9 @@ class AutomationWorker:
         trigger_event = f"Order {order_id} filled ({snapshot.get('pair', '')} {snapshot.get('side', '')})"
 
         # Mark as triggered BEFORE executing to prevent duplicate executions
+        # The rule is acting, so any previously-logged skip no longer
+        # applies — forget it so the next one is recorded afresh.
+        self._clear_skip_state(rule.id)
         AutomationDbContext.mark_rule_triggered(rule.id)
 
         try:
@@ -513,6 +727,13 @@ class AutomationWorker:
                 continue
 
             if not AutomationDbContext.is_cooldown_elapsed(rule.id):
+                self._log_skip_once(
+                    rule, 'cooldown', AutomationDbContext,
+                    trigger_event="Cooldown active",
+                    action_executed="Skipped",
+                    action_result=f"Waiting out the {self._format_cooldown(rule.cooldown_minutes)} "
+                                  f"cooldown since the last run before checking again.",
+                )
                 continue
 
             if not rule.trigger_asset or not rule.trigger_threshold or not rule.trigger_price_quote_asset:
@@ -542,22 +763,39 @@ class AutomationWorker:
                         base_asset=rule.trigger_asset,
                         quote_asset=rule.trigger_price_quote_asset,
                     )
-                except (DDoSProtection, RateLimitExceeded):
+                except (DDoSProtection, RateLimitExceeded) as e:
+                    self._note_error(f'ticker {pair_key}', e)
                     print(f"[WORKER] Rate limited fetching ticker {pair_key} for user {user_id}")
                     market_prices[cache_key] = None
-                except ExchangeNotAvailable:
+                except ExchangeNotAvailable as e:
+                    self._note_error(f'ticker {pair_key}', e)
                     print(f"[WORKER] Exchange unavailable fetching ticker {pair_key} for user {user_id}")
                     market_prices[cache_key] = None
                 except Exception as e:
+                    self._note_error(f'ticker {pair_key}', e)
                     print(f"[WORKER] Failed to fetch ticker {pair_key} for user {user_id}: {e}")
                     market_prices[cache_key] = None
 
             current_price = market_prices.get(cache_key)
             if current_price is None:
+                self._log_skip_once(
+                    rule, 'price_unavailable', AutomationDbContext,
+                    trigger_event=f"Price check for {pair_key} could not run",
+                    action_executed="Skipped",
+                    action_result=f"Could not read a price for {pair_key} from the exchange. "
+                                  f"Check that this pair is tradable there.",
+                )
                 continue
 
             threshold = float(rule.trigger_threshold)
             if current_price < threshold:
+                self._log_skip_once(
+                    rule, 'price_below_target', AutomationDbContext,
+                    trigger_event=f"Price {pair_key} = {current_price:.10g} (target {threshold:.10g})",
+                    action_executed="Skipped",
+                    action_result=f"Price is below the target, so this rule did not run. "
+                                  f"Needs {pair_key} at {threshold:.10g} or higher.",
+                )
                 continue
 
             trigger_event = (
@@ -565,6 +803,9 @@ class AutomationWorker:
                 f"{current_price:.10g} >= target {threshold:.10g}"
             )
 
+            # The rule is acting, so any previously-logged skip no longer
+            # applies — forget it so the next one is recorded afresh.
+            self._clear_skip_state(rule.id)
             AutomationDbContext.mark_rule_triggered(rule.id)
 
             try:
@@ -803,6 +1044,24 @@ class AutomationWorker:
 
 
 _worker_instance = None
+
+
+def get_worker_status() -> dict:
+    """Worker liveness for the API. Safe to call before the worker exists."""
+    if _worker_instance is None:
+        return {
+            'state': 'not_started',
+            'healthy': False,
+            'running': False,
+            'poll_interval': AutomationWorker.POLL_INTERVAL,
+            'started_at': None,
+            'last_cycle_completed_at': None,
+            'age_seconds': None,
+            'cycle_count': 0,
+            'restart_count': 0,
+            'last_error': None,
+        }
+    return _worker_instance.status()
 
 
 def start_worker(app: Flask):

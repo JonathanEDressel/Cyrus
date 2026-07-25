@@ -9,6 +9,15 @@
     <select id="commands-exchange-selector" class="commands-exchange-select">
       <option value="" disabled selected>Loading exchanges...</option>
     </select>
+
+    <!-- Automation engine heartbeat. Rules are evaluated by a background worker
+         thread; the API keeps answering even if that thread dies, so without
+         this a stopped engine is completely invisible and rules silently
+         never fire. Hover for cycle count and the last error. -->
+    <div class="worker-status worker-status-unknown" id="worker-status" title="Checking the automation engine...">
+      <span class="worker-status-dot"></span>
+      <span class="worker-status-text" id="worker-status-text">Checking engine...</span>
+    </div>
   </div>
 
   <div class="alert alert-warning d-none" id="commands-error">

@@ -39,6 +39,13 @@ class AutomationController {
     return response.data;
   }
 
+  static async getWorkerStatus(): Promise<any> {
+    const token = AuthController.getToken();
+    if (!token) throw new Error('Not authenticated');
+    const response = await AutomationData.getWorkerStatus(token);
+    return response.data;
+  }
+
   static async getWithdrawalMinimums(exchangeName?: string): Promise<Record<string, number>> {
     const token = AuthController.getToken();
     if (!token) throw new Error('Not authenticated');

@@ -431,6 +431,24 @@ def get_withdrawal_minimums():
         return handle_error(e)
 
 
+@automation_bp.route('/worker-status', methods=['GET'])
+@token_required
+@active_required
+def worker_status():
+    """Liveness of the background automation worker.
+
+    Served by a Flask request thread, so it still answers when the worker
+    thread itself is dead or blocked — which is the case this exists to catch.
+    Imported lazily to keep Routes.py -> controllers import order independent
+    of the worker module.
+    """
+    try:
+        from automation.worker import get_worker_status
+        return success_response(data=get_worker_status())
+    except Exception as e:
+        return handle_error(e)
+
+
 @automation_bp.route('/logs', methods=['GET'])
 @token_required
 @active_required

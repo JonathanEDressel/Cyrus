@@ -44,6 +44,13 @@ class AutomationData {
     );
   }
 
+  static async getWorkerStatus(token: string): Promise<ApiResponse<any>> {
+    return DataAccess.get<any>(
+      `${AppConfig.API_BASE}/automation/worker-status`,
+      token
+    );
+  }
+
   static async getWithdrawalMinimums(token: string, exchangeName: string = 'kraken'): Promise<ApiResponse<Record<string, number>>> {
     return DataAccess.get<Record<string, number>>(
       `${AppConfig.API_BASE}/automation/withdrawal-minimums?exchange=${encodeURIComponent(exchangeName)}`,

@@ -26,6 +26,10 @@ def create_exchange(exchange_name: str, api_key: str, private_key: str,
         'apiKey': api_key,
         'secret': private_key,
         'enableRateLimit': True,
+        # Explicit ceiling so a hung socket can't park the automation worker's
+        # poll thread indefinitely (ccxt's own default is 10s, but relying on a
+        # library default for something that can freeze rule execution is thin).
+        'timeout': 20000,
     }
     if passphrase:
         config['password'] = passphrase
