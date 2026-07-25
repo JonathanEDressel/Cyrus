@@ -182,6 +182,91 @@ a.help-icon {
   margin-bottom: 0.75rem;
 }
 
+/* ── Partners nudge ───────────────────────────────────────────────────────
+   Deliberately lighter than a .profile-card: this is a suggestion sitting
+   under the connection form, not another setting competing with it. */
+.partner-nudge {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 0.75rem;
+  padding: 1rem 1.25rem;
+  border: 1px dashed var(--border-primary);
+  border-radius: 12px;
+  background: transparent;
+}
+
+.partner-nudge-icon {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  flex-shrink: 0;
+  color: #fff;
+  font-size: 0.95rem;
+  background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
+}
+
+.partner-nudge-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.partner-nudge-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.partner-nudge-text {
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.partner-nudge-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.5rem 0.9rem;
+  border-radius: 8px;
+  border: 1px solid var(--accent-cyan);
+  color: var(--accent-cyan);
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: background-color 0.2s, color 0.2s;
+}
+
+.partner-nudge-cta:hover,
+.partner-nudge-cta:focus-visible {
+  background: var(--accent-cyan);
+  color: var(--bg-primary);
+  outline: none;
+}
+
+.partner-nudge-cta i {
+  font-size: 0.72rem;
+}
+
+@media (max-width: 600px) {
+  .partner-nudge {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .partner-nudge-cta {
+    align-self: stretch;
+    justify-content: center;
+  }
+}
+
 @media (max-width: 600px) {
   .profile-card {
     padding: 1rem;

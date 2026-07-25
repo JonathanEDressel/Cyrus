@@ -2,36 +2,29 @@
 
   <div class="overview-header">
     <h1 class="page-title"><i class="fa-solid fa-handshake me-2"></i>Trusted Partners</h1>
-    <p class="page-subtitle">Tools and services we personally recommend — partnered to support Cyrus.</p>
+    <p class="page-subtitle">Tools we actually use to keep exchange accounts and keys safe.</p>
   </div>
 
-  <div class="affiliate-carousel-wrapper">
-    <!-- Prev button -->
-    <button class="affiliate-nav affiliate-nav-prev" id="affiliate-prev" aria-label="Previous">
-      <i class="fa-solid fa-chevron-left"></i>
-    </button>
-
-    <!-- Card track -->
-    <div class="affiliate-track-outer">
-      <div class="affiliate-track" id="affiliate-track">
-        <!-- Cards injected by viewmodel -->
-      </div>
+  <!-- Disclosure sits at the top, not buried under the cards. If the links
+       are going to earn money, saying so first is both better manners and
+       better design than a footnote nobody reads. -->
+  <div class="partner-disclosure">
+    <i class="fa-solid fa-circle-info partner-disclosure-icon"></i>
+    <div>
+      <strong>These are affiliate links.</strong>
+      Cyrus may earn a commission if you sign up, at no extra cost to you. Nothing here is paid
+      placement — every partner is a service we'd recommend regardless.
     </div>
-
-    <!-- Next button -->
-    <button class="affiliate-nav affiliate-nav-next" id="affiliate-next" aria-label="Next">
-      <i class="fa-solid fa-chevron-right"></i>
-    </button>
   </div>
 
-  <!-- Dot indicators -->
-  <div class="affiliate-dots" id="affiliate-dots"></div>
+  <!-- Partner sections injected by the viewmodel, grouped by category -->
+  <div id="partner-sections"></div>
 
-  <!-- Disclaimer -->
-  <p class="affiliate-disclaimer">
-    <i class="fa-solid fa-circle-info"></i>
-    These are affiliate links. Cyrus may earn a commission if you sign up — at no extra cost to you.
-    We only recommend services we believe in.
-  </p>
+  <!-- Shown when no partners are configured -->
+  <div class="partner-empty d-none" id="partner-empty">
+    <div class="partner-empty-icon"><i class="fa-solid fa-handshake-angle"></i></div>
+    <h3 class="partner-empty-title">No partners yet</h3>
+    <p class="partner-empty-text">Recommendations will show up here as partnerships are added.</p>
+  </div>
 
 </div>

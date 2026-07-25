@@ -84,6 +84,15 @@ function applyTheme(theme: string): void {
     title: 'Profile',
   });
 
+  router.register('affiliates', {
+    view: 'app/views/overview/affiliates.html',
+    viewModel: '../dist/app/viewmodels/overview/affiliates.js',
+    style: 'app/styles/overview/affiliates.css',
+    showChrome: true,
+    showExchangeSelector: false,
+    title: 'Trusted Partners',
+  });
+
   router.register('privacy', {
     view: 'app/views/overview/privacy.html',
     viewModel: '../dist/app/viewmodels/overview/privacy.js',

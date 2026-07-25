@@ -4,28 +4,96 @@ interface AffiliateProduct {
   name: string;
   description: string;
   link: string;
+  /** Optional short pitch shown on the button, e.g. "Save 70%" */
+  badge?: string;
 }
 
 interface Affiliate {
   name: string;
   category: string;
   iconClass: string;
+  /** Maps to a .partner-icon-<key> rule in affiliates.css for brand tinting. */
   iconColorClass: string;
   tags: string[];
   why: string;
   products: AffiliateProduct[];
 }
 
+/**
+ * Partner list. Only real, signed-up affiliate links belong here — an
+ * unaffiliated homepage URL dressed up as a recommendation earns nothing and
+ * costs trust. Add new entries with the template at the bottom; the layout
+ * groups by `category` and reflows on its own.
+ */
 const AFFILIATES: Affiliate[] = [
+  {
+    name: 'Kraken',
+    category: 'Exchanges',
+    iconClass: 'fa-solid fa-building-columns',
+    iconColorClass: 'kraken',
+    tags: ['Spot Trading', 'Withdrawal API', 'Address Whitelist'],
+    why: `Kraken is the exchange Cyrus supports most completely. It's the only one of the three whose API
+          exposes <strong>whitelisted withdrawal addresses</strong>, which is what makes auto-withdraw rules
+          possible &mdash; on Coinbase and Binance you can convert, but you can't send funds out.
+          If you want the full automation set, this is where to run it.`,
+    products: [
+      {
+        name: 'Open a Kraken account',
+        description: 'Spot trading with the API access Cyrus needs for balance, price, convert, and withdraw automations.',
+        link: 'https://invite.kraken.com/JDNW/mjewpya5',
+      },
+    ],
+  },
+  {
+    name: 'Coinbase',
+    category: 'Exchanges',
+    iconClass: 'fa-solid fa-arrow-right-arrow-left',
+    iconColorClass: 'coinbase',
+    tags: ['Spot Trading', 'Convert Actions', 'Beginner Friendly'],
+    why: `The easiest place to start if you're new to this. Cyrus supports Coinbase Advanced for
+          <strong>price and balance triggers and convert actions</strong> &mdash; so take-profit and
+          swap-on-threshold rules work fine. Auto-withdraw rules don't, because Coinbase's API doesn't
+          expose a withdrawal address book; for those you'll want Kraken. Support is still in beta.`,
+    products: [
+      {
+        name: 'Coinbase Advanced',
+        description: 'The trading interface Cyrus actually connects to — this is the one to use for price, balance, and convert automations.',
+        link: 'https://advanced.coinbase.com/join/EC99C6S?src=referral-link',
+      },
+      {
+        name: 'Coinbase',
+        description: 'The standard app, if you just want somewhere simple to buy and hold before automating anything.',
+        link: 'https://coinbase.com/join/HB7T7JN?src=referral-link',
+      },
+    ],
+  },
+  {
+    name: 'Tangem',
+    category: 'Hardware Wallets',
+    iconClass: 'fa-solid fa-credit-card',
+    iconColorClass: 'tangem',
+    tags: ['Cold Storage', 'Self-Custody', 'Tap to Sign'],
+    why: `An auto-withdraw rule needs somewhere to send funds &mdash; and the whole point of sweeping an
+          exchange balance is that it ends up somewhere <strong>you</strong> hold the keys to. Tangem is a
+          hardware wallet in card form: tap it to your phone to sign, no cable and no battery, and it ships
+          as a set so you have a backup card rather than a phrase on a piece of paper.`,
+    products: [
+      {
+        name: 'Get a Tangem wallet',
+        description: 'A withdrawal destination you control, for balance-threshold and order-filled sweep rules.',
+        link: 'https://tangem.com/invite/366PAR',
+      },
+    ],
+  },
   {
     name: 'Nord Security',
     category: 'Privacy & Security',
     iconClass: 'fa-solid fa-shield-halved',
     iconColorClass: 'nord',
-    tags: ['VPN', 'Password Manager', 'Privacy', 'Encryption'],
+    tags: ['VPN', 'Password Manager', 'Encryption'],
     why: `When you're managing real money and connecting to exchanges, <strong>your security posture matters</strong>.
-          Nord Security's suite protects your internet traffic with a VPN, secures your credentials with a password manager,
-          and keeps your identity safe — all tools we consider essential for any active trader or crypto user.`,
+          Nord Security's suite protects your internet traffic with a VPN, secures your credentials with a password
+          manager, and keeps your identity safe — tools worth having for any active trader or crypto user.`,
     products: [
       {
         name: 'NordVPN',
@@ -39,132 +107,100 @@ const AFFILIATES: Affiliate[] = [
       },
     ],
   },
-  // ── Add more affiliates here ──────────────────────────────────
+
+  // ── Template — copy, fill in, and paste a real affiliate link ─────────────
+  // New categories create their own section automatically; entries sharing a
+  // category are grouped together in the order they appear here.
   // {
-  //   name: 'Example Partner',
-  //   category: 'Category',
-  //   iconClass: 'fa-solid fa-icon-name',
-  //   iconColorClass: 'example',
-  //   tags: ['Tag1', 'Tag2'],
-  //   why: 'Why this partner matters for Cyrus users...',
+  //   name: 'Partner Name',
+  //   category: 'Crypto Tax',
+  //   iconClass: 'fa-solid fa-file-invoice-dollar',
+  //   iconColorClass: 'example',      // add .partner-icon-example in affiliates.css
+  //   tags: ['Tag One', 'Tag Two'],
+  //   why: 'Why this matters for Cyrus users...',
   //   products: [
-  //     { name: 'Product', description: 'Short description.', link: 'https://...' },
+  //     { name: 'Product', description: 'Short description.', link: 'https://...', badge: 'Save 10%' },
   //   ],
   // },
 ];
 
 class AffiliatesController {
-  private current = 0;
-  private track: HTMLElement | null = null;
-  private dotsEl: HTMLElement | null = null;
+  private root: HTMLElement | null = null;
 
   constructor() {
-    this.track = document.getElementById('affiliate-track');
-    this.dotsEl = document.getElementById('affiliate-dots');
+    this.root = document.getElementById('partner-sections');
     this.render();
-    this.bindNav();
-    this.bindSwipe();
   }
 
   private render(): void {
-    if (!this.track || !this.dotsEl) return;
+    if (!this.root) return;
 
-    this.track.innerHTML = AFFILIATES.map(a => this.buildCard(a)).join('');
+    const empty = document.getElementById('partner-empty');
+    if (AFFILIATES.length === 0) {
+      this.root.innerHTML = '';
+      empty?.classList.remove('d-none');
+      return;
+    }
+    empty?.classList.add('d-none');
 
-    this.dotsEl.innerHTML = AFFILIATES.map((_, i) =>
-      `<button class="affiliate-dot${i === 0 ? ' active' : ''}" data-index="${i}" aria-label="Go to slide ${i + 1}"></button>`
-    ).join('');
+    // Group by category, preserving first-seen order so the list stays stable.
+    const groups = new Map<string, Affiliate[]>();
+    for (const a of AFFILIATES) {
+      if (!groups.has(a.category)) groups.set(a.category, []);
+      groups.get(a.category)!.push(a);
+    }
 
-    this.dotsEl.querySelectorAll('.affiliate-dot').forEach(dot => {
-      dot.addEventListener('click', () => {
-        const idx = parseInt((dot as HTMLElement).getAttribute('data-index') || '0', 10);
-        this.goTo(idx);
-      });
-    });
-
-    this.updateNav();
+    this.root.innerHTML = Array.from(groups.entries()).map(([category, items]) => `
+      <section class="partner-section">
+        <div class="partner-section-head">
+          <h2 class="partner-section-title">${this.esc(category)}</h2>
+          <span class="partner-section-count">${items.length} partner${items.length === 1 ? '' : 's'}</span>
+        </div>
+        <div class="partner-grid">${items.map(a => this.buildCard(a)).join('')}</div>
+      </section>`).join('');
   }
 
   private buildCard(a: Affiliate): string {
-    const tags = a.tags.map(t => `<span class="affiliate-tag">${this.esc(t)}</span>`).join('');
+    const tags = a.tags
+      .map(t => `<span class="partner-tag">${this.esc(t)}</span>`)
+      .join('');
+
     const products = a.products.map(p => `
-      <div class="affiliate-product">
-        <div class="affiliate-product-info">
-          <span class="affiliate-product-name">${this.esc(p.name)}</span>
-          <span class="affiliate-product-desc">${this.esc(p.description)}</span>
+      <li class="partner-product">
+        <div class="partner-product-text">
+          <span class="partner-product-name">${this.esc(p.name)}</span>
+          <span class="partner-product-desc">${this.esc(p.description)}</span>
         </div>
-        <a href="${this.esc(p.link)}" class="affiliate-product-link" target="_blank" rel="noopener noreferrer">
-          <i class="fa-solid fa-arrow-up-right-from-square"></i> Get Started
+        <a href="${this.esc(p.link)}" class="partner-product-cta" target="_blank" rel="noopener noreferrer">
+          ${p.badge ? `<span class="partner-product-badge">${this.esc(p.badge)}</span>` : ''}
+          <span>Get started</span>
+          <i class="fa-solid fa-arrow-up-right-from-square"></i>
         </a>
-      </div>`).join('');
+      </li>`).join('');
 
     return `
-      <div class="affiliate-card">
-        <div class="affiliate-card-header">
-          <div class="affiliate-icon-wrap ${this.esc(a.iconColorClass)}">
+      <article class="partner-card">
+        <header class="partner-card-head">
+          <div class="partner-icon partner-icon-${this.esc(a.iconColorClass)}">
             <i class="${this.esc(a.iconClass)}"></i>
           </div>
-          <div class="affiliate-card-meta">
-            <h2 class="affiliate-card-name">${this.esc(a.name)}</h2>
-            <span class="affiliate-card-category">${this.esc(a.category)}</span>
+          <div class="partner-card-meta">
+            <h3 class="partner-card-name">${this.esc(a.name)}</h3>
+            <span class="partner-card-category">${this.esc(a.category)}</span>
           </div>
-        </div>
-        <div class="affiliate-tags">${tags}</div>
-        <p class="affiliate-why">${a.why}</p>
-        <div class="affiliate-products">${products}</div>
-      </div>`;
-  }
+        </header>
 
-  private goTo(index: number): void {
-    this.current = Math.max(0, Math.min(index, AFFILIATES.length - 1));
-    if (this.track) {
-      this.track.style.transform = `translateX(-${this.current * 100}%)`;
-    }
-    this.dotsEl?.querySelectorAll('.affiliate-dot').forEach((dot, i) => {
-      dot.classList.toggle('active', i === this.current);
-    });
-    this.updateNav();
-  }
+        <div class="partner-tags">${tags}</div>
 
-  private updateNav(): void {
-    const prev = document.getElementById('affiliate-prev') as HTMLButtonElement | null;
-    const next = document.getElementById('affiliate-next') as HTMLButtonElement | null;
-    if (prev) prev.disabled = this.current === 0;
-    if (next) next.disabled = this.current === AFFILIATES.length - 1;
-  }
+        <p class="partner-why">${a.why}</p>
 
-  private bindNav(): void {
-    document.getElementById('affiliate-prev')?.addEventListener('click', () => this.goTo(this.current - 1));
-    document.getElementById('affiliate-next')?.addEventListener('click', () => this.goTo(this.current + 1));
-  }
-
-  private bindSwipe(): void {
-    const outer = document.querySelector('.affiliate-track-outer') as HTMLElement | null;
-    if (!outer) return;
-
-    let startX = 0;
-    let dragging = false;
-
-    outer.addEventListener('pointerdown', (e: PointerEvent) => {
-      startX = e.clientX;
-      dragging = true;
-    });
-
-    outer.addEventListener('pointerup', (e: PointerEvent) => {
-      if (!dragging) return;
-      dragging = false;
-      const delta = e.clientX - startX;
-      if (Math.abs(delta) > 50) {
-        this.goTo(delta < 0 ? this.current + 1 : this.current - 1);
-      }
-    });
-
-    outer.addEventListener('pointercancel', () => { dragging = false; });
+        <ul class="partner-products">${products}</ul>
+      </article>`;
   }
 
   private esc(str: string): string {
     const d = document.createElement('div');
-    d.textContent = str;
+    d.textContent = String(str ?? '');
     return d.innerHTML;
   }
 }
