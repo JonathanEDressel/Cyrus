@@ -22,3 +22,5 @@ __pycache__/
 *.db
 *.db-shm
 *.db-wal
+# Private business planning — must not be published (repo is public)
+MONETIZATION_PLAN.md
