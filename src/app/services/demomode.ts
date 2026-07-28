@@ -99,6 +99,7 @@ const DemoData = (() => {
         requires_passphrase: false,
         has_withdrawal_addresses: true,
         supports_withdraw: true,
+        supports_rebalance: true,
         has_sandbox: false,
         website: 'https://www.kraken.com',
         api_key_url: 'https://www.kraken.com/u/security/api',
@@ -110,6 +111,7 @@ const DemoData = (() => {
         requires_passphrase: false,
         has_withdrawal_addresses: false,
         supports_withdraw: false,
+        supports_rebalance: true,
         has_sandbox: false,
         website: 'https://www.coinbase.com',
         api_key_url: 'https://www.coinbase.com/settings/api',
@@ -139,6 +141,190 @@ const DemoData = (() => {
     });
     positions.sort((a, b) => b.usd_value - a.usd_value);
     return { positions, total_usd: total };
+  }
+
+  // ── Asset fundamentals (Holdings page) ────────────────────────────────────
+
+  /** [name, rank, marketCap, circulating, total, max, ath, athDate, atl, atlDate,
+   *   1h%, 24h%, 7d%, 30d%] — plausible figures, not live ones. */
+  const FUNDAMENTALS: Record<string, any[]> = {
+    BTC:   ['Bitcoin', 1, 1.34e12, 19.7e6, 19.7e6, 21e6, 73750, '2024-03-14', 67.81, '2013-07-06', 0.2, 1.8, 4.2, 9.6],
+    ETH:   ['Ethereum', 2, 4.2e11, 120.2e6, 120.2e6, null, 4878, '2021-11-10', 0.43, '2015-10-20', -0.1, 1.1, 2.8, 6.4],
+    SOL:   ['Solana', 5, 6.9e10, 460e6, 587e6, null, 260, '2021-11-06', 0.5, '2020-05-11', 0.6, 3.4, 8.1, 15.2],
+    ADA:   ['Cardano', 9, 1.6e10, 35.4e9, 45e9, 45e9, 3.09, '2021-09-02', 0.017, '2020-03-13', -0.3, -0.8, 1.4, -3.2],
+    DOT:   ['Polkadot', 14, 1.0e10, 1.43e9, 1.48e9, null, 54.98, '2021-11-04', 2.7, '2020-08-20', 0.1, -1.2, 0.6, -5.1],
+    LINK:  ['Chainlink', 12, 9.1e9, 626e6, 1e9, 1e9, 52.7, '2021-05-10', 0.148, '2017-11-29', 0.4, 2.2, 5.6, 11.3],
+    AVAX:  ['Avalanche', 11, 1.5e10, 395e6, 442e6, 720e6, 144.96, '2021-11-21', 2.8, '2020-12-31', 0.3, 2.9, 6.2, 8.8],
+    ATOM:  ['Cosmos Hub', 38, 3.7e9, 391e6, 391e6, null, 44.7, '2021-09-20', 1.16, '2020-03-13', -0.2, -1.6, -2.4, -7.9],
+    XRP:   ['XRP', 6, 3.0e10, 56.2e9, 99.99e9, 100e9, 3.4, '2018-01-07', 0.0028, '2014-05-22', 0.1, 0.9, 3.1, 4.7],
+    MATIC: ['Polygon', 18, 6.7e9, 9.3e9, 10e9, 10e9, 2.92, '2021-12-27', 0.0031, '2019-05-10', -0.4, -2.1, -4.8, -12.4],
+    DOGE:  ['Dogecoin', 8, 2.3e10, 145e9, 145e9, null, 0.7376, '2021-05-08', 0.0000869, '2015-05-06', 0.8, 4.6, 9.3, 18.1],
+    LTC:   ['Litecoin', 20, 6.3e9, 75e6, 75e6, 84e6, 410.26, '2021-05-10', 1.15, '2015-01-14', 0.2, 1.3, 2.2, 3.9],
+    UNI:   ['Uniswap', 22, 6.9e9, 600e6, 1e9, 1e9, 44.97, '2021-05-03', 1.03, '2020-09-17', -0.1, 0.4, 1.9, -2.6],
+    USDC:  ['USD Coin', 7, 3.4e10, 34e9, 34e9, null, 1.17, '2019-05-08', 0.877, '2023-03-11', 0.0, 0.01, -0.02, 0.0],
+    USDT:  ['Tether', 3, 1.1e11, 110e9, 110e9, null, 1.32, '2018-07-24', 0.573, '2015-03-02', 0.0, 0.02, 0.01, 0.0],
+  };
+
+  /** A deterministic 7-day squiggle that ends consistent with the 7d change. */
+  function sparkFor(symbol: string, price: number, change7d: number): number[] {
+    const seed = symbol.split('').reduce((a, ch) => a + ch.charCodeAt(0), 0);
+    const start = price / (1 + change7d / 100);
+    return Array.from({ length: 40 }, (_, i) => {
+      const t = i / 39;
+      const wobble = Math.sin(t * 6 + seed) * 0.012 + Math.sin(t * 17 + seed * 2) * 0.005;
+      return start + (price - start) * t + price * wobble;
+    });
+  }
+
+  function fundamentals(symbol: string): any | null {
+    const f = FUNDAMENTALS[symbol];
+    if (!f) return null;
+    const [name, rank, cap, circ, total, max, ath, athDate, atl, atlDate, c1h, c24h, c7d, c30d] = f;
+    const price = PRICE[symbol] ?? 0;
+    const volume = cap * 0.06;
+    return {
+      coin_id: name.toLowerCase().replace(/\s+/g, '-'),
+      name, symbol,
+      price,
+      market_cap: cap,
+      market_cap_rank: rank,
+      fully_diluted_valuation: max ? price * max : cap,
+      total_volume: volume,
+      volume_to_cap_pct: (volume / cap) * 100,
+      high_24h: price * 1.02,
+      low_24h: price * 0.97,
+      change_1h_pct: c1h, change_24h_pct: c24h,
+      change_7d_pct: c7d, change_30d_pct: c30d,
+      circulating_supply: circ, total_supply: total, max_supply: max,
+      supply_issued_pct: max || total ? Math.min(100, (circ / (max || total)) * 100) : null,
+      ath, ath_date: `${athDate}T00:00:00.000Z`,
+      ath_change_pct: ((price - ath) / ath) * 100,
+      atl, atl_date: `${atlDate}T00:00:00.000Z`,
+      atl_change_pct: ((price - atl) / atl) * 100,
+      sparkline_7d: sparkFor(symbol, price, c7d),
+    };
+  }
+
+  const FIAT = new Set(['USD', 'ZUSD', 'EUR']);
+
+  function holdings(connId: number | string = 'all'): any {
+    const ids = connId === 'all' || connId == null
+      ? [KRAKEN, COINBASE]
+      : [typeof connId === 'string' ? parseInt(connId, 10) : connId];
+
+    const merged: Record<string, any> = {};
+    for (const id of ids) {
+      const label = id === KRAKEN ? 'Kraken' : 'Coinbase';
+      for (const p of portfolio(id).positions) {
+        const entry = merged[p.asset] || (merged[p.asset] = {
+          asset: p.asset, amount: 0, usd_value: 0, venues: [],
+        });
+        entry.amount += p.amount;
+        entry.usd_value += p.usd_value;
+        entry.venues.push({ exchange_label: label, connection_id: id, amount: p.amount, usd_value: p.usd_value });
+      }
+    }
+
+    const total = Object.values(merged).reduce((s: number, e: any) => s + e.usd_value, 0);
+    const positions = Object.values(merged).map((e: any) => {
+      const info = fundamentals(e.asset);
+      const c24 = info?.change_24h_pct;
+      return {
+        ...e,
+        is_cash: FIAT.has(e.asset),
+        unit_price: e.amount ? e.usd_value / e.amount : 0,
+        weight_percent: total ? (e.usd_value / total) * 100 : 0,
+        value_change_24h_usd: c24 != null ? e.usd_value - e.usd_value / (1 + c24 / 100) : null,
+        info,
+      };
+    }).sort((a: any, b: any) => b.usd_value - a.usd_value);
+
+    return {
+      total_usd: total, positions,
+      market_data_live: true, market_data_stale_seconds: 0, errors: [],
+    };
+  }
+
+  function assetDetail(symbol: string): any {
+    const sym = String(symbol || '').toUpperCase();
+    const info = fundamentals(sym);
+    const price = PRICE[sym] ?? 0;
+    return {
+      symbol: sym,
+      is_cash: FIAT.has(sym),
+      info,
+      exchange: info ? {
+        available: true, pair: `${sym}/USD`,
+        high: info.ath * 0.98, high_date: String(info.ath_date).slice(0, 10),
+        low: price * 0.35, low_date: '2022-11-21',
+        high_52w: price * 1.28, low_52w: price * 0.61,
+        since: '2017-06-05',
+        min_order_amount: price > 1000 ? 0.0001 : 0.5,
+        min_order_cost: null, maker_fee: 0.0016, taker_fee: 0.0026,
+      } : { available: false },
+      market_data_live: true, market_data_stale_seconds: 0,
+    };
+  }
+
+  // ── Balancer (allocation caps over the same holdings) ─────────────────────
+
+  const CONVERT_TARGETS = ['USD', 'USDC', 'USDT', 'BTC', 'ETH'];
+
+  /** Caps per connection: asset -> [max %, down-to %, destination]. */
+  const CAPS: Record<number, Record<string, [number, number, string]>> = {
+    [KRAKEN]: { BTC: [30, 25, 'USDC'], SOL: [12, 9, 'USDC'] },
+    [COINBASE]: { LINK: [18, 14, 'USDT'] },
+  };
+
+  function allocations(connId: number): any {
+    const pf = portfolio(connId);
+    const caps = CAPS[connId] || {};
+    const minTrade = 25;
+
+    const positions = pf.positions.map((p) => {
+      const cap = caps[p.asset];
+      const weight = pf.total_usd > 0 ? (p.usd_value / pf.total_usd) * 100 : 0;
+      const row: any = {
+        asset: p.asset,
+        amount: p.amount,
+        usd_value: p.usd_value,
+        weight_percent: Number(weight.toFixed(4)),
+        held: true,
+        convert_targets: CONVERT_TARGETS.filter((t) => t !== p.asset),
+        rule_id: null,
+        enabled: false,
+        max_percent: null,
+        target_percent: null,
+        convert_to_asset: null,
+        excess_usd: 0,
+        would_convert_amount: 0,
+        over_cap: false,
+      };
+      if (!cap) return row;
+
+      const [max, target, to] = cap;
+      row.rule_id = 6000 + Object.keys(caps).indexOf(p.asset);
+      row.enabled = true;
+      row.max_percent = max;
+      row.target_percent = target;
+      row.convert_to_asset = to;
+      if (weight >= max) {
+        const excess = ((weight - target) / 100) * pf.total_usd;
+        row.over_cap = true;
+        row.excess_usd = Number(excess.toFixed(2));
+        if (excess >= minTrade && p.amount > 0) {
+          row.would_convert_amount = Math.min(excess / (p.usd_value / p.amount), p.amount);
+        }
+      }
+      return row;
+    });
+
+    return {
+      connection: { id: connId, exchange_name: connId === KRAKEN ? 'kraken' : 'coinbase', label: 'Default' },
+      total_usd: pf.total_usd,
+      settings: { cooldown_minutes: 1440, min_trade_usd: minTrade, dry_run: false },
+      positions,
+    };
   }
 
   // ── Open orders ────────────────────────────────────────────────────────────
@@ -241,6 +427,23 @@ const DemoData = (() => {
     };
   }
 
+  /** "When a coin grows past a share of the portfolio, trim it back." */
+  function allocationRule(id: number, ex: number, asset: string, max: number, target: number,
+                          to: string, active: boolean, trigCount: number, lastAgoMs: number): any {
+    return {
+      id, rule_name: `Balance ${asset} → ${to}`, is_active: active,
+      trigger_type: 'allocation_threshold',
+      trigger_asset: asset,
+      trigger_allocation_percent: String(max),
+      rebalance_target_percent: String(target),
+      min_trade_usd: '25', dry_run: false,
+      cooldown_minutes: 1440,
+      action_type: 'convert_crypto', action_asset: asset, convert_to_asset: to,
+      trigger_exchange_id: ex, action_exchange_id: ex,
+      trigger_count: trigCount, last_triggered_at: trigCount > 0 ? ago(lastAgoMs) : null,
+    };
+  }
+
   /** "When a specific order fills, withdraw it (addrKey) or convert it (to)." */
   function orderRule(id: number, name: string, ex: number, orderId: string, asset: string, opts: { addrKey?: string; to?: string }, active: boolean, trigCount: number, lastAgoMs: number): any {
     const r: any = {
@@ -281,6 +484,10 @@ const DemoData = (() => {
       orderRule(5018, 'Convert XRP fills → USDT', COINBASE, 'a9e2c5d1-4b6f-4d72-9a03-xrpbuy0017', 'XRP', { to: 'USDT' }, true, 2, 16 * HOUR),
       priceRule(5019, 'Take profit: LTC → USDT', COINBASE, 'LTC', '92', 'USDT', false, 'all', '', 0, null, 0),
       balanceRule(5020, 'Compound UNI → ETH', COINBASE, 'UNI', '350', 'ETH', true, 1, 26 * HOUR),
+      // ── Balancer caps (edited on the Balancer page, listed here like any rule) ──
+      allocationRule(6000, KRAKEN, 'BTC', 30, 25, 'USDC', true, 2, 3 * DAY),
+      allocationRule(6001, KRAKEN, 'SOL', 12, 9, 'USDC', true, 0, 0),
+      allocationRule(6002, COINBASE, 'LINK', 18, 14, 'USDT', true, 1, 4 * DAY),
     ];
   }
 
@@ -439,6 +646,9 @@ const DemoData = (() => {
     supportedExchanges,
     balance,
     portfolio,
+    holdings,
+    assetDetail,
+    allocations,
     openOrders,
     withdrawalAddresses,
     rules,
@@ -482,6 +692,9 @@ class DemoMode {
       [ExchangeController, 'getPortfolio', async (id: number) => DemoData.portfolio(id)],
 
       [AutomationController, 'getRules', async () => DemoData.rules()],
+      [AutomationController, 'getAllocations', async (id: number) => DemoData.allocations(id)],
+      // Demo mode is read-only: accept the save so the page behaves, change nothing.
+      [AutomationController, 'saveAllocations', async () => ({})],
       [AutomationController, 'getLogs', async (limit?: number) => DemoData.logs().slice(0, limit ?? 100)],
       [AutomationController, 'getWithdrawalMinimums', async () => DemoData.withdrawalMinimums()],
       [AutomationController, 'getWorkerStatus', async () => ({
@@ -501,6 +714,8 @@ class DemoMode {
       [MarketData, 'getPairs', async () => DemoData.wrap(DemoData.pairs())],
       [MarketData, 'getOHLCV', async (_t: string, sym: string, range: string) => DemoData.wrap(DemoData.ohlcv(sym, range))],
       [MarketData, 'getTicker', async (_t: string, sym: string) => DemoData.wrap(DemoData.ticker(sym))],
+      [MarketData, 'getHoldings', async (_t: string, connId: number | 'all') => DemoData.wrap(DemoData.holdings(connId))],
+      [MarketData, 'getAssetDetail', async (_t: string, sym: string) => DemoData.wrap(DemoData.assetDetail(sym))],
     ];
   }
 

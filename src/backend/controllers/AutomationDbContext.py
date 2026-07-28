@@ -17,7 +17,11 @@ class AutomationDbContext:
                     convert_to_asset: str = None,
                     trigger_price_quote_asset: str = None,
                     action_amount_mode: str = None,
-                    max_executions: int = None) -> int:
+                    max_executions: int = None,
+                    trigger_allocation_percent: str = None,
+                    rebalance_target_percent: str = None,
+                    min_trade_usd: str = None,
+                    dry_run: bool = False) -> int:
         return execute_insert(
             '''INSERT INTO automation_rules
                (user_id, rule_name, trigger_type, trigger_order_id,
@@ -25,14 +29,18 @@ class AutomationDbContext:
                 action_address_key, action_amount, use_filled_amount,
                 trigger_asset, trigger_threshold, cooldown_minutes,
                      trigger_exchange_id, action_exchange_id, convert_to_asset,
-                     trigger_price_quote_asset, action_amount_mode, max_executions)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+                     trigger_price_quote_asset, action_amount_mode, max_executions,
+                     trigger_allocation_percent, rebalance_target_percent,
+                     min_trade_usd, dry_run)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
             (user_id, rule_name, trigger_type, trigger_order_id,
              trigger_pair, trigger_side, action_type, action_asset,
              action_address_key, action_amount, use_filled_amount,
              trigger_asset, trigger_threshold, cooldown_minutes,
                  trigger_exchange_id, action_exchange_id, convert_to_asset,
-                 trigger_price_quote_asset, action_amount_mode, max_executions)
+                 trigger_price_quote_asset, action_amount_mode, max_executions,
+                 trigger_allocation_percent, rebalance_target_percent,
+                 min_trade_usd, 1 if dry_run else 0)
         )
 
     @staticmethod
@@ -89,7 +97,9 @@ class AutomationDbContext:
             'rule_name', 'trigger_threshold', 'cooldown_minutes',
             'action_address_key', 'action_amount', 'use_filled_amount',
             'convert_to_asset', 'trigger_price_quote_asset',
-            'action_amount_mode', 'max_executions'
+            'action_amount_mode', 'max_executions', 'is_active',
+            'trigger_allocation_percent', 'rebalance_target_percent',
+            'min_trade_usd', 'dry_run'
         }
         updates = {k: v for k, v in kwargs.items() if k in allowed_columns}
         if not updates:
@@ -101,6 +111,24 @@ class AutomationDbContext:
             tuple(values)
         )
         return True
+
+    # ---- Portfolio balancer (allocation_threshold rules) ----
+
+    @staticmethod
+    def get_allocation_rules(user_id: int, connection_id: int) -> list:
+        """Every allocation rule for one connection, active or paused.
+
+        The balancer page edits the whole set at once, so paused rules must come
+        back too — otherwise saving would silently delete them.
+        """
+        rows = execute_query_all(
+            '''SELECT * FROM automation_rules
+               WHERE user_id = ? AND trigger_type = 'allocation_threshold'
+                 AND trigger_exchange_id = ?
+               ORDER BY action_asset''',
+            (user_id, connection_id)
+        )
+        return [AutomationRule.from_row(r) for r in rows]
 
     @staticmethod
     def mark_rule_triggered(rule_id: int) -> None:

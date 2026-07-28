@@ -27,6 +27,7 @@
   --shadow-heavy: rgba(0, 0, 0, 0.5);
   --shadow-medium: rgba(0, 0, 0, 0.4);
   --shadow-light: rgba(0, 0, 0, 0.3);
+  --sidebar-width: 232px;
 }
 
 body.theme-light {
@@ -175,14 +176,17 @@ body.theme-light {
   scrollbar-color: var(--border-primary) var(--bg-primary);
 }
 
+/* ── Sidebar ──────────────────────────────────────────────────
+   Raised one surface above the page so the app reads as a panel plus a canvas
+   rather than one flat sheet. */
 .app-sidebar {
   position: fixed;
   top: 0;
   left: 0;
   bottom: 0;
-  width: 220px;
-  background: var(--bg-primary);
-  border-right: 1px solid var(--border-secondary);
+  width: var(--sidebar-width);
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border-primary);
   z-index: 100;
   overflow: hidden;
 }
@@ -192,19 +196,19 @@ body.theme-light {
   height: 100%;
   display: flex;
   flex-direction: column;
-  padding: 1.25rem 1rem;
+  padding: 1.15rem 0.85rem 1rem;
+  gap: 0.25rem;
 }
 
 .header-logo {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  padding-bottom: 0.5rem;
-  border-bottom: 1px solid var(--border-secondary);
+  gap: 0.6rem;
+  padding: 0 0.35rem 0.9rem;
 }
 
 .header-logo img {
-  height: 28px;
+  height: 30px;
   width: auto;
   border-radius: 35px;
   object-fit: contain;
@@ -221,20 +225,37 @@ body.theme-light {
 }
 
 .header-brand {
-  font-size: 1.25rem;
+  font-size: 1.2rem;
   font-weight: 700;
-  color: var(--accent-cyan);
-  letter-spacing: -0.5px;
+  color: var(--text-primary);
+  letter-spacing: -0.3px;
 }
 
 .header-nav {
   display: flex;
   flex-direction: column;
-  gap: 0.15rem;
+  gap: 1rem;
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
-  margin-top: 1rem;
+  margin-top: 0.9rem;
+  padding-right: 0.15rem;
+}
+
+/* Navigation is grouped so eight destinations read as three short lists. */
+.nav-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.nav-group-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.9px;
+  color: var(--text-muted);
+  padding: 0 0.75rem 0.4rem;
 }
 
 /* Global exchange selector, relocated into the sidebar */
@@ -242,7 +263,10 @@ body.theme-light {
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
-  margin-top: 1.25rem;
+  padding: 0.7rem 0.75rem 0.75rem;
+  border-radius: 10px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-secondary);
 }
 
 .sidebar-exchange .exchange-selector {
@@ -254,31 +278,97 @@ body.theme-light {
 .sidebar-logout {
   flex-shrink: 0;
   width: 100%;
-  margin-top: 1rem;
+  margin-top: 0.85rem;
+  padding: 0.55rem 0.75rem;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
+  border-radius: 10px;
+  font-weight: 600;
+}
+
+.sidebar-logout:hover {
+  border-color: rgba(239, 68, 68, 0.55);
+  color: #f87171;
 }
 
 .header-nav a {
-  color: var(--text-muted);
+  position: relative;
+  color: var(--text-tertiary);
   text-decoration: none;
-  font-size: 0.9rem;
+  font-size: 0.875rem;
   font-weight: 500;
-  padding: 0.6rem 0.75rem;
-  border-radius: 6px;
-  transition: color 0.2s, background 0.2s;
+  padding: 0.55rem 0.75rem;
+  border-radius: 10px;
+  transition: color 0.15s ease, background 0.15s ease;
   display: flex;
   align-items: center;
-  gap: 0.6rem;
+  gap: 0.7rem;
   white-space: nowrap;
 }
 
-.header-nav a:hover,
-.header-nav a.active {
+/* Fixed-width icon slot so every label starts on the same vertical line. */
+.header-nav a i {
+  width: 1.1rem;
+  text-align: center;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  transition: color 0.15s ease;
+  flex-shrink: 0;
+}
+
+.header-nav a:hover {
   color: var(--text-primary);
   background: var(--hover-overlay);
+}
+
+.header-nav a:hover i {
+  color: var(--text-secondary);
+}
+
+.header-nav a:focus-visible {
+  outline: 2px solid var(--accent-cyan-light);
+  outline-offset: -2px;
+}
+
+/* Active page: tinted pill plus a marker in the left gutter, so the current
+   location is obvious at a glance and not just "slightly brighter". */
+.header-nav a.active {
+  color: var(--text-primary);
+  font-weight: 600;
+  background: linear-gradient(90deg,
+              rgba(99, 102, 241, 0.22), rgba(99, 102, 241, 0.05));
+}
+
+.header-nav a.active::before {
+  content: '';
+  position: absolute;
+  left: -0.85rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 1.15rem;
+  border-radius: 0 3px 3px 0;
+  background: var(--accent-purple-light);
+}
+
+.header-nav a.active i {
+  color: var(--accent-purple-light);
+}
+
+/* Slim scrollbar for the nav list itself. */
+.header-nav::-webkit-scrollbar {
+  width: 6px;
+}
+
+.header-nav::-webkit-scrollbar-thumb {
+  background: var(--border-primary);
+  border-radius: 999px;
+}
+
+.header-nav::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 /* Rule Summary */
@@ -394,7 +484,7 @@ body.theme-light {
 }
 
 .app-sidebar:not(.d-none) ~ #app-content {
-  margin-left: 220px;
+  margin-left: var(--sidebar-width);
   padding-top: 0;
 }
 
@@ -498,7 +588,7 @@ body.theme-light {
 .inactive-warning {
   position: fixed;
   top: 0;
-  left: 220px;
+  left: var(--sidebar-width);
   right: 0;
   z-index: 100;
   background: linear-gradient(135deg, #991b1b 0%, #7f1d1d 100%);
@@ -557,7 +647,7 @@ body.theme-light {
 .api-key-warning {
   position: fixed;
   top: 0;
-  left: 220px;
+  left: var(--sidebar-width);
   right: 0;
   z-index: 99;
   background: linear-gradient(135deg, #92400e 0%, #78350f 100%);
@@ -645,7 +735,7 @@ body.theme-light {
   padding: 1rem 0;
   position: fixed;
   bottom: 0;
-  left: 220px;
+  left: var(--sidebar-width);
   right: 0;
 }
 
@@ -713,7 +803,11 @@ body.theme-light {
   box-shadow: 0 6px 16px rgba(6, 182, 212, 0.5), 0 4px 8px rgba(0, 0, 0, 0.4);
 }
 
-.donation-toggle i {
+/* Only beats on hover. A permanently-running transform animation on a fixed
+   overlay keeps a composited layer alive for the life of the app, and that is a
+   known way to end up with stale paint elsewhere on the page. */
+.donation-toggle:hover i,
+.donation-toggle:focus-visible i {
   animation: heartbeat 1.5s ease-in-out infinite;
 }
 

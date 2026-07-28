@@ -219,6 +219,30 @@ def run_column_migrations():
             conn.execute('ALTER TABLE users ADD COLUMN smtp_port INTEGER')
             conn.commit()
             print("[MIGRATION] Added smtp_port column to users")
+
+        # Portfolio balancer (trigger_type = 'allocation_threshold'). The cap and
+        # the rebalance-down-to target are stored as separate percentages: acting
+        # exactly down to the cap would re-fire on the next tick, so a rule needs
+        # both a ceiling and somewhere lower to land.
+        if not _has_column(conn, 'automation_rules', 'trigger_allocation_percent'):
+            conn.execute('ALTER TABLE automation_rules ADD COLUMN trigger_allocation_percent TEXT')
+            conn.commit()
+            print("[MIGRATION] Added trigger_allocation_percent column to automation_rules")
+
+        if not _has_column(conn, 'automation_rules', 'rebalance_target_percent'):
+            conn.execute('ALTER TABLE automation_rules ADD COLUMN rebalance_target_percent TEXT')
+            conn.commit()
+            print("[MIGRATION] Added rebalance_target_percent column to automation_rules")
+
+        if not _has_column(conn, 'automation_rules', 'min_trade_usd'):
+            conn.execute('ALTER TABLE automation_rules ADD COLUMN min_trade_usd TEXT')
+            conn.commit()
+            print("[MIGRATION] Added min_trade_usd column to automation_rules")
+
+        if not _has_column(conn, 'automation_rules', 'dry_run'):
+            conn.execute('ALTER TABLE automation_rules ADD COLUMN dry_run INTEGER DEFAULT 0')
+            conn.commit()
+            print("[MIGRATION] Added dry_run column to automation_rules")
     except Exception as e:
         conn.rollback()
         print(f"[MIGRATION ERROR] Column migration failed: {e}")

@@ -75,6 +75,39 @@ function applyTheme(theme: string): void {
     title: 'Automations',
   });
 
+  router.register('holdings', {
+    view: 'app/views/overview/holdings.html',
+    viewModel: '../dist/app/viewmodels/overview/holdings.js',
+    style: [
+      'app/styles/overview/home.css',
+      'app/styles/overview/commands.css',
+      'app/styles/overview/holdings.css',
+    ],
+    showChrome: true,
+    // Has its own picker with an "All exchanges" option that aggregates.
+    showExchangeSelector: false,
+    title: 'Holdings',
+  });
+
+  router.register('rebalancer', {
+    view: 'app/views/overview/rebalancer.html',
+    viewModel: '../dist/app/viewmodels/overview/rebalancer.js',
+    // The page shell + table come from home.css and the form controls, buttons
+    // and alerts from commands.css; rebalancer.css is loaded last so its own
+    // rules win. Without these the page renders unstyled unless the user
+    // happened to visit Overview or Automations first.
+    style: [
+      'app/styles/overview/home.css',
+      'app/styles/overview/commands.css',
+      'app/styles/overview/rebalancer.css',
+    ],
+    showChrome: true,
+    // The page edits one account's allocations at a time, so the sidebar's
+    // "All Exchanges" mode has no meaning here — it has its own picker.
+    showExchangeSelector: false,
+    title: 'Balancer',
+  });
+
   router.register('profile', {
     view: 'app/views/overview/profile.html',
     viewModel: '../dist/app/viewmodels/overview/profile.js',

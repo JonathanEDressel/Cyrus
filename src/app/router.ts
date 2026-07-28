@@ -1,7 +1,8 @@
 interface RouteConfig {
   view: string;
   viewModel: string;
-  style?: string;
+  /** One stylesheet, or several loaded in order (later files win). */
+  style?: string | string[];
   showChrome: boolean;
   showExchangeSelector?: boolean;
   title: string;
@@ -54,7 +55,10 @@ class Router {
     }
 
     if (route.style) {
-      this.loadStyle(route.style);
+      // Styles are additive and never unloaded, so a route that reuses another
+      // page's stylesheet just lists it here instead of duplicating the rules.
+      const styles = Array.isArray(route.style) ? route.style : [route.style];
+      styles.forEach(href => this.loadStyle(href));
     }
 
     try {

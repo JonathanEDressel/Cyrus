@@ -33,7 +33,8 @@ const RuleFlow = (() => {
   }
 
   function sourceAsset(rule: any): string | null {
-    if (rule.trigger_type === 'balance_threshold' || rule.trigger_type === 'price_threshold') {
+    if (rule.trigger_type === 'balance_threshold' || rule.trigger_type === 'price_threshold'
+        || rule.trigger_type === 'allocation_threshold') {
       return (rule.trigger_asset || rule.action_asset || '').toUpperCase() || null;
     }
     return (rule.action_asset || '').toUpperCase() || null; // order_filled
@@ -52,6 +53,9 @@ const RuleFlow = (() => {
   }
 
   function amountText(rule: any): string {
+    if (rule.trigger_type === 'allocation_threshold') {
+      return `the excess above ${rule.rebalance_target_percent ?? '?'}% of`;
+    }
     if (rule.action_type === 'withdraw_crypto') {
       if (rule.trigger_type === 'balance_threshold') return 'the full balance of';
       if (rule.use_filled_amount) return 'the filled amount of';
@@ -74,6 +78,8 @@ const RuleFlow = (() => {
     } else if (rule.trigger_type === 'balance_threshold') {
       const a = rule.trigger_asset || src;
       trig = `When your ${a} balance reaches ${rule.trigger_threshold ?? '?'} ${a}`;
+    } else if (rule.trigger_type === 'allocation_threshold') {
+      trig = `When ${src} grows past ${rule.trigger_allocation_percent ?? '?'}% of your portfolio`;
     } else {
       const oid = rule.trigger_order_id ? `order ${String(rule.trigger_order_id).slice(0, 8)}…` : 'an order';
       trig = `When ${oid} fills`;

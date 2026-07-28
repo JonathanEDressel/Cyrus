@@ -27,7 +27,11 @@ class AutomationRule:
                  trigger_price_quote_asset: Optional[str] = None,
                  action_amount_mode: Optional[str] = None,
                  max_executions: Optional[int] = None,
-                 execution_count: int = 0):
+                 execution_count: int = 0,
+                 trigger_allocation_percent: Optional[str] = None,
+                 rebalance_target_percent: Optional[str] = None,
+                 min_trade_usd: Optional[str] = None,
+                 dry_run: bool = False):
         self.id = id
         self.user_id = user_id
         self.rule_name = rule_name
@@ -55,6 +59,11 @@ class AutomationRule:
         self.action_amount_mode = action_amount_mode
         self.max_executions = max_executions
         self.execution_count = execution_count
+        # Portfolio balancer ('allocation_threshold') fields.
+        self.trigger_allocation_percent = trigger_allocation_percent
+        self.rebalance_target_percent = rebalance_target_percent
+        self.min_trade_usd = min_trade_usd
+        self.dry_run = dry_run
 
     @staticmethod
     def from_row(row: dict) -> 'AutomationRule':
@@ -88,7 +97,32 @@ class AutomationRule:
             action_amount_mode=row.get('action_amount_mode'),
             max_executions=row.get('max_executions'),
             execution_count=row.get('execution_count', 0),
+            trigger_allocation_percent=row.get('trigger_allocation_percent'),
+            rebalance_target_percent=row.get('rebalance_target_percent'),
+            min_trade_usd=row.get('min_trade_usd'),
+            dry_run=bool(row.get('dry_run', False)),
         )
+
+    def allocation_cap(self) -> Optional[float]:
+        """The rule's max-allocation percent, or None when it isn't set."""
+        try:
+            return float(self.trigger_allocation_percent)
+        except (TypeError, ValueError):
+            return None
+
+    def allocation_target(self) -> float:
+        """Percent to rebalance down to.
+
+        Defaults to 5 points below the cap when unset — acting exactly down to
+        the cap would leave the position sitting on the trigger and re-firing
+        every cycle.
+        """
+        cap = self.allocation_cap() or 0.0
+        try:
+            target = float(self.rebalance_target_percent)
+        except (TypeError, ValueError):
+            target = cap - 5.0
+        return max(0.0, min(target, cap))
 
     def has_reached_execution_limit(self) -> bool:
         if self.max_executions is None:
@@ -132,6 +166,10 @@ class AutomationRule:
             'action_amount_mode': self.action_amount_mode,
             'max_executions': self.max_executions,
             'execution_count': self.execution_count,
+            'trigger_allocation_percent': self.trigger_allocation_percent,
+            'rebalance_target_percent': self.rebalance_target_percent,
+            'min_trade_usd': self.min_trade_usd,
+            'dry_run': self.dry_run,
         }
 
 

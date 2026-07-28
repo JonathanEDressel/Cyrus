@@ -1,0 +1,79 @@
+<div class="page-container holdings-page">
+  <div class="overview-header">
+    <h1 class="page-title">Holdings</h1>
+    <p class="page-subtitle" id="holdings-subtitle">
+      What you own, and what's behind it — market cap, supply, and how far each
+      coin sits from its all-time high.
+    </p>
+  </div>
+
+  <div class="alert alert-warning d-none" id="holdings-error">
+    <span id="holdings-error-message"></span>
+  </div>
+
+  <div class="holdings-notice d-none" id="holdings-stale">
+    <i class="fa-solid fa-cloud-arrow-down"></i>
+    <span id="holdings-stale-message"></span>
+  </div>
+
+  <div class="overview-section">
+    <div class="section-header">
+      <h2 class="section-title">Portfolio</h2>
+      <div class="holdings-toolbar">
+        <select id="holdings-connection" class="holdings-conn-select" aria-label="Exchange connection">
+          <option value="all">All exchanges</option>
+        </select>
+        <button type="button" class="btn-icon" id="holdings-refresh" title="Refresh">
+          <i class="fa-solid fa-rotate"></i>
+        </button>
+      </div>
+    </div>
+
+    <div class="holdings-summary" id="holdings-summary"></div>
+  </div>
+
+  <div class="overview-section">
+    <div class="section-header">
+      <h2 class="section-title" id="holdings-count-title">Assets</h2>
+      <span class="holdings-hint">Select a row for the full breakdown</span>
+    </div>
+
+    <div class="data-table-wrapper">
+      <table class="data-table" id="holdings-table">
+        <thead id="holdings-thead">
+          <tr>
+            <th class="holdings-sortable" data-sort="asset" tabindex="0">Asset<span class="holdings-arrow"></span></th>
+            <th class="holdings-sortable holdings-th-num" data-sort="price" tabindex="0">Price<span class="holdings-arrow"></span></th>
+            <th class="holdings-sortable holdings-th-num" data-sort="change24" tabindex="0">24h<span class="holdings-arrow"></span></th>
+            <th class="holdings-sortable holdings-th-num" data-sort="change7d" tabindex="0">7d<span class="holdings-arrow"></span></th>
+            <th class="holdings-th-mid">7-day trend</th>
+            <th class="holdings-sortable holdings-th-num" data-sort="amount" tabindex="0">Amount<span class="holdings-arrow"></span></th>
+            <th class="holdings-sortable holdings-th-num" data-sort="value" tabindex="0">Value<span class="holdings-arrow"></span></th>
+            <th class="holdings-sortable holdings-th-num" data-sort="weight" tabindex="0">% of port.<span class="holdings-arrow"></span></th>
+            <th class="holdings-sortable holdings-th-num" data-sort="marketCap" tabindex="0">Market cap<span class="holdings-arrow"></span></th>
+            <th class="holdings-sortable holdings-th-num" data-sort="fromAth" tabindex="0">From ATH<span class="holdings-arrow"></span></th>
+          </tr>
+        </thead>
+        <tbody id="holdings-tbody">
+          <tr class="empty-row"><td colspan="10">Loading holdings…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="overview-section d-none" id="holdings-detail-section">
+    <div class="section-header">
+      <h2 class="section-title" id="holdings-detail-title">Asset detail</h2>
+      <button type="button" class="btn-icon" id="holdings-detail-close" title="Close">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+    </div>
+    <div id="holdings-detail"></div>
+  </div>
+
+  <p class="holdings-footnote">
+    Balances and prices come from your exchange. Market cap, supply and all-time
+    highs come from CoinGecko's public API — only the coin's ticker is sent, never
+    your balances — and are cached for ten minutes.
+  </p>
+</div>

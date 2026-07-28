@@ -29,14 +29,27 @@
       </div>
 
       <nav class="header-nav" id="header-nav">
-        <a href="#" data-route="home" class="nav-link"><i class="fa-solid fa-house"></i> Overview</a>
-        <a href="#" data-route="commands" class="nav-link"><i class="fa-solid fa-bolt"></i> Automations</a>
-        <a href="#" data-route="openorders" class="nav-link"><i class="fa-solid fa-clock-rotate-left"></i> Open Orders</a>
-        <!-- <a href="#" data-route="whitelist" class="nav-link"><i class="fa-solid fa-address-book"></i> Whitelisted Addresses</a> -->
-        <a href="#" data-route="profile" class="nav-link"><i class="fa-solid fa-user"></i> Profile</a>
-        <a href="#" data-route="affiliates" class="nav-link"><i class="fa-solid fa-handshake"></i> Partners</a>
-        <!-- <a href="#" data-route="privacy" class="nav-link"><i class="fa-solid fa-user-secret"></i> Privacy</a> -->
-        <a href="#" data-route="about" class="nav-link"><i class="fa-solid fa-cross"></i> About</a>
+        <div class="nav-group">
+          <span class="nav-group-label">Portfolio</span>
+          <a href="#" data-route="home" class="nav-link"><i class="fa-solid fa-house"></i><span>Overview</span></a>
+          <a href="#" data-route="holdings" class="nav-link"><i class="fa-solid fa-coins"></i><span>Holdings</span></a>
+          <a href="#" data-route="openorders" class="nav-link"><i class="fa-solid fa-clock-rotate-left"></i><span>Open Orders</span></a>
+          <!-- <a href="#" data-route="whitelist" class="nav-link"><i class="fa-solid fa-address-book"></i><span>Whitelisted Addresses</span></a> -->
+        </div>
+
+        <div class="nav-group">
+          <span class="nav-group-label">Automation</span>
+          <a href="#" data-route="commands" class="nav-link"><i class="fa-solid fa-bolt"></i><span>Automations</span></a>
+          <a href="#" data-route="rebalancer" class="nav-link"><i class="fa-solid fa-scale-balanced"></i><span>Balancer</span></a>
+        </div>
+
+        <div class="nav-group">
+          <span class="nav-group-label">Account</span>
+          <a href="#" data-route="profile" class="nav-link"><i class="fa-solid fa-user"></i><span>Profile</span></a>
+          <a href="#" data-route="affiliates" class="nav-link"><i class="fa-solid fa-handshake"></i><span>Partners</span></a>
+          <!-- <a href="#" data-route="privacy" class="nav-link"><i class="fa-solid fa-user-secret"></i><span>Privacy</span></a> -->
+          <a href="#" data-route="about" class="nav-link"><i class="fa-solid fa-cross"></i><span>About</span></a>
+        </div>
       </nav>
 
       <button class="header-user-btn sidebar-logout" id="logout-btn">
@@ -298,9 +311,11 @@
   <script src="../dist/app/services/exchangestore.js"></script>
   <script src="../dist/app/services/notificationservice.js"></script>
   <script src="../dist/app/services/helptooltip.js"></script>
+  <script src="../dist/app/services/repaint.js"></script>
   <script src="../dist/app/services/ruleflow.js"></script>
   <script src="../dist/app/services/orderflow.js"></script>
   <script src="../dist/app/services/portfoliochart.js"></script>
+  <script src="../dist/app/services/allocationchart.js"></script>
   <script src="../dist/app/services/portfoliohistory.js"></script>
   <script src="../dist/app/services/monthlyreport.js"></script>
   <script src="../dist/app/router.js"></script>

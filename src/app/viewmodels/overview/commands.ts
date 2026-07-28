@@ -507,7 +507,14 @@ class CommandsController {
         this.deleteRule(ruleId);
       } else if (action === 'edit') {
         const rule = this.allRules.find((r: any) => r.id === ruleId);
-        if (rule) this.openEditModal(rule);
+        if (!rule) return;
+        // Allocation caps only make sense next to the rest of the portfolio, so
+        // they're edited on the Balancer page rather than in this modal.
+        if (rule.trigger_type === 'allocation_threshold') {
+          router.navigate('rebalancer');
+          return;
+        }
+        this.openEditModal(rule);
       }
     });
 
@@ -1821,6 +1828,16 @@ class CommandsController {
         + `<span class="asset-badge">${this.escapeHtml(quote)}</span>`
         + `<br><span class="cooldown-text">${this.escapeHtml(asset)}/${this.escapeHtml(quote)} | Cooldown: ${cooldown}</span>`;
     }
+    if (rule.trigger_type === 'allocation_threshold') {
+      const asset = rule.action_asset || rule.trigger_asset || '';
+      const cap = rule.trigger_allocation_percent ?? '?';
+      const cooldown = this.formatCooldown(rule.cooldown_minutes || 1440);
+      const sim = rule.dry_run ? ' | simulate only' : '';
+      return `<span class="trigger-badge trigger-badge-balance">Allocation ≥</span> `
+        + `<strong>${this.escapeHtml(cap)}%</strong> `
+        + `<span class="asset-badge">${this.escapeHtml(asset)}</span>`
+        + `<br><span class="cooldown-text">of portfolio | Cooldown: ${cooldown}${sim}</span>`;
+    }
     return this.escapeHtml(rule.trigger_type);
   }
 
@@ -1842,6 +1859,9 @@ class CommandsController {
       let convertAmountText = rule.action_amount
         ? `<strong>${this.escapeHtml(rule.action_amount)}</strong>`
         : '<em>Full Balance</em>';
+      if (rule.trigger_type === 'allocation_threshold') {
+        convertAmountText = `<em>excess above ${this.escapeHtml(rule.rebalance_target_percent ?? '?')}%</em>`;
+      }
       if (rule.trigger_type === 'price_threshold') {
         const mode = (rule.action_amount_mode || 'all').toLowerCase();
         if (mode === 'percent') {
@@ -2209,7 +2229,8 @@ class CommandsController {
     const triggerLabel: Record<string, string> = {
       order_filled: 'Order Filled',
       balance_threshold: 'Balance Threshold',
-      price_threshold: 'Price Threshold'
+      price_threshold: 'Price Threshold',
+      allocation_threshold: 'Allocation Cap'
     };
     const actionLabel: Record<string, string> = {
       withdraw_crypto: 'Withdraw',

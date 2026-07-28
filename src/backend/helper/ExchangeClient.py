@@ -253,6 +253,34 @@ def convert(exchange: ccxt.Exchange, from_asset: str, to_asset: str,
     )
 
 
+def has_convert_pair(exchange: ccxt.Exchange, from_asset: str, to_asset: str) -> bool:
+    """True when ``convert()`` could route *from_asset* into *to_asset*.
+
+    Mirrors the pair lookup in ``convert()`` — either direction of the market is
+    usable, since a missing FROM/TO is handled as a quote-amount buy on TO/FROM.
+    Markets are loaded once and cached on the exchange instance.
+    """
+    if not from_asset or not to_asset or from_asset == to_asset:
+        return False
+    exchange.load_markets()
+    markets = exchange.markets or {}
+    return f"{from_asset}/{to_asset}" in markets or f"{to_asset}/{from_asset}" in markets
+
+
+def available_convert_targets(exchange: ccxt.Exchange, from_asset: str,
+                              candidates: list[str]) -> list[str]:
+    """Filter *candidates* down to those actually tradable against *from_asset*."""
+    try:
+        exchange.load_markets()
+    except Exception:
+        # Without a market list we can't tell — offer the full candidate set
+        # rather than presenting an empty dropdown. Save-time validation still
+        # rejects a pair that doesn't exist.
+        return [c for c in candidates if c != from_asset]
+    return [c for c in candidates
+            if c != from_asset and has_convert_pair(exchange, from_asset, c)]
+
+
 _STABLECOIN_FALLBACKS: dict[str, list[str]] = {
     'USDT': ['USD', 'USDC'],
     'USDC': ['USD', 'USDT'],

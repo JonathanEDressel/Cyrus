@@ -1,0 +1,492 @@
+/* Balancer page — editable allocation-cap bar chart + position table.
+ *
+ * The route also loads home.css (page shell + data table) and commands.css
+ * (form controls, buttons, alerts); this file only carries what's specific to
+ * the balancer, plus the overrides below where a shared rule doesn't fit.
+ */
+
+/* Section headers collapse on the Overview page — here they're static. */
+.balancer-page .section-header {
+  cursor: default;
+}
+
+/* Contrast: this page is mostly small supporting text on the near-black
+   --bg-primary, where the shared --text-dim / --text-muted greys fall to around
+   4:1. Everything readable here is raised a step; hierarchy is kept by weight
+   and size instead of by fading text out. */
+.balancer-page .page-subtitle {
+  color: var(--text-tertiary);
+}
+
+.balancer-page .form-group label {
+  color: var(--text-tertiary);
+}
+
+.balancer-page .asset-badge {
+  color: var(--accent-purple-light);
+  background: rgba(129, 140, 248, 0.14);
+}
+
+/* Alerts: the only .alert-warning in the app lives in login.css (light theme,
+   and not even loaded when a saved session skips the login screen), so the
+   balancer states its own — same shape as commands.css's .alert-success. */
+.balancer-page .alert {
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  margin-bottom: 1.5rem;
+  display: flex;
+  align-items: center;
+}
+
+.balancer-page .alert-warning {
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.25);
+  color: #f59e0b;
+}
+
+.balancer-page .alert-success {
+  background: rgba(34, 197, 94, 0.1);
+  border: 1px solid rgba(34, 197, 94, 0.2);
+  color: #22c55e;
+}
+
+.balancer-page .data-table td {
+  vertical-align: middle;
+}
+
+/* home.css scrolls the table by turning <tbody> into a block with its own
+   overflow and re-declaring every <tr> as a table. Rows inserted into that
+   hybrid layout paint unreliably in Chromium — they stay blank until a hover
+   repaints the row. Restore the real table layout here and move the scroll to
+   the wrapper, keeping the header pinned with position: sticky. */
+.balancer-page .data-table-wrapper {
+  max-height: 520px;
+  overflow-y: auto;
+}
+
+.balancer-page .data-table {
+  table-layout: fixed;
+}
+
+.balancer-page .data-table thead {
+  display: table-header-group;
+}
+
+.balancer-page .data-table tbody {
+  display: table-row-group;
+  max-height: none;
+  overflow: visible;
+}
+
+.balancer-page .data-table tbody tr {
+  display: table-row;
+}
+
+.balancer-page .data-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+/* Nine equal columns would crush the inputs; with table-layout: fixed the
+   header row sets the widths for the whole column. */
+.balancer-page .data-table th:nth-child(1) { width: 4%; }
+.balancer-page .data-table th:nth-child(2) { width: 9%; }
+.balancer-page .data-table th:nth-child(3) { width: 13%; }
+.balancer-page .data-table th:nth-child(4) { width: 11%; }
+.balancer-page .data-table th:nth-child(5) { width: 8%; }
+.balancer-page .data-table th:nth-child(6) { width: 10%; }
+.balancer-page .data-table th:nth-child(7) { width: 11%; }
+.balancer-page .data-table th:nth-child(8) { width: 12%; }
+
+/* Column headers sit on the near-black --bg-primary; --text-muted is too faint
+   there, so the balancer's table header steps up one level. */
+.balancer-page .data-table thead th {
+  color: var(--text-tertiary);
+}
+
+.balancer-page .data-table tbody td {
+  color: var(--text-secondary);
+}
+
+.balancer-amount,
+.balancer-value {
+  font-variant-numeric: tabular-nums;
+}
+
+.balancer-value {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.balancer-weight {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.balancer-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.balancer-conn-select {
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-primary);
+  border-radius: 8px;
+  padding: 0.45rem 0.7rem;
+  font-size: 0.85rem;
+  transition: border-color 0.2s;
+}
+
+.balancer-conn-select:focus {
+  outline: none;
+  border-color: var(--accent-purple);
+}
+
+/* Same pill group as the Automations / Open Orders tab strips. */
+.balancer-scale-toggle {
+  display: flex;
+  gap: 0.2rem;
+  background: var(--bg-tertiary);
+  padding: 0.25rem;
+  border-radius: 8px;
+}
+
+.balancer-hint {
+  color: var(--text-tertiary);
+  font-size: 0.85rem;
+  line-height: 1.5;
+  margin: 0 0 1rem;
+  max-width: 70ch;
+}
+
+.balancer-chart-wrap {
+  overflow-x: auto;
+  padding-bottom: 0.5rem;
+}
+
+/* ── Chart ───────────────────────────────────────────────────────────────── */
+
+.ac-chart {
+  min-height: 320px;
+}
+
+.ac-svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  touch-action: none;   /* let the handle own vertical drags */
+}
+
+.ac-chart.ac-dragging {
+  cursor: ns-resize;
+  user-select: none;
+}
+
+.ac-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 3rem 1rem;
+  color: var(--text-tertiary);
+}
+
+.ac-empty i {
+  font-size: 1.75rem;
+}
+
+.ac-grid {
+  stroke: var(--border-secondary);
+  stroke-width: 1;
+}
+
+.ac-axis {
+  stroke: var(--border-primary);
+  stroke-width: 1.5;
+}
+
+.ac-axis-label {
+  fill: var(--text-muted);
+  font-size: 10px;
+}
+
+.ac-track {
+  fill: var(--hover-overlay);
+}
+
+.ac-bar {
+  fill: var(--accent-cyan);
+  transition: fill 0.15s ease;
+}
+
+.ac-bar-over {
+  fill: #f59e0b;
+}
+
+.ac-bar-empty {
+  fill: var(--text-dim);
+}
+
+.ac-cap-line {
+  stroke: var(--accent-purple-light);
+  stroke-width: 2;
+}
+
+.ac-handle {
+  fill: var(--accent-purple);
+  stroke: var(--bg-secondary);
+  stroke-width: 1;
+  cursor: ns-resize;
+}
+
+.ac-handle:hover,
+.ac-handle-active {
+  fill: var(--accent-purple-light);
+}
+
+.ac-handle:focus-visible {
+  outline: 2px solid var(--accent-cyan-light);
+  outline-offset: 2px;
+}
+
+.ac-cap-label {
+  fill: var(--accent-purple-dim);
+  font-size: 10px;
+  font-weight: 600;
+  pointer-events: none;
+}
+
+.ac-cap-paused .ac-cap-line,
+.ac-cap-paused .ac-handle {
+  opacity: 0.4;
+}
+
+.ac-target-line {
+  stroke: var(--text-tertiary);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 3;
+}
+
+.ac-asset-label {
+  fill: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.ac-asset-label-empty {
+  fill: var(--text-muted);
+}
+
+.ac-weight-label {
+  fill: var(--text-tertiary);
+  font-size: 10px;
+}
+
+.ac-dest-label {
+  fill: var(--accent-cyan);
+  font-size: 9.5px;
+}
+
+/* ── Legend ──────────────────────────────────────────────────────────────── */
+
+.balancer-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 0.75rem;
+  font-size: 0.78rem;
+  color: var(--text-tertiary);
+}
+
+.balancer-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.balancer-swatch {
+  width: 14px;
+  height: 8px;
+  border-radius: 2px;
+  display: inline-block;
+}
+
+.balancer-swatch-bar { background: var(--accent-cyan); }
+.balancer-swatch-over { background: #f59e0b; }
+.balancer-swatch-cap { background: var(--accent-purple); }
+.balancer-swatch-target {
+  height: 0;
+  border-top: 2px dashed var(--text-muted);
+  border-radius: 0;
+}
+
+.balancer-legend-total {
+  margin-left: auto;
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+/* ── Table ───────────────────────────────────────────────────────────────── */
+
+.balancer-num,
+.balancer-select {
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-primary);
+  border-radius: 8px;
+  padding: 0.4rem 0.55rem;
+  font-size: 0.82rem;
+  transition: border-color 0.2s;
+}
+
+.balancer-num {
+  width: 5.5rem;
+  text-align: right;
+}
+
+.balancer-select {
+  width: 7.5rem;
+}
+
+.balancer-num:focus,
+.balancer-select:focus {
+  outline: none;
+  border-color: var(--accent-purple);
+}
+
+.balancer-num::placeholder {
+  color: var(--text-muted);
+}
+
+.balancer-num:disabled,
+.balancer-select:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Checkboxes: the app has no styled checkbox elsewhere (profile uses a toggle
+   switch), so give the native control the accent colour and a usable hit area. */
+#balancer-tbody input[type="checkbox"],
+.balancer-check input[type="checkbox"] {
+  accent-color: var(--accent-purple);
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  margin: 0;
+}
+
+.balancer-row-off {
+  opacity: 0.7;
+}
+
+.balancer-muted {
+  color: var(--text-muted);
+}
+
+.balancer-over {
+  color: #f59e0b;
+  font-weight: 600;
+}
+
+.balancer-trim {
+  color: var(--text-primary);
+}
+
+.balancer-dirty-flag {
+  color: #f59e0b;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border: 1px solid #f59e0b;
+  border-radius: 999px;
+  padding: 0.15rem 0.6rem;
+}
+
+/* ── Settings + actions ──────────────────────────────────────────────────── */
+
+.balancer-settings {
+  align-items: flex-end;
+}
+
+.balancer-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+.balancer-dry-run {
+  padding-bottom: 0.4rem;
+}
+
+.balancer-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.balancer-footnote {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  margin: 0.75rem 0 0;
+}
+
+/* ── Light theme ─────────────────────────────────────────────────────────── */
+/* The amber and the lighter accents read fine on the dark background but wash
+   out on white, so the text (not the chart shapes) darkens a step. */
+
+body.theme-light .balancer-over,
+body.theme-light .balancer-page .alert-warning {
+  color: #b45309;
+}
+
+body.theme-light .balancer-dirty-flag {
+  color: #b45309;
+  border-color: #b45309;
+}
+
+body.theme-light .ac-cap-label {
+  fill: var(--accent-purple);
+}
+
+body.theme-light .ac-dest-label {
+  fill: var(--accent-cyan-hover);
+}
+
+/* ── Empty state ─────────────────────────────────────────────────────────── */
+
+.balancer-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 3rem 1rem;
+  text-align: center;
+  color: var(--text-tertiary);
+}
+
+.balancer-empty i {
+  font-size: 2rem;
+  color: var(--text-muted);
+}
+
+.balancer-empty h2 {
+  color: var(--text-primary);
+  font-size: 1.1rem;
+  margin: 0;
+}
+
+.balancer-empty p {
+  max-width: 52ch;
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.6;
+}

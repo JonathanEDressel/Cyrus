@@ -371,6 +371,11 @@ class AutomationWorker:
         if price_rules:
             self._poll_prices(price_rules, user_id, AutomationDbContext,
                               get_user_exchange, get_market_price, get_balance, convert)
+
+        allocation_rules = [r for r in rules if r.trigger_type == 'allocation_threshold']
+        if allocation_rules:
+            self._poll_allocations(allocation_rules, user_id, AutomationDbContext,
+                                   get_user_exchange, convert)
     
     def _poll_balances(self, balance_rules, user_id, AutomationDbContext,
                        get_user_exchange, get_connection_row,
@@ -864,6 +869,189 @@ class AutomationWorker:
                 )
                 print(f"[WORKER] Price rule '{rule.rule_name}' failed: {e}")
     
+    def _poll_allocations(self, allocation_rules, user_id, AutomationDbContext,
+                          get_user_exchange, convert):
+        """Portfolio balancer: trim positions that grew past their allocation cap.
+
+        One ``get_portfolio`` call per connection per cycle prices every holding
+        in USD; all caps on that connection share it. A cap fires when the
+        position's share of the portfolio reaches ``trigger_allocation_percent``,
+        and sells only the excess above ``rebalance_target_percent`` — landing
+        below the cap is what stops it re-firing on the next cycle.
+        """
+        from helper.ExchangeClient import get_portfolio
+
+        portfolios = {}
+
+        for rule in allocation_rules:
+            if self._stop_event.is_set():
+                return
+
+            if self._deactivate_if_limit_reached(rule, AutomationDbContext):
+                continue
+
+            cap = rule.allocation_cap()
+            asset = (rule.action_asset or '').upper()
+            conn_id = rule.trigger_exchange_id
+            if cap is None or not asset or not rule.convert_to_asset or not conn_id:
+                continue
+
+            if not AutomationDbContext.is_cooldown_elapsed(rule.id):
+                self._log_skip_once(
+                    rule, 'cooldown', AutomationDbContext,
+                    trigger_event="Cooldown active",
+                    action_executed="Skipped",
+                    action_result=f"Waiting out the {self._format_cooldown(rule.cooldown_minutes)} "
+                                  f"cooldown since the last run before checking again.",
+                )
+                continue
+
+            if conn_id not in portfolios:
+                try:
+                    exchange = get_user_exchange(user_id, conn_id)
+                    portfolios[conn_id] = get_portfolio(exchange) if exchange else None
+                except (DDoSProtection, RateLimitExceeded) as e:
+                    self._note_error(f'portfolio/conn {conn_id}', e)
+                    print(f"[WORKER] Rate limited pricing portfolio for user {user_id} conn {conn_id}, will retry next cycle")
+                    portfolios[conn_id] = None
+                except ExchangeNotAvailable as e:
+                    self._note_error(f'portfolio/conn {conn_id}', e)
+                    print(f"[WORKER] Exchange unavailable pricing portfolio for user {user_id} conn {conn_id}, will retry next cycle")
+                    portfolios[conn_id] = None
+                except Exception as e:
+                    self._note_error(f'portfolio/conn {conn_id}', e)
+                    print(f"[WORKER] Portfolio API error for user {user_id} conn {conn_id}: {e}")
+                    portfolios[conn_id] = None
+
+            portfolio = portfolios.get(conn_id)
+            if not portfolio:
+                self._log_skip_once(
+                    rule, 'portfolio_unavailable', AutomationDbContext,
+                    trigger_event="Allocation check could not run",
+                    action_executed="Skipped",
+                    action_result="Could not price the portfolio on the exchange this cycle. "
+                                  "Will retry automatically.",
+                )
+                continue
+
+            total_usd = float(portfolio.get('total_usd') or 0)
+            if total_usd <= 0:
+                self._log_skip_once(
+                    rule, 'portfolio_empty', AutomationDbContext,
+                    trigger_event="Portfolio value is zero",
+                    action_executed="Skipped",
+                    action_result="No priceable holdings on this connection, so allocations "
+                                  "can't be measured.",
+                )
+                continue
+
+            position = next((p for p in portfolio.get('positions', [])
+                             if str(p.get('asset', '')).upper() == asset), None)
+            amount = float(position['amount']) if position else 0.0
+            usd_value = float(position['usd_value']) if position else 0.0
+
+            if amount <= 0 or usd_value <= 0:
+                self._log_skip_once(
+                    rule, 'not_held', AutomationDbContext,
+                    trigger_event=f"No {asset} held",
+                    action_executed="Skipped",
+                    action_result=f"This connection holds no priceable {asset}, so its "
+                                  f"allocation cap has nothing to trim.",
+                )
+                continue
+
+            weight = usd_value / total_usd * 100.0
+            if weight < cap:
+                self._log_skip_once(
+                    rule, 'under_cap', AutomationDbContext,
+                    trigger_event=f"{asset} = {weight:.2f}% of portfolio (cap {cap:g}%)",
+                    action_executed="Skipped",
+                    action_result=f"{asset} is under its {cap:g}% cap, so nothing was sold.",
+                )
+                continue
+
+            target = rule.allocation_target()
+            excess_usd = (weight - target) / 100.0 * total_usd
+            min_trade = 0.0
+            try:
+                min_trade = float(rule.min_trade_usd or 0)
+            except (TypeError, ValueError):
+                min_trade = 0.0
+
+            if min_trade > 0 and excess_usd < min_trade:
+                self._log_skip_once(
+                    rule, 'below_min_trade', AutomationDbContext,
+                    trigger_event=f"{asset} = {weight:.2f}% of portfolio (cap {cap:g}%)",
+                    action_executed="Skipped",
+                    action_result=f"The excess above {target:g}% is only ${excess_usd:,.2f}, "
+                                  f"below the ${min_trade:,.2f} minimum trade size.",
+                )
+                continue
+
+            unit_price = usd_value / amount
+            sell_amount = min(excess_usd / unit_price, amount) if unit_price > 0 else 0.0
+            if sell_amount <= 0:
+                self._log_skip_once(
+                    rule, 'nothing_to_sell', AutomationDbContext,
+                    trigger_event=f"{asset} = {weight:.2f}% of portfolio (cap {cap:g}%)",
+                    action_executed="Skipped",
+                    action_result="Computed trim amount was zero.",
+                )
+                continue
+
+            trigger_event = (
+                f"{asset} = {weight:.2f}% of portfolio "
+                f"(cap {cap:g}%, total ${total_usd:,.2f})"
+            )
+            action_desc = (
+                f"Convert {sell_amount:.10g} {asset} -> {rule.convert_to_asset} "
+                f"(trim {weight:.2f}% down to {target:g}%, ~${excess_usd:,.2f})"
+            )
+
+            if rule.dry_run:
+                # Simulate-only mode: log what would have happened and move on.
+                # The dedup key carries the whole-percent weight so drift gets a
+                # fresh entry instead of one row for the entire episode.
+                self._log_skip_once(
+                    rule, f'dry_run:{weight:.0f}', AutomationDbContext,
+                    trigger_event=trigger_event,
+                    action_executed="Simulated (no trade placed)",
+                    action_result=f"Would have run: {action_desc}",
+                )
+                print(f"[WORKER] Balancer rule '{rule.rule_name}' simulated for user {user_id}")
+                continue
+
+            # Mark as triggered BEFORE executing to prevent duplicate executions.
+            self._clear_skip_state(rule.id)
+            AutomationDbContext.mark_rule_triggered(rule.id)
+
+            try:
+                action_exchange = get_user_exchange(user_id, rule.action_exchange_id or conn_id)
+                if not action_exchange:
+                    raise Exception("Action exchange connection not available")
+
+                result = convert(
+                    exchange=action_exchange,
+                    from_asset=asset,
+                    to_asset=rule.convert_to_asset,
+                    amount=sell_amount,
+                )
+
+                AutomationDbContext.create_log(
+                    rule_id=rule.id, user_id=rule.user_id, trigger_event=trigger_event,
+                    action_executed=action_desc, action_result=str(result), status='success',
+                )
+                self._on_rule_success(rule, AutomationDbContext)
+                self._notify_execution(rule.user_id, rule, trigger_event, action_desc, result)
+                print(f"[WORKER] Balancer rule '{rule.rule_name}' executed for user {rule.user_id}")
+
+            except Exception as e:
+                AutomationDbContext.create_log(
+                    rule_id=rule.id, user_id=rule.user_id, trigger_event=trigger_event,
+                    action_executed=action_desc, action_result=str(e), status='error',
+                )
+                print(f"[WORKER] Balancer rule '{rule.rule_name}' failed: {e}")
+
     def _resolve_amount(self, rule, snapshot: dict, closed_order: dict = None) -> str:
         if not rule.use_filled_amount:
             return rule.action_amount

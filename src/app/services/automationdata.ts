@@ -37,6 +37,23 @@ class AutomationData {
     );
   }
 
+  /** Holdings + their allocation caps for one connection (Balancer page). */
+  static async getAllocations(token: string, connectionId: number): Promise<ApiResponse<any>> {
+    return DataAccess.get<any>(
+      `${AppConfig.API_BASE}/automation/allocations/${connectionId}`,
+      token
+    );
+  }
+
+  /** Replace the whole balancer configuration for one connection. */
+  static async saveAllocations(token: string, connectionId: number, payload: any): Promise<ApiResponse<any>> {
+    return DataAccess.put<any>(
+      `${AppConfig.API_BASE}/automation/allocations/${connectionId}`,
+      payload,
+      token
+    );
+  }
+
   static async getLogs(token: string, limit: number = 50): Promise<ApiResponse<any[]>> {
     return DataAccess.get<any[]>(
       `${AppConfig.API_BASE}/automation/logs?limit=${limit}`,

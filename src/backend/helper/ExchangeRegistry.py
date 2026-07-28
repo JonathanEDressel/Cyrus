@@ -21,6 +21,8 @@ SUPPORTED_EXCHANGES: dict[str, dict] = {
         'requires_passphrase': False,
         'has_withdrawal_addresses': True,
         'supports_withdraw': True,
+        # Portfolio balancer: needs USD-priceable balances plus market orders.
+        'supports_rebalance': True,
         'has_sandbox': False,
         'website': 'https://www.kraken.com',
         'api_key_url': 'https://www.kraken.com/u/security/api',
@@ -35,6 +37,7 @@ SUPPORTED_EXCHANGES: dict[str, dict] = {
         'requires_passphrase': False,
         'has_withdrawal_addresses': False,
         'supports_withdraw': False,
+        'supports_rebalance': True,
         'has_sandbox': False,
         'website': 'https://www.coinbase.com',
         'api_key_url': 'https://www.coinbase.com/settings/api',
@@ -46,6 +49,7 @@ SUPPORTED_EXCHANGES: dict[str, dict] = {
         'requires_passphrase': False,
         'has_withdrawal_addresses': False,
         'supports_withdraw': False,
+        'supports_rebalance': True,
         'has_sandbox': False,
         'website': 'https://www.binance.com',
         'api_key_url': 'https://www.binance.com/en/my/settings/api-management',
@@ -57,6 +61,9 @@ SUPPORTED_EXCHANGES: dict[str, dict] = {
         'requires_passphrase': False,
         'has_withdrawal_addresses': False,  # no withdrawal API
         'supports_withdraw': False,         # market-order (convert) only
+        # Rebalancing works, but Robinhood has no bulk-ticker endpoint, so
+        # pricing the portfolio costs one request per held asset per cycle.
+        'supports_rebalance': True,
         'has_sandbox': False,
         'website': 'https://robinhood.com',
         'api_key_url': 'https://robinhood.com/account/crypto',
@@ -108,6 +115,13 @@ WITHDRAWAL_MINIMUMS: dict[str, dict[str, float]] = {
 
 MINIMUM_WITHDRAWAL_CUSHION = 1.10
 
+# Assets the portfolio balancer offers as a destination for trimmed positions.
+# Filtered per position against the exchange's actual market list, so a target
+# only appears when there's a tradable pair for it.
+REBALANCE_TARGET_CANDIDATES: list[str] = [
+    'USD', 'USDC', 'USDT', 'DAI', 'BTC', 'ETH',
+]
+
 
 # ---------------------------------------------------------------------------
 # Public helpers
@@ -122,6 +136,7 @@ def get_supported_exchanges() -> list[dict]:
             'requires_passphrase': meta['requires_passphrase'],
             'has_withdrawal_addresses': meta['has_withdrawal_addresses'],
             'supports_withdraw': meta.get('supports_withdraw', False),
+            'supports_rebalance': meta.get('supports_rebalance', False),
             'has_sandbox': meta.get('has_sandbox', False),
             'website': meta.get('website', ''),
             'api_key_url': meta.get('api_key_url', ''),
@@ -136,6 +151,11 @@ def get_minimum_withdrawal(exchange_name: str, asset: str) -> float:
     minimums = WITHDRAWAL_MINIMUMS.get(exchange_name, {})
     base = minimums.get(asset, 0)
     return base * MINIMUM_WITHDRAWAL_CUSHION if base > 0 else 0
+
+
+def supports_rebalance(exchange_name: str) -> bool:
+    """True when the balancer can operate on *exchange_name*."""
+    return SUPPORTED_EXCHANGES.get(exchange_name, {}).get('supports_rebalance', False)
 
 
 def get_all_minimums(exchange_name: str) -> dict[str, float]:

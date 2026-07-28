@@ -62,6 +62,10 @@ def setup_database():
                 action_amount_mode TEXT,
                 max_executions INTEGER,
                 execution_count INTEGER DEFAULT 0,
+                trigger_allocation_percent TEXT,
+                rebalance_target_percent TEXT,
+                min_trade_usd TEXT,
+                dry_run INTEGER DEFAULT 0,
                 FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
                 FOREIGN KEY (trigger_exchange_id) REFERENCES exchange_connections(id) ON DELETE SET NULL,
                 FOREIGN KEY (action_exchange_id) REFERENCES exchange_connections(id) ON DELETE SET NULL
@@ -98,6 +102,21 @@ def setup_database():
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (rule_id) REFERENCES automation_rules(id) ON DELETE CASCADE,
                 FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            )
+        ''')
+
+        # Asset fundamentals (market cap, supply, all-time highs) fetched from
+        # CoinGecko for the Holdings page. Cached per symbol so a page refresh
+        # doesn't re-hit a rate-limited public API; not user-specific, since the
+        # numbers are the same for everyone. `coin_id` outlives `payload` — the
+        # symbol→id mapping is stable, the market data goes stale in minutes.
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS asset_market_info (
+                symbol TEXT PRIMARY KEY,
+                coin_id TEXT,
+                payload TEXT,
+                fetched_at INTEGER DEFAULT 0,
+                resolved_at INTEGER DEFAULT 0
             )
         ''')
 

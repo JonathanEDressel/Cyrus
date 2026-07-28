@@ -1,0 +1,126 @@
+<div class="page-container balancer-page">
+  <div class="overview-header">
+    <h1 class="page-title">Balancer</h1>
+    <p class="page-subtitle" id="balancer-subtitle">
+      Cap how much of your portfolio any one coin is allowed to become.
+    </p>
+  </div>
+
+  <div class="alert alert-warning d-none" id="balancer-error">
+    <span id="balancer-error-message"></span>
+  </div>
+  <div class="alert alert-success d-none" id="balancer-success">
+    <span id="balancer-success-message"></span>
+  </div>
+
+  <!-- No connection on a rebalance-capable exchange -->
+  <div class="overview-section d-none" id="balancer-unsupported">
+    <div class="balancer-empty">
+      <i class="fa-solid fa-scale-unbalanced"></i>
+      <h2>No supported exchange connected</h2>
+      <p id="balancer-unsupported-text">
+        The balancer needs an exchange that can price your holdings and place market
+        orders. Connect one in your profile to use this page.
+      </p>
+      <button type="button" class="btn-primary" data-route="profile">Go to Profile</button>
+    </div>
+  </div>
+
+  <div id="balancer-main" class="d-none">
+    <div class="overview-section">
+      <div class="section-header">
+        <h2 class="section-title">Allocation caps</h2>
+        <div class="balancer-toolbar">
+          <select id="balancer-connection" class="balancer-conn-select" aria-label="Exchange connection"></select>
+          <div class="balancer-scale-toggle" id="balancer-scale-toggle" role="group" aria-label="Chart scale">
+            <button type="button" class="rules-tab-btn active" data-scale="100">0–100%</button>
+            <button type="button" class="rules-tab-btn" data-scale="fit">Fit</button>
+          </div>
+          <button type="button" class="btn-icon" id="balancer-refresh" title="Refresh holdings">
+            <i class="fa-solid fa-rotate"></i>
+          </button>
+        </div>
+      </div>
+
+      <p class="balancer-hint">
+        Each bar is a holding's current share of this account. Drag the handle above a
+        bar — or type in the table — to set the most of your portfolio you want that
+        coin to be. When a bar reaches its cap, Cyrus sells the excess into the asset
+        you pick and stops at the "down to" line.
+      </p>
+
+      <div class="balancer-chart-wrap">
+        <div id="balancer-chart"></div>
+      </div>
+
+      <div class="balancer-legend">
+        <span class="balancer-legend-item"><span class="balancer-swatch balancer-swatch-bar"></span> Current share</span>
+        <span class="balancer-legend-item"><span class="balancer-swatch balancer-swatch-over"></span> Over its cap</span>
+        <span class="balancer-legend-item"><span class="balancer-swatch balancer-swatch-cap"></span> Maximum (drag)</span>
+        <span class="balancer-legend-item"><span class="balancer-swatch balancer-swatch-target"></span> Rebalance down to</span>
+        <span class="balancer-legend-total" id="balancer-total"></span>
+      </div>
+    </div>
+
+    <div class="overview-section">
+      <div class="section-header">
+        <h2 class="section-title">Positions</h2>
+        <span class="balancer-dirty-flag d-none" id="balancer-dirty">Unsaved changes</span>
+      </div>
+
+      <div class="data-table-wrapper">
+        <table class="data-table" id="balancer-table">
+          <thead>
+            <tr>
+              <th>On</th>
+              <th>Asset</th>
+              <th>Holdings</th>
+              <th>Value</th>
+              <th>Now</th>
+              <th>Max %</th>
+              <th>Down to %</th>
+              <th>Convert into</th>
+              <th>Would trim now</th>
+            </tr>
+          </thead>
+          <tbody id="balancer-tbody">
+            <tr class="empty-row"><td colspan="9">Loading holdings…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="overview-section">
+      <div class="section-header">
+        <h2 class="section-title">Safety settings</h2>
+      </div>
+
+      <div class="form-row balancer-settings">
+        <div class="form-group">
+          <label for="balancer-cooldown" data-help="Minimum time between rebalances for each position. Prevents a choppy market from triggering repeated trades.">Cooldown (minutes)</label>
+          <input type="number" id="balancer-cooldown" min="1" step="1" value="1440">
+        </div>
+        <div class="form-group">
+          <label for="balancer-min-trade" data-help="Skip a rebalance when the excess to sell is worth less than this. Stops the balancer placing dust trades the exchange would reject anyway.">Minimum trade (USD)</label>
+          <input type="number" id="balancer-min-trade" min="0" step="1" value="25">
+        </div>
+        <div class="form-group balancer-dry-run">
+          <label class="balancer-check">
+            <input type="checkbox" id="balancer-dry-run">
+            <span data-help="Simulate only: the balancer logs what it would have traded and places no orders. Recommended until you've watched it run once.">Simulate only (log, don't trade)</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="balancer-actions">
+        <button type="button" class="btn-secondary" id="balancer-reset">Discard changes</button>
+        <button type="button" class="btn-primary" id="balancer-save">Save balancer</button>
+      </div>
+
+      <p class="balancer-footnote">
+        Rebalances run on the automation worker's normal cycle and appear in the
+        Automations log (and your email alerts, if enabled) like any other rule.
+      </p>
+    </div>
+  </div>
+</div>

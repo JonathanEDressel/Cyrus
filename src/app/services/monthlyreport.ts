@@ -194,6 +194,8 @@ const MonthlyReport = (() => {
         return `${r.trigger_asset} balance reaches ${r.trigger_threshold}`;
       case 'price_threshold':
         return `${r.trigger_asset} price reaches ${r.trigger_threshold} ${r.trigger_price_quote_asset || 'USD'}`;
+      case 'allocation_threshold':
+        return `${r.action_asset || r.trigger_asset} exceeds ${r.trigger_allocation_percent}% of the portfolio`;
       default:
         return r.trigger_type || '—';
     }
@@ -209,7 +211,8 @@ const MonthlyReport = (() => {
     if (r.action_type === 'convert_crypto') {
       const mode = (r.action_amount_mode || '').toLowerCase();
       let amt = '';
-      if (mode === 'percent') amt = `${r.action_amount}% of `;
+      if (r.trigger_type === 'allocation_threshold') amt = `the excess above ${r.rebalance_target_percent}% of `;
+      else if (mode === 'percent') amt = `${r.action_amount}% of `;
       else if (mode === 'fixed' && r.action_amount) amt = `${r.action_amount} `;
       return `convert ${amt}${r.action_asset || ''} → ${r.convert_to_asset || ''}`
         .replace(/\s+/g, ' ').trim();

@@ -321,6 +321,12 @@ function createWindow(startHidden = false) {
     height: 800,
     icon: path.join(__dirname, '../src/assets/icon.ico'),
     show: false,
+    // Without an explicit backing colour the window starts with no opaque
+    // surface, which on Windows leaves Chromium computing damage rects against
+    // an empty root layer — regions redrawn after the first paint (a table
+    // whose rows were just replaced) can stay stale until something else
+    // invalidates them. Matches --bg-primary so there's no flash on show.
+    backgroundColor: '#0f172a',
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,

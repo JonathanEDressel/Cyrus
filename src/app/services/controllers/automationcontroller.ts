@@ -32,6 +32,20 @@ class AutomationController {
     await AutomationData.deleteRule(token, ruleId);
   }
 
+  static async getAllocations(connectionId: number): Promise<any> {
+    const token = AuthController.getToken();
+    if (!token) throw new Error('Not authenticated');
+    const response = await AutomationData.getAllocations(token, connectionId);
+    return response.data;
+  }
+
+  static async saveAllocations(connectionId: number, payload: any): Promise<any> {
+    const token = AuthController.getToken();
+    if (!token) throw new Error('Not authenticated');
+    const response = await AutomationData.saveAllocations(token, connectionId, payload);
+    return response.data;
+  }
+
   static async getLogs(limit?: number): Promise<any[]> {
     const token = AuthController.getToken();
     if (!token) throw new Error('Not authenticated');
