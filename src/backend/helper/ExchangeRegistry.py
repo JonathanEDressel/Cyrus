@@ -64,6 +64,10 @@ SUPPORTED_EXCHANGES: dict[str, dict] = {
         # Rebalancing works, but Robinhood has no bulk-ticker endpoint, so
         # pricing the portfolio costs one request per held asset per cycle.
         'supports_rebalance': True,
+        # Robinhood issues no secret: the user generates an Ed25519 keypair,
+        # registers the public half, and pastes the private half here. The
+        # Profile page offers a key generator when this is set.
+        'needs_generated_keypair': True,
         'has_sandbox': False,
         'website': 'https://robinhood.com',
         'api_key_url': 'https://robinhood.com/account/crypto',
@@ -137,6 +141,7 @@ def get_supported_exchanges() -> list[dict]:
             'has_withdrawal_addresses': meta['has_withdrawal_addresses'],
             'supports_withdraw': meta.get('supports_withdraw', False),
             'supports_rebalance': meta.get('supports_rebalance', False),
+            'needs_generated_keypair': meta.get('needs_generated_keypair', False),
             'has_sandbox': meta.get('has_sandbox', False),
             'website': meta.get('website', ''),
             'api_key_url': meta.get('api_key_url', ''),

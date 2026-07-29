@@ -276,3 +276,79 @@ a.help-icon {
 .connection-label {
   color: var(--text-primary);
 }
+/* ── Key generator offer (exchanges that issue no secret) ─────────────────── */
+
+.keygen-panel {
+  margin-bottom: 1rem;
+  padding: 0.9rem 1rem;
+  border-radius: 10px;
+  background: rgba(99, 102, 241, 0.07);
+  border: 1px solid rgba(99, 102, 241, 0.28);
+}
+
+.keygen-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.keygen-head i {
+  color: var(--accent-purple-light);
+}
+
+.keygen-body {
+  margin: 0.5rem 0 0.6rem;
+  font-size: 0.82rem;
+  line-height: 1.55;
+  color: var(--text-tertiary);
+}
+
+.keygen-steps {
+  margin: 0 0 0.75rem;
+  padding-left: 1.2rem;
+  font-size: 0.8rem;
+  line-height: 1.6;
+  color: var(--text-tertiary);
+}
+
+.keygen-steps strong {
+  color: var(--text-secondary);
+}
+
+.keygen-steps a {
+  color: var(--accent-cyan);
+}
+
+.keygen-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.keygen-status {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.keygen-status-ok {
+  color: #4ade80;
+}
+
+.keygen-status-error {
+  color: #f87171;
+}
+
+.keygen-note {
+  display: block;
+  margin-top: 0.6rem;
+  font-size: 0.74rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+body.theme-light .keygen-status-ok { color: #15803d; }
+body.theme-light .keygen-status-error { color: #b91c1c; }

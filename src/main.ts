@@ -1,4 +1,4 @@
-import { app, BrowserWindow, shell, ipcMain, Tray, Menu, nativeImage } from 'electron';
+import { app, BrowserWindow, shell, ipcMain, Tray, Menu, nativeImage, dialog } from 'electron';
 import * as path from 'path';
 import { spawn, execFileSync, ChildProcess } from 'child_process';
 import * as fs from 'fs';
@@ -184,6 +184,57 @@ ipcMain.handle('capture-region', async (_event, rect: { x: number; y: number; wi
     console.error('[CAPTURE] capturePage failed:', err);
     return null;
   }
+});
+
+// Save the Robinhood key-generator script somewhere the user chooses.
+//
+// Robinhood issues no secret — you generate an Ed25519 keypair and register the
+// public half — and some people quite reasonably prefer to generate their own
+// keys rather than have an app do it. The script is dependency-free (pure-Python
+// Ed25519 when PyNaCl isn't around), so it runs on any Python 3 and needs no
+// network. Copying it out is a plain file write; the renderer never gets fs
+// access.
+ipcMain.handle('save-keygen-script', async (_event, exchange: string) => {
+  const scripts: Record<string, string> = {
+    robinhood: 'robinhood_keygen.py',
+  };
+  const filename = scripts[String(exchange || '').toLowerCase()];
+  if (!filename) {
+    return { saved: false, error: 'No key generator is available for that exchange.' };
+  }
+
+  const source = path.join(__dirname, '../src/assets/tools', filename);
+
+  try {
+    const options = {
+      title: 'Save key generator',
+      defaultPath: path.join(app.getPath('downloads'), filename),
+      filters: [{ name: 'Python script', extensions: ['py'] }],
+    };
+    // Parent it to the window when there is one, so the dialog is modal.
+    const result = mainWindow
+      ? await dialog.showSaveDialog(mainWindow, options)
+      : await dialog.showSaveDialog(options);
+    if (result.canceled || !result.filePath) {
+      return { saved: false, canceled: true };
+    }
+
+    // Read-then-write rather than copyFile: inside a packaged build the source
+    // lives in app.asar, which fs can read but isn't a real path on disk.
+    const contents = fs.readFileSync(source);
+    fs.writeFileSync(result.filePath, contents);
+    return { saved: true, path: result.filePath };
+  } catch (err: any) {
+    console.error('[KEYGEN] Could not save script:', err);
+    return { saved: false, error: err?.message || 'Could not save the file.' };
+  }
+});
+
+// Reveal a saved file in Explorer, so "where did it go?" needs no answer.
+ipcMain.handle('show-item-in-folder', async (_event, filePath: string) => {
+  if (!filePath) return false;
+  shell.showItemInFolder(filePath);
+  return true;
 });
 
 // ─── Tray, autostart, and close-to-tray ─────────────────────────────────────

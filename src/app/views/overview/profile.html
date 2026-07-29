@@ -50,6 +50,37 @@
               <option value="" disabled selected>Loading exchanges...</option>
             </select>
           </div>
+          <!-- Shown only for exchanges that issue no secret (Robinhood): you
+               generate the keypair, they only ever see the public half. -->
+          <div class="keygen-panel d-none" id="keygen-panel">
+            <div class="keygen-head">
+              <i class="fa-solid fa-key"></i>
+              <span id="keygen-title">This exchange doesn't give you a secret key</span>
+            </div>
+            <p class="keygen-body">
+              You create a keypair, give <strong id="keygen-exchange-name">the exchange</strong>
+              the <em>public</em> half, and it hands back an API key ID. The
+              <em>private</em> half stays with you and goes in the Private Key field below.
+            </p>
+            <ol class="keygen-steps">
+              <li>Download the generator and run it — it prints both keys.</li>
+              <li>Paste the <strong>public key</strong> into
+                <a href="#" id="keygen-portal-link" target="_blank" rel="noopener noreferrer">your exchange's API settings</a>.</li>
+              <li>Copy the <strong>API key ID</strong> it gives you into the field below, and the
+                <strong>private key</strong> from the generator into Private Key.</li>
+            </ol>
+            <div class="keygen-actions">
+              <button type="button" class="btn btn-secondary btn-sm" id="keygen-download-btn">
+                <i class="fa-solid fa-download me-2"></i>Download key generator
+              </button>
+              <span class="keygen-status" id="keygen-status"></span>
+            </div>
+            <small class="keygen-note">
+              Optional — needs Python 3, nothing else to install, and works offline.
+              Generating your own keys means the private key exists nowhere until you paste it.
+            </small>
+          </div>
+
           <div class="form-group">
             <label for="new-connection-label" class="form-label">Label (optional)</label>
             <input id="new-connection-label" type="text" class="form-control" placeholder="e.g. Main Account, Trading" />

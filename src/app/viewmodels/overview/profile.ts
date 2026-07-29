@@ -3,6 +3,8 @@
 class ProfileController {
   private connections: ExchangeConnection[] = [];
   private supportedExchanges: any[] = [];
+  /** Exchange the key-generator panel is currently offering a script for. */
+  private keygenExchangeId: string | null = null;
 
   constructor() {
     this.init();
@@ -67,7 +69,74 @@ class ProfileController {
           guideWrapper.classList.add('d-none');
         }
       }
+
+      this.updateKeygenPanel(exchange);
     });
+
+    document.getElementById('keygen-download-btn')?.addEventListener('click', () => {
+      this.downloadKeygenScript();
+    });
+  }
+
+  /** Show the key-generator offer for exchanges that issue no secret. */
+  private updateKeygenPanel(exchange: any): void {
+    const panel = document.getElementById('keygen-panel');
+    if (!panel) return;
+
+    // The bridge only exists inside Electron, and saving needs a native dialog.
+    const canSave = typeof (window as any).cyrus?.saveKeygenScript === 'function';
+    const show = !!exchange?.needs_generated_keypair && canSave;
+    panel.classList.toggle('d-none', !show);
+    if (!show) return;
+
+    const name = exchange.name || exchange.id;
+    const nameEl = document.getElementById('keygen-exchange-name');
+    if (nameEl) nameEl.textContent = name;
+    const titleEl = document.getElementById('keygen-title');
+    if (titleEl) titleEl.textContent = `${name} doesn't give you a secret key`;
+
+    const portal = document.getElementById('keygen-portal-link') as HTMLAnchorElement | null;
+    if (portal) {
+      portal.href = exchange.api_key_url || exchange.website || '#';
+      portal.textContent = `${name}'s API settings`;
+    }
+
+    this.setKeygenStatus('');
+    this.keygenExchangeId = exchange.id;
+  }
+
+  private setKeygenStatus(message: string, tone: 'ok' | 'error' | '' = ''): void {
+    const el = document.getElementById('keygen-status');
+    if (!el) return;
+    el.textContent = message;
+    el.classList.toggle('keygen-status-ok', tone === 'ok');
+    el.classList.toggle('keygen-status-error', tone === 'error');
+  }
+
+  private async downloadKeygenScript(): Promise<void> {
+    const bridge = (window as any).cyrus;
+    if (!bridge?.saveKeygenScript || !this.keygenExchangeId) return;
+
+    const btn = document.getElementById('keygen-download-btn') as HTMLButtonElement | null;
+    if (btn) btn.disabled = true;
+    this.setKeygenStatus('Saving…');
+
+    try {
+      const result = await bridge.saveKeygenScript(this.keygenExchangeId);
+      if (result?.canceled) {
+        this.setKeygenStatus('');
+      } else if (result?.saved) {
+        this.setKeygenStatus('Saved — run it, then paste the keys here.', 'ok');
+        // Point Explorer at it so nobody has to hunt for the file.
+        bridge.showItemInFolder?.(result.path);
+      } else {
+        this.setKeygenStatus(result?.error || 'Could not save the file.', 'error');
+      }
+    } catch (err: any) {
+      this.setKeygenStatus(err?.message || 'Could not save the file.', 'error');
+    } finally {
+      if (btn) btn.disabled = false;
+    }
   }
 
   private async loadProfile(): Promise<void> {

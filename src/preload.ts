@@ -7,6 +7,13 @@ contextBridge.exposeInMainWorld('cyrus', {
   // data URL, or null on failure.
   captureRegion: (rect: { x: number; y: number; width: number; height: number }): Promise<string | null> =>
     ipcRenderer.invoke('capture-region', rect),
+  // Save the bundled key-generator script for an exchange to a location the
+  // user picks. Returns { saved, path? , canceled?, error? }.
+  saveKeygenScript: (exchange: string): Promise<{
+    saved: boolean; path?: string; canceled?: boolean; error?: string;
+  }> => ipcRenderer.invoke('save-keygen-script', exchange),
+  showItemInFolder: (filePath: string): Promise<boolean> =>
+    ipcRenderer.invoke('show-item-in-folder', filePath),
 });
 
 contextBridge.exposeInMainWorld('api', {
