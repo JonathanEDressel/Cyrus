@@ -66,6 +66,9 @@ The sidebar is now grouped into **Portfolio**, **Automation** and **Account** in
 
 - **Table rows could stay blank until you moved the mouse over them.** The window was created without an opaque background colour, and a decorative animation ran permanently on a fixed overlay — between them, Chromium could skip redrawing a region after its contents changed, so rows only appeared once a hover forced a repaint. Both are fixed, and tables now explicitly invalidate themselves after their contents change.
 - Text across the new pages was checked for contrast: several greys used for supporting text sat around 4:1 on the dark background and have been raised, and the red used for losses was too dim next to the green used for gains.
+- **The Balancer's position rows were far too tall.** Its nine columns didn't fit the page width, so the "would trim now" sentence wrapped onto three lines and stretched every row with it. The Balancer and Holdings pages now use the full width of a wide window, and the amount to sell is shown to four significant figures rather than eight decimal places.
+- **A cap label could be unreadable on a coin that had passed its cap** — the bar grows past its own handle, so the percentage sat on top of the amber fill. It's now outlined against whatever is behind it.
+- **Exchange connections in your profile only showed their label.** Four accounts labelled "Main", "Trading", "Spot" and "Crypto" gave no clue which exchange each one was; every connection now shows its exchange alongside the label.
 
 ### 🔧 Under the hood
 
