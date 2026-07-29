@@ -173,6 +173,9 @@ class ProfileController {
     try {
       this.supportedExchanges = await ExchangeController.getSupportedExchanges();
       this.refreshExchangeDropdown();
+      // Connections may have rendered before this metadata arrived, in which
+      // case their exchange badges fell back to the raw id. Redraw with names.
+      if (this.connections.length > 0) this.renderConnections();
     } catch {
       const select = document.getElementById('new-exchange-name') as HTMLSelectElement;
       if (select) select.innerHTML = '<option value="" disabled selected>Failed to load exchanges</option>';
@@ -233,9 +236,15 @@ class ProfileController {
         ? new Date(c.keys_last_validated.endsWith('Z') ? c.keys_last_validated : c.keys_last_validated + 'Z').toLocaleString()
         : 'Never';
       const label = c.label || 'Default';
+      // Without the exchange name, four connections labelled Main / Advanced /
+      // Spot / Crypto give no clue which account is which.
+      const meta = this.supportedExchanges.find(e => e.id === c.exchange_name);
+      const exchangeName = (meta?.name || c.exchange_name || '')
+        .replace(/\s*\(beta\)\s*/i, '');
 
       return `<div class="connection-card mt-4" data-conn-id="${c.id}">
         <div class="connection-info mb-4">
+          <span class="exchange-badge exchange-${this.escapeHtml(c.exchange_name)}">${this.escapeHtml(exchangeName)}</span>
           <span class="connection-label">${this.escapeHtml(label)} - </span>
           <span class="status-badge ${statusClass}">${statusText}</span>${sandboxBadge}
           <span class="text-muted small">Last checked: ${this.escapeHtml(lastValidated)}</span>

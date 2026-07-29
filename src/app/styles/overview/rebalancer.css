@@ -5,6 +5,13 @@
  * the balancer, plus the overrides below where a shared rule doesn't fit.
  */
 
+/* Nine columns — three of them form controls — don't fit the shared 1200px
+   container: the last one wraps to three lines and stretches every row. Give
+   this page more room on wide windows. */
+.balancer-page {
+  max-width: 1480px;
+}
+
 /* Section headers collapse on the Overview page — here they're static. */
 .balancer-page .section-header {
   cursor: default;
@@ -90,15 +97,22 @@
 }
 
 /* Nine equal columns would crush the inputs; with table-layout: fixed the
-   header row sets the widths for the whole column. */
-.balancer-page .data-table th:nth-child(1) { width: 4%; }
-.balancer-page .data-table th:nth-child(2) { width: 9%; }
-.balancer-page .data-table th:nth-child(3) { width: 13%; }
-.balancer-page .data-table th:nth-child(4) { width: 11%; }
-.balancer-page .data-table th:nth-child(5) { width: 8%; }
-.balancer-page .data-table th:nth-child(6) { width: 10%; }
-.balancer-page .data-table th:nth-child(7) { width: 11%; }
-.balancer-page .data-table th:nth-child(8) { width: 12%; }
+   header row sets the widths for the whole column. The last column carries a
+   whole sentence, so it gets the largest share — starved of width it wraps to
+   three lines and drags every row's height with it. */
+.balancer-page .data-table th:nth-child(1) { width: 4%;  }  /* On           */
+.balancer-page .data-table th:nth-child(2) { width: 8%;  }  /* Asset        */
+.balancer-page .data-table th:nth-child(3) { width: 11%; }  /* Holdings     */
+.balancer-page .data-table th:nth-child(4) { width: 9%;  }  /* Value        */
+.balancer-page .data-table th:nth-child(5) { width: 7%;  }  /* Now          */
+.balancer-page .data-table th:nth-child(6) { width: 9%;  }  /* Max %        */
+.balancer-page .data-table th:nth-child(7) { width: 10%; }  /* Down to %    */
+.balancer-page .data-table th:nth-child(8) { width: 12%; }  /* Convert into */
+.balancer-page .data-table th:nth-child(9) { width: 30%; }  /* Would trim   */
+
+.balancer-preview {
+  line-height: 1.45;
+}
 
 /* Column headers sit on the near-black --bg-primary; --text-muted is too faint
    there, so the balancer's table header steps up one level. */
@@ -259,6 +273,12 @@
   font-size: 10px;
   font-weight: 600;
   pointer-events: none;
+  /* An over-cap bar reaches past its own handle, so the label can land on the
+     amber fill. Outline it in the page colour so it reads on either. */
+  paint-order: stroke;
+  stroke: var(--bg-primary);
+  stroke-width: 3px;
+  stroke-linejoin: round;
 }
 
 .ac-cap-paused .ac-cap-line,
@@ -392,6 +412,10 @@
 .balancer-over {
   color: #f59e0b;
   font-weight: 600;
+}
+
+.balancer-preview {
+  line-height: 1.4;
 }
 
 .balancer-trim {

@@ -6,7 +6,7 @@
  * page are swapped for versions that return ONE internally-consistent fake
  * dataset, so the numbers line up across the whole app:
  *
- *   • Two connected exchanges (Kraken + Coinbase) …
+ *   • Four connected exchanges (Kraken, Coinbase, Binance, Robinhood) …
  *   • whose balances == the portfolio doughnut on the Overview …
  *   • whose open orders match the order-flow chart …
  *   • whose automations reference those same orders/assets/wallets …
@@ -27,33 +27,69 @@ const DemoData = (() => {
   // Use high connection IDs so they never collide with a real connection.
   const KRAKEN = 9001;
   const COINBASE = 9002;
+  const BINANCE = 9003;
+  const ROBINHOOD = 9004;
+
+  const EXCHANGE_OF: Record<number, string> = {
+    [KRAKEN]: 'kraken',
+    [COINBASE]: 'coinbase',
+    [BINANCE]: 'binance',
+    [ROBINHOOD]: 'robinhood',
+  };
+
+  const ALL_CONNS = [KRAKEN, COINBASE, BINANCE, ROBINHOOD];
 
   // Reference USD prices, keyed by base asset. Everything else (portfolio
   // values, order fills, log amounts, chart levels) is derived from these so
   // the story stays consistent.
   const PRICE: Record<string, number> = {
-    BTC: 67200,
-    ETH: 3480,
-    SOL: 152,
-    ADA: 0.46,
-    LINK: 14.2,
-    XRP: 0.53,
-    DOGE: 0.16,
-    AVAX: 38,
-    DOT: 7.2,
-    LTC: 84,
-    MATIC: 0.72,
-    ATOM: 9.4,
-    UNI: 11.5,
-    USDC: 1,
-    USDT: 1,
+    BTC:     67200,
+    ETH:     3480,
+    SOL:     152,
+    ADA:     0.46,
+    LINK:    14.2,
+    XRP:     0.53,
+    DOGE:    0.16,
+    AVAX:    38,
+    DOT:     7.2,
+    LTC:     84,
+    MATIC:   0.72,
+    ATOM:    9.4,
+    UNI:     11.5,
+    NEAR:    6.1,
+    ARB:     1.12,
+    OP:      2.35,
+    INJ:     27.4,
+    SUI:     1.48,
+    TIA:     9.8,
+    RENDER:  8.3,
+    FET:     2.24,
+    AAVE:    96,
+    MKR:     2380,
+    XLM:     0.114,
+    BCH:     428,
+    ETC:     26.4,
+    ALGO:    0.185,
+    HBAR:    0.089,
+    FIL:     5.6,
+    GRT:     0.24,
+    IMX:     2.05,
+    SHIB:    2.48e-05,
+    PEPE:    1.09e-05,
+    USDC:    1,
+    USDT:    1,
+    DAI:     1,
+    USD:     1,
   };
 
   // Holdings per connection (asset -> amount). These ARE the balances and the
-  // portfolio at the same time.
+  // portfolio at the same time. USD entries show up as cash on the Holdings
+  // page rather than as a coin.
   const HOLDINGS: Record<number, Record<string, number>> = {
-    [KRAKEN]: { BTC: 0.6, ETH: 5, SOL: 80, ADA: 4000, USDC: 6000, DOT: 300, LINK: 250, AVAX: 120, ATOM: 400 },
-    [COINBASE]: { BTC: 0.25, ETH: 3, LINK: 400, XRP: 5000, USDT: 2500, MATIC: 8000, DOGE: 30000, LTC: 40, UNI: 350 },
+    [KRAKEN]: { BTC: 0.62, ETH: 5.4, SOL: 80, ADA: 4000, USDC: 6000, DOT: 300, LINK: 250, AVAX: 120, ATOM: 400, XLM: 12000, FIL: 300, AAVE: 12, USD: 850 },
+    [COINBASE]: { BTC: 0.25, ETH: 3.1, LINK: 400, XRP: 5000, USDT: 2500, MATIC: 8000, DOGE: 30000, LTC: 40, UNI: 350, NEAR: 600, OP: 900, GRT: 15000 },
+    [BINANCE]: { BTC: 0.18, ETH: 2.2, SOL: 45, ARB: 3000, INJ: 60, SUI: 2500, TIA: 250, FET: 900, USDT: 4000, BCH: 4, ALGO: 9000, RENDER: 400 },
+    [ROBINHOOD]: { BTC: 0.12, ETH: 1.4, DOGE: 60000, SHIB: 25000000, LTC: 12, ETC: 40, XLM: 8000, SOL: 18, AVAX: 30, HBAR: 20000, IMX: 800, USD: 1450 },
   };
 
   /** A timestamp `offsetMs` in the past, ISO without the trailing `Z`
@@ -70,24 +106,14 @@ const DemoData = (() => {
 
   function connections(): ExchangeConnection[] {
     return [
-      {
-        id: KRAKEN,
-        exchange_name: 'kraken',
-        label: 'Default',
-        is_validated: true,
-        is_sandbox: false,
-        keys_last_validated: ago(12 * MIN),
-        created_at: ago(90 * DAY),
-      },
-      {
-        id: COINBASE,
-        exchange_name: 'coinbase',
-        label: 'Default',
-        is_validated: true,
-        is_sandbox: false,
-        keys_last_validated: ago(31 * MIN),
-        created_at: ago(60 * DAY),
-      },
+      { id: KRAKEN, exchange_name: 'kraken', label: 'Main', is_validated: true,
+        is_sandbox: false, keys_last_validated: ago(12 * MIN), created_at: ago(180 * DAY) },
+      { id: COINBASE, exchange_name: 'coinbase', label: 'Trading', is_validated: true,
+        is_sandbox: false, keys_last_validated: ago(31 * MIN), created_at: ago(120 * DAY) },
+      { id: BINANCE, exchange_name: 'binance', label: 'Spot', is_validated: true,
+        is_sandbox: false, keys_last_validated: ago(48 * MIN), created_at: ago(64 * DAY) },
+      { id: ROBINHOOD, exchange_name: 'robinhood', label: 'Crypto', is_validated: true,
+        is_sandbox: false, keys_last_validated: ago(9 * MIN), created_at: ago(21 * DAY) },
     ];
   }
 
@@ -100,6 +126,7 @@ const DemoData = (() => {
         has_withdrawal_addresses: true,
         supports_withdraw: true,
         supports_rebalance: true,
+        needs_generated_keypair: false,
         has_sandbox: false,
         website: 'https://www.kraken.com',
         api_key_url: 'https://www.kraken.com/u/security/api',
@@ -112,10 +139,38 @@ const DemoData = (() => {
         has_withdrawal_addresses: false,
         supports_withdraw: false,
         supports_rebalance: true,
+        needs_generated_keypair: false,
         has_sandbox: false,
         website: 'https://www.coinbase.com',
         api_key_url: 'https://www.coinbase.com/settings/api',
         guide_url: 'https://docs.cdp.coinbase.com/exchange/introduction/rest-quickstart',
+      },
+      {
+        id: 'binance',
+        name: 'Binance (Beta)',
+        requires_passphrase: false,
+        has_withdrawal_addresses: false,
+        supports_withdraw: false,
+        supports_rebalance: true,
+        needs_generated_keypair: false,
+        has_sandbox: false,
+        website: 'https://www.binance.com',
+        api_key_url: 'https://www.binance.com/en/my/settings/api-management',
+        guide_url: 'https://www.binance.com/en/support/faq/how-to-create-api-keys-on-binance-360002502072',
+      },
+      {
+        id: 'robinhood',
+        name: 'Robinhood (Beta)',
+        requires_passphrase: false,
+        has_withdrawal_addresses: false,
+        supports_withdraw: false,
+        supports_rebalance: true,
+        // Drives the key-generator offer in Profile.
+        needs_generated_keypair: true,
+        has_sandbox: false,
+        website: 'https://robinhood.com',
+        api_key_url: 'https://robinhood.com/account/crypto',
+        guide_url: 'https://docs.robinhood.com/crypto/trading/',
       },
     ];
   }
@@ -148,21 +203,42 @@ const DemoData = (() => {
   /** [name, rank, marketCap, circulating, total, max, ath, athDate, atl, atlDate,
    *   1h%, 24h%, 7d%, 30d%] — plausible figures, not live ones. */
   const FUNDAMENTALS: Record<string, any[]> = {
-    BTC:   ['Bitcoin', 1, 1.34e12, 19.7e6, 19.7e6, 21e6, 73750, '2024-03-14', 67.81, '2013-07-06', 0.2, 1.8, 4.2, 9.6],
-    ETH:   ['Ethereum', 2, 4.2e11, 120.2e6, 120.2e6, null, 4878, '2021-11-10', 0.43, '2015-10-20', -0.1, 1.1, 2.8, 6.4],
-    SOL:   ['Solana', 5, 6.9e10, 460e6, 587e6, null, 260, '2021-11-06', 0.5, '2020-05-11', 0.6, 3.4, 8.1, 15.2],
-    ADA:   ['Cardano', 9, 1.6e10, 35.4e9, 45e9, 45e9, 3.09, '2021-09-02', 0.017, '2020-03-13', -0.3, -0.8, 1.4, -3.2],
-    DOT:   ['Polkadot', 14, 1.0e10, 1.43e9, 1.48e9, null, 54.98, '2021-11-04', 2.7, '2020-08-20', 0.1, -1.2, 0.6, -5.1],
-    LINK:  ['Chainlink', 12, 9.1e9, 626e6, 1e9, 1e9, 52.7, '2021-05-10', 0.148, '2017-11-29', 0.4, 2.2, 5.6, 11.3],
-    AVAX:  ['Avalanche', 11, 1.5e10, 395e6, 442e6, 720e6, 144.96, '2021-11-21', 2.8, '2020-12-31', 0.3, 2.9, 6.2, 8.8],
-    ATOM:  ['Cosmos Hub', 38, 3.7e9, 391e6, 391e6, null, 44.7, '2021-09-20', 1.16, '2020-03-13', -0.2, -1.6, -2.4, -7.9],
-    XRP:   ['XRP', 6, 3.0e10, 56.2e9, 99.99e9, 100e9, 3.4, '2018-01-07', 0.0028, '2014-05-22', 0.1, 0.9, 3.1, 4.7],
-    MATIC: ['Polygon', 18, 6.7e9, 9.3e9, 10e9, 10e9, 2.92, '2021-12-27', 0.0031, '2019-05-10', -0.4, -2.1, -4.8, -12.4],
-    DOGE:  ['Dogecoin', 8, 2.3e10, 145e9, 145e9, null, 0.7376, '2021-05-08', 0.0000869, '2015-05-06', 0.8, 4.6, 9.3, 18.1],
-    LTC:   ['Litecoin', 20, 6.3e9, 75e6, 75e6, 84e6, 410.26, '2021-05-10', 1.15, '2015-01-14', 0.2, 1.3, 2.2, 3.9],
-    UNI:   ['Uniswap', 22, 6.9e9, 600e6, 1e9, 1e9, 44.97, '2021-05-03', 1.03, '2020-09-17', -0.1, 0.4, 1.9, -2.6],
-    USDC:  ['USD Coin', 7, 3.4e10, 34e9, 34e9, null, 1.17, '2019-05-08', 0.877, '2023-03-11', 0.0, 0.01, -0.02, 0.0],
-    USDT:  ['Tether', 3, 1.1e11, 110e9, 110e9, null, 1.32, '2018-07-24', 0.573, '2015-03-02', 0.0, 0.02, 0.01, 0.0],
+    BTC:     ['Bitcoin', 1, 1340000000000.0, 19700000.0, 19700000.0, 21000000.0, 73750, '2024-03-14', 67.81, '2013-07-06', 0.2, 1.8, 4.2, 9.6],
+    ETH:     ['Ethereum', 2, 420000000000.0, 120200000.0, 120200000.0, null, 4878, '2021-11-10', 0.43, '2015-10-20', -0.1, 1.1, 2.8, 6.4],
+    USDT:    ['Tether', 3, 110000000000.0, 110000000000.0, 110000000000.0, null, 1.32, '2018-07-24', 0.573, '2015-03-02', 0.0, 0.02, 0.01, 0.0],
+    SOL:     ['Solana', 5, 69000000000.0, 460000000.0, 587000000.0, null, 260, '2021-11-06', 0.5, '2020-05-11', 0.6, 3.4, 8.1, 15.2],
+    XRP:     ['XRP', 6, 30000000000.0, 56200000000.0, 99990000000.0, 100000000000.0, 3.4, '2018-01-07', 0.0028, '2014-05-22', 0.1, 0.9, 3.1, 4.7],
+    USDC:    ['USD Coin', 7, 34000000000.0, 34000000000.0, 34000000000.0, null, 1.17, '2019-05-08', 0.877, '2023-03-11', 0.0, 0.01, -0.02, 0.0],
+    DOGE:    ['Dogecoin', 8, 23000000000.0, 145000000000.0, 145000000000.0, null, 0.7376, '2021-05-08', 8.69e-05, '2015-05-06', 0.8, 4.6, 9.3, 18.1],
+    ADA:     ['Cardano', 9, 16000000000.0, 35400000000.0, 45000000000.0, 45000000000.0, 3.09, '2021-09-02', 0.017, '2020-03-13', -0.3, -0.8, 1.4, -3.2],
+    AVAX:    ['Avalanche', 11, 15000000000.0, 395000000.0, 442000000.0, 720000000.0, 144.96, '2021-11-21', 2.8, '2020-12-31', 0.3, 2.9, 6.2, 8.8],
+    LINK:    ['Chainlink', 12, 9100000000.0, 626000000.0, 1000000000.0, 1000000000.0, 52.7, '2021-05-10', 0.148, '2017-11-29', 0.4, 2.2, 5.6, 11.3],
+    DOT:     ['Polkadot', 14, 10000000000.0, 1430000000.0, 1480000000.0, null, 54.98, '2021-11-04', 2.7, '2020-08-20', 0.1, -1.2, 0.6, -5.1],
+    MATIC:   ['Polygon', 18, 6700000000.0, 9300000000.0, 10000000000.0, 10000000000.0, 2.92, '2021-12-27', 0.0031, '2019-05-10', -0.4, -2.1, -4.8, -12.4],
+    LTC:     ['Litecoin', 20, 6300000000.0, 75000000.0, 75000000.0, 84000000.0, 410.26, '2021-05-10', 1.15, '2015-01-14', 0.2, 1.3, 2.2, 3.9],
+    UNI:     ['Uniswap', 22, 6900000000.0, 600000000.0, 1000000000.0, 1000000000.0, 44.97, '2021-05-03', 1.03, '2020-09-17', -0.1, 0.4, 1.9, -2.6],
+    BCH:     ['Bitcoin Cash', 24, 8400000000.0, 19700000.0, 19700000.0, 21000000.0, 4355, '2017-12-20', 76.93, '2018-12-16', 0.2, 1.6, 3.4, 5.2],
+    NEAR:    ['NEAR Protocol', 26, 6600000000.0, 1080000000.0, 1200000000.0, null, 20.44, '2022-01-16', 0.526, '2020-11-04', 0.5, 3.1, 7.4, 12.9],
+    ICP:     ['Internet Computer', 27, 5200000000.0, 470000000.0, 512000000.0, null, 700.65, '2021-05-10', 2.87, '2023-09-22', -0.2, -1.1, 2.2, -4.4],
+    ATOM:    ['Cosmos Hub', 38, 3700000000.0, 391000000.0, 391000000.0, null, 44.7, '2021-09-20', 1.16, '2020-03-13', -0.2, -1.6, -2.4, -7.9],
+    XLM:     ['Stellar', 30, 3300000000.0, 29200000000.0, 50000000000.0, 50000000000.0, 0.875, '2018-01-03', 0.00047, '2015-03-05', 0.1, 0.7, 1.8, 2.4],
+    INJ:     ['Injective', 41, 2700000000.0, 98000000.0, 100000000.0, 100000000.0, 52.62, '2024-03-14', 0.6574, '2020-11-03', 0.9, 4.2, 11.6, 19.4],
+    ARB:     ['Arbitrum', 44, 3400000000.0, 3000000000.0, 10000000000.0, 10000000000.0, 2.4, '2024-01-12', 0.7563, '2023-12-08', -0.5, -2.6, -5.4, -14.2],
+    OP:      ['Optimism', 46, 2600000000.0, 1100000000.0, 4290000000.0, 4290000000.0, 4.85, '2024-03-06', 0.4014, '2022-06-18', -0.3, -1.8, -3.6, -9.7],
+    FIL:     ['Filecoin', 48, 3100000000.0, 560000000.0, 1960000000.0, 1960000000.0, 236.84, '2021-04-01', 1.83, '2022-12-30', 0.1, 1.2, 2.6, -1.8],
+    ETC:     ['Ethereum Classic', 50, 3800000000.0, 147000000.0, 210000000.0, 210000000.0, 176.16, '2021-05-06', 0.615, '2016-07-25', 0.2, 1.4, 2.9, 4.1],
+    HBAR:    ['Hedera', 52, 3200000000.0, 35800000000.0, 50000000000.0, 50000000000.0, 0.5701, '2021-09-15', 0.00994, '2020-03-13', 0.4, 2.4, 6.1, 8.2],
+    TIA:     ['Celestia', 58, 1900000000.0, 196000000.0, 1000000000.0, null, 20.85, '2024-02-11', 2.0, '2023-10-31', 0.7, 3.8, 9.2, 14.6],
+    RENDER:  ['Render', 60, 3200000000.0, 388000000.0, 532000000.0, 644000000.0, 13.53, '2024-03-17', 0.03664, '2020-06-16', 0.6, 3.2, 8.4, 16.1],
+    SUI:     ['Sui', 62, 3700000000.0, 2500000000.0, 10000000000.0, 10000000000.0, 2.18, '2024-03-27', 0.3643, '2023-10-19', 0.8, 4.4, 10.8, 17.3],
+    FET:     ['Artificial Superintelligence', 64, 1900000000.0, 848000000.0, 2630000000.0, 2630000000.0, 3.45, '2024-03-29', 0.00816, '2020-03-13', 1.1, 5.2, 12.4, 21.8],
+    AAVE:    ['Aave', 66, 1400000000.0, 14800000.0, 16000000.0, 16000000.0, 661.69, '2021-05-18', 26.02, '2020-11-05', 0.3, 2.1, 4.8, 7.6],
+    IMX:     ['Immutable', 68, 3100000000.0, 1500000000.0, 2000000000.0, 2000000000.0, 9.52, '2021-11-26', 0.3808, '2022-12-30', -0.2, -1.4, -2.8, -6.9],
+    GRT:     ['The Graph', 70, 2300000000.0, 9500000000.0, 10800000000.0, null, 2.88, '2021-02-12', 0.0521, '2022-12-31', 0.3, 1.9, 4.4, 6.8],
+    ALGO:    ['Algorand', 74, 1500000000.0, 8100000000.0, 10000000000.0, 10000000000.0, 3.56, '2019-06-20', 0.0904, '2023-09-11', 0.1, 0.8, 2.1, 1.4],
+    MKR:     ['Maker', 78, 2200000000.0, 920000.0, 1000000.0, 1000000.0, 6339, '2021-05-03', 168.36, '2020-03-16', -0.1, 0.6, 1.8, -3.4],
+    SHIB:    ['Shiba Inu', 15, 14600000000.0, 589000000000000.0, 589000000000000.0, null, 8.845e-05, '2021-10-28', 1e-10, '2020-11-28', 0.9, 5.1, 11.2, 22.4],
+    PEPE:    ['Pepe', 25, 4600000000.0, 420000000000000.0, 420000000000000.0, 420000000000000.0, 1.718e-05, '2024-05-27', 5e-08, '2023-04-18', 1.4, 6.8, 15.4, 28.6],
   };
 
   /** A deterministic 7-day squiggle that ends consistent with the 7d change. */
@@ -209,12 +285,12 @@ const DemoData = (() => {
 
   function holdings(connId: number | string = 'all'): any {
     const ids = connId === 'all' || connId == null
-      ? [KRAKEN, COINBASE]
+      ? ALL_CONNS.slice()
       : [typeof connId === 'string' ? parseInt(connId, 10) : connId];
 
     const merged: Record<string, any> = {};
     for (const id of ids) {
-      const label = id === KRAKEN ? 'Kraken' : 'Coinbase';
+      const label = EXCHANGE_OF[id] || 'exchange';
       for (const p of portfolio(id).positions) {
         const entry = merged[p.asset] || (merged[p.asset] = {
           asset: p.asset, amount: 0, usd_value: 0, venues: [],
@@ -272,8 +348,10 @@ const DemoData = (() => {
 
   /** Caps per connection: asset -> [max %, down-to %, destination]. */
   const CAPS: Record<number, Record<string, [number, number, string]>> = {
-    [KRAKEN]: { BTC: [30, 25, 'USDC'], SOL: [12, 9, 'USDC'] },
-    [COINBASE]: { LINK: [18, 14, 'USDT'] },
+    [KRAKEN]: { BTC: [30, 25, 'USDC'], ETH: [22, 18, 'USDC'], SOL: [12, 9, 'USDC'] },
+    [COINBASE]: { BTC: [28, 24, 'USDT'], LINK: [18, 14, 'USDT'] },
+    [BINANCE]: { BTC: [26, 22, 'USDT'], SOL: [15, 11, 'USDT'] },
+    [ROBINHOOD]: { BTC: [32, 27, 'USD'], DOGE: [12, 9, 'USD'] },
   };
 
   function allocations(connId: number): any {
@@ -320,7 +398,7 @@ const DemoData = (() => {
     });
 
     return {
-      connection: { id: connId, exchange_name: connId === KRAKEN ? 'kraken' : 'coinbase', label: 'Default' },
+      connection: { id: connId, exchange_name: EXCHANGE_OF[connId] || 'kraken', label: 'Default' },
       total_usd: pf.total_usd,
       settings: { cooldown_minutes: 1440, min_trade_usd: minTrade, dry_run: false },
       positions,
@@ -347,33 +425,84 @@ const DemoData = (() => {
   // the order-filled automations below, so those stay in sync.
   const ORDERS: Record<number, any[]> = {
     [KRAKEN]: [
-      ord('OQ4F7K-T2A9P-ETHB01', 'ETH/USD', 'buy', 3300, 1.5, 0, 3),
-      ord('OB7N2C-V5K8D-SOLS02', 'SOL/USD', 'sell', 165, 30, 8, 26),
-      ord('OZ8L2M-R5C7N-BTCB03', 'BTC/USD', 'buy', 63000, 0.2, 0, 5),
-      ord('OD3P9Q-X1F4G-ADAS04', 'ADA/USD', 'sell', 0.52, 2000, 500, 14),
-      ord('OK6R1S-Y7H2J-DOTB05', 'DOT/USD', 'buy', 6.5, 200, 0, 9),
-      ord('OL2T8U-Z3M5N-LNKS06', 'LINK/USD', 'sell', 16, 150, 30, 18),
-      ord('OM3X9V-K1D4S-AVXB07', 'AVAX/USD', 'buy', 34, 60, 0, 7),
-      ord('ON5W4Y-P8Q2R-ATMS08', 'ATOM/USD', 'sell', 11, 250, 0, 31),
-      ord('OP9A2B-C4D6E-SOLC09', 'SOL/USDC', 'buy', 140, 25, 0, 12),
-      ord('OQ1C3D-E5F7G-ETBT10', 'ETH/BTC', 'sell', 0.052, 2, 0, 40),
-      ord('OR4E6F-G8H1J-BTUC11', 'BTC/USDC', 'buy', 64000, 0.1, 0, 2),
-      ord('OS7G9H-J2K4L-AVXS12', 'AVAX/USD', 'sell', 42, 40, 10, 21),
-      ord('OT2J5K-L6M8N-LNKB13', 'LINK/USD', 'buy', 12.5, 100, 0, 33),
+      ord('O7Q9SB-XGZJ3-BTC00', 'BTC/USD', 'buy', 64848.00, 0.15, 0.0, 3),
+      ord('ODWFYH-5N7Q9-BTC01', 'BTC/USD', 'sell', 72038.40, 0.2, 0.0, 26),
+      ord('OK4M6P-BUDWF-ETH02', 'ETH/USD', 'buy', 3382.56, 1.5, 0.495, 7),
+      ord('ORATCV-H2K4M-ETH03', 'ETH/USD', 'sell', 3681.84, 2.0, 0.0, 14),
+      ord('OXGZJ3-P8RAT-SOL04', 'SOL/USD', 'sell', 164.92, 40, 0.0, 2),
+      ord('O5N7Q9-VEXGZ-SOL05', 'SOL/USD', 'buy', 142.88, 25, 0.0, 31),
+      ord('OBUDWF-3L5N7-ADA06', 'ADA/USD', 'buy', 0.4393, 2500, 1000.0, 9),
+      ord('OH2K4M-9SBUD-DOT07', 'DOT/USD', 'sell', 7.99, 150, 0.0, 44),
+      ord('OP8RAT-FYH2K-LIN08', 'LINK/USD', 'buy', 13.63, 150, 75.0, 11),
+      ord('OVEXGZ-M6P8R-LIN09', 'LINK/USD', 'sell', 15.48, 120, 0.0, 20),
+      ord('O3L5N7-TCVEX-AVA10', 'AVAX/USD', 'sell', 41.99, 60, 0.0, 6),
+      ord('O9SBUD-ZJ3L5-ATO11', 'ATOM/USD', 'buy', 8.88, 200, 0.0, 38),
+      ord('OFYH2K-7Q9SB-XLM12', 'XLM/USD', 'buy', 0.10602, 8000, 2000.0, 16),
+      ord('OM6P8R-DWFYH-FIL13', 'FIL/USD', 'sell', 6.38, 150, 0.0, 52),
+      ord('OTCVEX-K4M6P-AAV14', 'AAVE/USD', 'sell', 103.20, 6, 0.0, 4),
+      ord('OZJ3L5-RATCV-BTC15', 'BTC/USDC', 'buy', 65856.00, 0.08, 0.0, 1),
+      ord('O7Q9SB-XGZJ3-ETH16', 'ETH/USDC', 'sell', 3636.60, 1.2, 0.0, 29),
+      ord('ODWFYH-5N7Q9-SOL17', 'SOL/USDC', 'buy', 145.16, 30, 0.0, 47),
+      ord('OK4M6P-BUDWF-DOT18', 'DOT/USD', 'buy', 6.62, 400, 0.0, 63),
     ],
     [COINBASE]: [
-      ord('7f1c8a92-4d3e-4b21-9c10-btcsel0014', 'BTC/USD', 'sell', 72000, 0.1, 0, 8),
-      ord('c1f4a2b8-7d3e-49aa-8f02-lnkbuy0015', 'LINK/USD', 'buy', 13, 150, 50, 11),
-      ord('e2b9d6c4-1a5f-4c88-b3e1-eths000016', 'ETH/USD', 'sell', 3600, 1, 0, 6),
-      ord('a9e2c5d1-4b6f-4d72-9a03-xrpbuy0017', 'XRP/USD', 'buy', 0.48, 4000, 1000, 19),
-      ord('b4f7e1a3-6c2d-4e55-8b41-matsel0018', 'MATIC/USD', 'sell', 0.85, 5000, 0, 27),
-      ord('d8c3b6f2-9e1a-4a37-9d52-dogbuy0019', 'DOGE/USD', 'buy', 0.14, 20000, 5000, 16),
-      ord('f5a1d9e7-3b8c-4f64-8c63-ltcsel0020', 'LTC/USD', 'sell', 92, 25, 0, 23),
-      ord('0a6b2c8d-5e4f-41a9-9e74-unibuy0021', 'UNI/USD', 'buy', 10, 200, 0, 4),
-      ord('1b7c3d9e-6f5a-42ba-8f85-dogsel0022', 'DOGE/USD', 'sell', 0.18, 15000, 0, 36),
-      ord('2c8d4e0f-7a6b-43cb-9096-ethbuy0023', 'ETH/USDT', 'buy', 3400, 1.2, 0, 10),
-      ord('3d9e5f1a-8b7c-44dc-81a7-xrpsel0024', 'XRP/USD', 'sell', 0.6, 3000, 0, 29),
-      ord('4e0f6a2b-9c8d-45ed-92b8-solbuy0025', 'SOL/USD', 'buy', 145, 20, 0, 13),
+      ord('b5f93d71-82c6-45f9-82c6-f93d71b5c60a', 'BTC/USD', 'buy', 65184.00, 0.06, 0.0, 5),
+      ord('b61c72d8-83e9-450b-82d8-fa50b61cc72d', 'BTC/USD', 'sell', 71568.00, 0.1, 0.0, 22),
+      ord('37bf37bf-048c-4d15-8ae2-7bf37bf348c0', 'ETH/USD', 'sell', 3660.96, 1.0, 0.0, 8),
+      ord('38d27c16-05af-4d27-8af4-7c16b05a49e3', 'ETH/USD', 'buy', 3368.64, 0.8, 0.4, 18),
+      ord('ad0369cf-7ad0-447a-8147-e147ad03be14', 'LINK/USD', 'buy', 13.56, 200, 50.0, 11),
+      ord('ae26ae26-7bf3-448c-8159-e26ae26abf37', 'LINK/USD', 'sell', 15.45, 180, 0.0, 33),
+      ord('ef012345-bcde-489a-8567-23456789f012', 'XRP/USD', 'buy', 0.4982, 4000, 1000.0, 19),
+      ord('e02468ac-bdf1-48ac-8579-2468ace0f135', 'XRP/USD', 'sell', 0.59095, 3000, 0.0, 29),
+      ord('a18f6d4b-7e5c-44b2-818f-e5c3a18fb290', 'MATIC/USD', 'sell', 0.8496, 5000, 0.0, 27),
+      ord('a2a2a2a2-7f7f-44c4-8191-e6e6e6e6b3b3', 'MATIC/USD', 'buy', 0.648, 6000, 0.0, 55),
+      ord('d71b5f93-a4e8-471b-84e8-1b5f93d7e82c', 'DOGE/USD', 'buy', 0.144, 20000, 5000.0, 16),
+      ord('d83e94fa-a50b-472d-84fa-1c72d83ee94f', 'DOGE/USD', 'sell', 0.18, 15000, 0.0, 36),
+      ord('99999999-6666-4333-8000-ddddddddaaaa', 'LTC/USD', 'sell', 91.98, 25, 0.0, 23),
+      ord('4e82c60a-1b5f-4e82-8b5f-82c60a4e5f93', 'UNI/USD', 'buy', 10.81, 200, 0.0, 4),
+      ord('27c16b05-f49e-4c16-89e3-6b05af4938d2', 'NEAR/USD', 'sell', 6.89, 300, 0.0, 41),
+      ord('dcba9876-a987-4765-8432-10fedcbaedcb', 'OP/USD', 'buy', 2.17, 500, 0.0, 13),
+      ord('7531fdb9-420e-41fd-8eca-b97531fd8642', 'GRT/USD', 'buy', 0.2196, 9000, 0.0, 49),
+      ord('369cf258-0369-4d03-8ad0-7ad0369c47ad', 'ETH/USDT', 'buy', 3393.00, 1.2, 0.0, 10),
+      ord('b73fb73f-840c-451d-82ea-fb73fb73c840', 'BTC/USDT', 'sell', 70896.00, 0.05, 0.0, 58),
+    ],
+    [BINANCE]: [
+      ord('21718423', 'BTC/USDT', 'buy', 65520.00, 0.05, 0.0, 2),
+      ord('21823152', 'BTC/USDT', 'sell', 71232.00, 0.09, 0.0, 17),
+      ord('21991233', 'ETH/USDT', 'buy', 3375.60, 1.0, 0.4, 6),
+      ord('22095962', 'ETH/USDT', 'sell', 3654.00, 1.2, 0.0, 25),
+      ord('22303638', 'SOL/USDT', 'sell', 164.16, 20, 0.0, 3),
+      ord('22408367', 'SOL/USDT', 'buy', 144.40, 15, 0.0, 21),
+      ord('22315121', 'ARB/USDT', 'buy', 1.03, 1500, 450.0, 12),
+      ord('22419850', 'ARB/USDT', 'sell', 1.30, 1200, 0.0, 39),
+      ord('22619607', 'INJ/USDT', 'sell', 30.14, 30, 0.0, 8),
+      ord('22724336', 'INJ/USDT', 'buy', 25.76, 25, 0.0, 45),
+      ord('22955769', 'SUI/USDT', 'buy', 1.38, 1200, 0.0, 15),
+      ord('23060498', 'SUI/USDT', 'sell', 1.69, 1000, 0.0, 30),
+      ord('23014766', 'TIA/USDT', 'sell', 10.98, 120, 0.0, 9),
+      ord('23127414', 'FET/USDT', 'buy', 2.02, 400, 200.0, 20),
+      ord('23232143', 'FET/USDT', 'sell', 2.69, 350, 0.0, 51),
+      ord('23194330', 'BCH/USDT', 'buy', 410.88, 2, 0.0, 34),
+      ord('23980093', 'ALGO/USDT', 'buy', 0.16835, 5000, 0.0, 43),
+      ord('25328105', 'RENDER/USDT', 'sell', 9.54, 200, 0.0, 7),
+      ord('23769844', 'SOL/BTC', 'buy', 0.00219405, 12, 0.0, 60),
+    ],
+    [ROBINHOOD]: [
+      ord('b5f93d71-82c6-45f9-82c6-f93d71b5c60a', 'BTC/USD', 'buy', 65856.00, 0.04, 0.0, 4),
+      ord('b61c72d8-83e9-450b-82d8-fa50b61cc72d', 'BTC/USD', 'sell', 70560.00, 0.06, 0.0, 28),
+      ord('37bf37bf-048c-4d15-8ae2-7bf37bf348c0', 'ETH/USD', 'buy', 3393.00, 0.6, 0.0, 10),
+      ord('38d27c16-05af-4d27-8af4-7c16b05a49e3', 'ETH/USD', 'sell', 3647.04, 0.8, 0.0, 32),
+      ord('d159d159-ae26-47bf-848c-159d159de26a', 'DOGE/USD', 'buy', 0.144, 25000, 10000.0, 5),
+      ord('d27c16b0-af49-47c1-849e-16b05af4e38d', 'DOGE/USD', 'sell', 0.1824, 20000, 0.0, 24),
+      ord('2fc9630d-fc96-4c96-8963-630da74130da', 'SHIB/USD', 'buy', 0.00002182, 10000000, 0.0, 18),
+      ord('94fa50b6-61c7-43e9-80b6-d83e94faa50b', 'LTC/USD', 'sell', 91.56, 6, 0.0, 12),
+      ord('49e38d27-16b0-4e38-8b05-8d27c16b5af4', 'ETC/USD', 'buy', 24.82, 20, 0.0, 37),
+      ord('3e94fa50-0b61-4d83-8a50-72d83e944fa5', 'XLM/USD', 'buy', 0.10488, 5000, 1250.0, 21),
+      ord('a3c5e709-7092-44d6-81a3-e7092b4db4d6', 'SOL/USD', 'sell', 163.40, 9, 0.0, 6),
+      ord('0c840c84-d951-4a62-873f-40c840c81d95', 'AVAX/USD', 'buy', 35.91, 15, 0.0, 40),
+      ord('71b5f93d-4e82-41b5-8e82-b5f93d7182c6', 'HBAR/USD', 'sell', 0.10324, 12000, 0.0, 46),
+      ord('a62ea62e-73fb-440c-81d9-ea62ea62b73f', 'IMX/USD', 'buy', 1.84, 500, 0.0, 54),
+      ord('db97531f-a864-4753-8420-1fdb9753eca8', 'DOGE/USD', 'buy', 0.136, 40000, 0.0, 66),
     ],
   };
 
@@ -388,8 +517,12 @@ const DemoData = (() => {
     [KRAKEN]: [
       { nickname_key: 'cold_storage_btc', asset: 'BTC', method: 'Bitcoin', address: 'bc1q9x8k2v7m4p3qz6r0t5n8w1y4u7s2d5f8g1h3j6' },
       { nickname_key: 'eth_ledger', asset: 'ETH', method: 'ERC20', address: '0x7a2F4c9B1e6D8a3C5f0B2e9A4d7C1f8E3b6D2a9C' },
+      { nickname_key: 'sol_phantom', asset: 'SOL', method: 'Solana', address: '7vfBGpjZTEZEsKNi1ZdYYBPGq1uFzWvLuV6xRP13tSo9' },
+      { nickname_key: 'atom_keplr', asset: 'ATOM', method: 'Cosmos', address: 'cosmos1x7v9k2m4p8q3z6r0t5n8w1y4u7s2d5f8g1h3j6' },
     ],
     [COINBASE]: [],
+    [BINANCE]: [],
+    [ROBINHOOD]: [],
   };
 
   function withdrawalAddresses(connId: number): any[] {
@@ -429,14 +562,15 @@ const DemoData = (() => {
 
   /** "When a coin grows past a share of the portfolio, trim it back." */
   function allocationRule(id: number, ex: number, asset: string, max: number, target: number,
-                          to: string, active: boolean, trigCount: number, lastAgoMs: number): any {
+                          to: string, active: boolean, trigCount: number, lastAgoMs: number,
+                          dryRun = false): any {
     return {
       id, rule_name: `Balance ${asset} → ${to}`, is_active: active,
       trigger_type: 'allocation_threshold',
       trigger_asset: asset,
       trigger_allocation_percent: String(max),
       rebalance_target_percent: String(target),
-      min_trade_usd: '25', dry_run: false,
+      min_trade_usd: '25', dry_run: dryRun,
       cooldown_minutes: 1440,
       action_type: 'convert_crypto', action_asset: asset, convert_to_asset: to,
       trigger_exchange_id: ex, action_exchange_id: ex,
@@ -462,32 +596,39 @@ const DemoData = (() => {
   // addresses); Coinbase is convert-only, matching its capability flags.
   function rules(): any[] {
     return [
-      // ── Kraken ──
-      priceRule(5001, 'Take profit: SOL → USDC', KRAKEN, 'SOL', '165', 'USDC', true, 'all', '', 3, null, 2 * HOUR),
-      orderRule(5002, 'Auto-withdraw ETH buy', KRAKEN, 'OQ4F7K-T2A9P-ETHB01', 'ETH', { addrKey: 'eth_ledger' }, true, 0, 0),
-      balanceRule(5003, 'Sweep idle USDC into BTC', KRAKEN, 'USDC', '6000', 'BTC', false, 0, 0),
-      priceRule(5004, 'Take profit: BTC → USDC', KRAKEN, 'BTC', '72000', 'USDC', true, 'percent', '50', 1, 5, 20 * HOUR),
-      balanceRule(5005, 'Stake-out: DOT → ETH', KRAKEN, 'DOT', '300', 'ETH', true, 4, 5 * DAY),
-      orderRule(5006, 'Cold-store the BTC buy', KRAKEN, 'OZ8L2M-R5C7N-BTCB03', 'BTC', { addrKey: 'cold_storage_btc' }, true, 0, 0),
-      priceRule(5007, 'Take profit: AVAX → USDC', KRAKEN, 'AVAX', '42', 'USDC', true, 'all', '', 2, null, 9 * HOUR),
-      balanceRule(5008, 'Rotate ATOM into BTC', KRAKEN, 'ATOM', '400', 'BTC', false, 0, 0),
-      orderRule(5009, 'Convert AVAX fills → USDC', KRAKEN, 'OM3X9V-K1D4S-AVXB07', 'AVAX', { to: 'USDC' }, true, 1, 30 * HOUR),
-      priceRule(5010, 'Take profit: LINK → USDC', KRAKEN, 'LINK', '16', 'USDC', true, 'all', '', 2, null, 6 * HOUR),
-      // ── Coinbase (convert only) ──
-      priceRule(5011, 'Take profit: BTC → USDT', COINBASE, 'BTC', '72000', 'USDT', true, 'percent', '50', 1, 5, 20 * HOUR),
-      balanceRule(5012, 'Stack LINK into ETH', COINBASE, 'LINK', '400', 'ETH', true, 2, 3 * DAY),
-      priceRule(5013, 'Take profit: ETH → USDT', COINBASE, 'ETH', '3600', 'USDT', true, 'all', '', 0, null, 0),
-      balanceRule(5014, 'Cash out XRP → USDT', COINBASE, 'XRP', '5000', 'USDT', false, 0, 0),
-      orderRule(5015, 'Convert LINK fills → ETH', COINBASE, 'c1f4a2b8-7d3e-49aa-8f02-lnkbuy0015', 'LINK', { to: 'ETH' }, true, 3, 2 * HOUR),
-      priceRule(5016, 'Take profit: MATIC → USDC', COINBASE, 'MATIC', '0.85', 'USDC', true, 'all', '', 1, null, 40 * HOUR),
-      balanceRule(5017, 'Cash out DOGE → USDT', COINBASE, 'DOGE', '30000', 'USDT', true, 5, 12 * HOUR),
-      orderRule(5018, 'Convert XRP fills → USDT', COINBASE, 'a9e2c5d1-4b6f-4d72-9a03-xrpbuy0017', 'XRP', { to: 'USDT' }, true, 2, 16 * HOUR),
-      priceRule(5019, 'Take profit: LTC → USDT', COINBASE, 'LTC', '92', 'USDT', false, 'all', '', 0, null, 0),
-      balanceRule(5020, 'Compound UNI → ETH', COINBASE, 'UNI', '350', 'ETH', true, 1, 26 * HOUR),
+      // ── Kraken (convert or withdraw) ──
+      priceRule(5001, 'Take profit: SOL to USDC', KRAKEN, 'SOL', '165', 'USDC', true, 'all', '', 3, null, 2 * HOUR),
+      priceRule(5002, 'Take profit: BTC to USDC', KRAKEN, 'BTC', '72000', 'USDC', true, 'percent', '50', 1, 5, 20 * HOUR),
+      priceRule(5003, 'Take profit: AAVE to USDC', KRAKEN, 'AAVE', '110', 'USDC', false, 'fixed', '4', 0, null, 0),
+      balanceRule(5004, 'Stake-out: DOT to ETH', KRAKEN, 'DOT', '300', 'ETH', true, 4, 120 * HOUR),
+      orderRule(5005, 'Cold-store the BTC buy', KRAKEN, 'O7Q9SB-XGZJ3-BTC00', 'BTC', { addrKey: 'cold_storage_btc' }, true, 1, 84 * HOUR),
+      orderRule(5006, 'Convert LINK fills to ETH', KRAKEN, 'OP8RAT-FYH2K-LIN08', 'LINK', { to: 'ETH' }, true, 2, 52 * HOUR),
+      // ── Coinbase Advanced (convert only) ──
+      priceRule(5007, 'Take profit: BTC to USDT', COINBASE, 'BTC', '72000', 'USDT', true, 'percent', '50', 1, 5, 20 * HOUR),
+      priceRule(5008, 'Take profit: ETH to USDT', COINBASE, 'ETH', '3600', 'USDT', true, 'all', '', 0, null, 0),
+      balanceRule(5009, 'Cash out DOGE to USDT', COINBASE, 'DOGE', '30000', 'USDT', true, 5, 12 * HOUR),
+      balanceRule(5010, 'Cash out XRP to USDT', COINBASE, 'XRP', '5000', 'USDT', false, 0, 0),
+      orderRule(5011, 'Convert LINK fills to ETH', COINBASE, 'ad0369cf-7ad0-447a-8147-e147ad03be14', 'LINK', { to: 'ETH' }, true, 3, 2 * HOUR),
+      // ── Binance ──
+      priceRule(5012, 'Take profit: SOL to USDT', BINANCE, 'SOL', '170', 'USDT', true, 'percent', '40', 2, null, 5 * HOUR),
+      priceRule(5013, 'Take profit: INJ to USDT', BINANCE, 'INJ', '32', 'USDT', true, 'all', '', 1, 3, 18 * HOUR),
+      balanceRule(5014, 'Sweep USDT into BTC', BINANCE, 'USDT', '4000', 'BTC', true, 1, 96 * HOUR),
+      orderRule(5015, 'Convert TIA fills to BTC', BINANCE, '23014766', 'TIA', { to: 'BTC' }, true, 0, 0),
+      // ── Robinhood ──
+      priceRule(5016, 'Take profit: DOGE to USD', ROBINHOOD, 'DOGE', '0.19', 'USD', true, 'percent', '50', 2, null, 8 * HOUR),
+      priceRule(5017, 'Take profit: SHIB to USD', ROBINHOOD, 'SHIB', '0.00003', 'USD', true, 'all', '', 1, null, 34 * HOUR),
+      balanceRule(5018, 'Rotate XLM into BTC', ROBINHOOD, 'XLM', '8000', 'BTC', true, 3, 42 * HOUR),
+      orderRule(5019, 'Convert LTC fills to USD', ROBINHOOD, '94fa50b6-61c7-43e9-80b6-d83e94faa50b', 'LTC', { to: 'USD' }, true, 1, 38 * HOUR),
       // ── Balancer caps (edited on the Balancer page, listed here like any rule) ──
-      allocationRule(6000, KRAKEN, 'BTC', 30, 25, 'USDC', true, 2, 3 * DAY),
-      allocationRule(6001, KRAKEN, 'SOL', 12, 9, 'USDC', true, 0, 0),
-      allocationRule(6002, COINBASE, 'LINK', 18, 14, 'USDT', true, 1, 4 * DAY),
+      allocationRule(6001, KRAKEN, 'BTC', 30, 25, 'USDC', true, 2, 72 * HOUR, false),
+      allocationRule(6002, KRAKEN, 'ETH', 22, 18, 'USDC', true, 1, 130 * HOUR, false),
+      allocationRule(6003, KRAKEN, 'SOL', 12, 9, 'USDC', true, 0, 0, false),
+      allocationRule(6004, COINBASE, 'BTC', 28, 24, 'USDT', true, 1, 96 * HOUR, false),
+      allocationRule(6005, COINBASE, 'LINK', 18, 14, 'USDT', true, 1, 100 * HOUR, false),
+      allocationRule(6006, BINANCE, 'BTC', 26, 22, 'USDT', true, 0, 0, false),
+      allocationRule(6007, BINANCE, 'SOL', 15, 11, 'USDT', true, 2, 46 * HOUR, true),
+      allocationRule(6008, ROBINHOOD, 'BTC', 32, 27, 'USD', true, 0, 0, false),
+      allocationRule(6009, ROBINHOOD, 'DOGE', 12, 9, 'USD', true, 1, 54 * HOUR, false),
     ];
   }
 
@@ -495,18 +636,31 @@ const DemoData = (() => {
 
   function logs(): any[] {
     return [
-      { rule_id: 5001, created_at: ago(2 * HOUR), trigger_event: 'SOL reached $165.00', action_executed: 'Convert 80 SOL → USDC', action_result: 'Filled: received 12,160 USDC', status: 'success' },
-      { rule_id: 5015, created_at: ago(2 * HOUR + 25 * MIN), trigger_event: 'Order c1f4a2b8… filled', action_executed: 'Convert 100 LINK → ETH', action_result: 'Filled: received 0.41 ETH', status: 'success' },
-      { rule_id: 5010, created_at: ago(6 * HOUR), trigger_event: 'LINK reached $16.00', action_executed: 'Convert 250 LINK → USDC', action_result: 'Filled: received 3,550 USDC', status: 'success' },
-      { rule_id: 5007, created_at: ago(9 * HOUR), trigger_event: 'AVAX reached $42.00', action_executed: 'Convert 120 AVAX → USDC', action_result: 'Filled: received 4,560 USDC', status: 'success' },
-      { rule_id: 5017, created_at: ago(12 * HOUR), trigger_event: 'DOGE balance reached 30,000', action_executed: 'Convert 30,000 DOGE → USDT', action_result: 'Filled: received 4,800 USDT', status: 'success' },
-      { rule_id: 5018, created_at: ago(16 * HOUR), trigger_event: 'Order a9e2c5d1… filled', action_executed: 'Convert 1,000 XRP → USDT', action_result: 'Failed: amount below exchange minimum', status: 'error' },
-      { rule_id: 5004, created_at: ago(20 * HOUR), trigger_event: 'BTC reached $72,000.00', action_executed: 'Convert 50% BTC → USDC', action_result: 'Filled: received ~20,160 USDC', status: 'success' },
-      { rule_id: 5011, created_at: ago(20 * HOUR + 10 * MIN), trigger_event: 'BTC reached $72,000.00', action_executed: 'Convert 50% BTC → USDT', action_result: 'Filled: received ~8,400 USDT', status: 'success' },
-      { rule_id: 5020, created_at: ago(26 * HOUR), trigger_event: 'UNI balance reached 350', action_executed: 'Convert 350 UNI → ETH', action_result: 'Filled: received 1.16 ETH', status: 'success' },
-      { rule_id: 5009, created_at: ago(30 * HOUR), trigger_event: 'Order OM3X9V… filled', action_executed: 'Convert 60 AVAX → USDC', action_result: 'Filled: received 2,280 USDC', status: 'success' },
-      { rule_id: 5016, created_at: ago(40 * HOUR), trigger_event: 'MATIC reached $0.85', action_executed: 'Convert 8,000 MATIC → USDC', action_result: 'Filled: received 5,760 USDC', status: 'success' },
-      { rule_id: 5005, created_at: ago(5 * DAY), trigger_event: 'DOT balance reached 300', action_executed: 'Convert 300 DOT → ETH', action_result: 'Filled: received 0.62 ETH', status: 'success' },
+      { rule_id: 5001, created_at: ago(35 * MIN), trigger_event: 'Price SOL/USD reached 166.20 >= target 165 (2x 1m candles since last check; now 164.80)', action_executed: 'Convert all (80 SOL) SOL -> USDC', action_result: 'Sold 80 SOL @ 165.4 USD -> 13232 USDC (closed)', status: 'success' },
+      { rule_id: 6001, created_at: ago(52 * MIN), trigger_event: 'BTC = 41.90% of portfolio (cap 30%, total $99,536.00)', action_executed: 'Convert 0.1561 BTC -> USDC (trim 41.90% down to 25%, ~$10,489.00)', action_result: 'Sold 0.1561 BTC @ 67180 USD -> 10486.8 USDC (closed)', status: 'success' },
+      { rule_id: 6007, created_at: ago(1 * HOUR), trigger_event: 'SOL = 13.60% of portfolio (cap 15%)', action_executed: 'Skipped', action_result: 'SOL is under its 15% cap, so nothing was sold.', status: 'skipped' },
+      { rule_id: 5011, created_at: ago(2 * HOUR + 25 * MIN), trigger_event: 'Order c1f4a2b8... filled', action_executed: 'Convert 200 LINK -> ETH', action_result: 'Filled: received 0.82 ETH', status: 'success' },
+      { rule_id: 5002, created_at: ago(4 * HOUR), trigger_event: 'Cooldown active', action_executed: 'Skipped', action_result: 'Waiting out the 24h cooldown since the last run before checking again.', status: 'skipped' },
+      { rule_id: 5016, created_at: ago(8 * HOUR), trigger_event: 'Price DOGE/USD reached 0.1904 >= target 0.19 (1x 1m candles since last check; now 0.1861)', action_executed: 'Convert 50% (30000 DOGE) DOGE -> USD', action_result: 'Sold 30000 DOGE @ 0.1898 USD -> 5694 USD (closed)', status: 'success' },
+      { rule_id: 5009, created_at: ago(12 * HOUR), trigger_event: 'Balance DOGE = 30000 >= threshold 30000', action_executed: 'Convert 30000 DOGE -> USDT', action_result: 'Filled: received 4800 USDT', status: 'success' },
+      { rule_id: 5008, created_at: ago(15 * HOUR), trigger_event: 'Price ETH/USD = 3480.00, peak 3512.40 (target 3600)', action_executed: 'Skipped', action_result: 'Price has not reached the target since the last check, so this rule did not run. Needs ETH/USD at 3600 or higher - highest seen was 3512.40.', status: 'skipped' },
+      { rule_id: 5013, created_at: ago(18 * HOUR), trigger_event: 'Price INJ/USDT reached 32.40 >= target 32 (4x 1m candles since last check; now 31.05)', action_executed: 'Convert all (60 INJ) INJ -> USDT', action_result: 'Sold 60 INJ @ 32.1 USDT -> 1926 USDT (closed)', status: 'success' },
+      { rule_id: 6009, created_at: ago(20 * HOUR), trigger_event: 'DOGE = 27.50% of portfolio (cap 12%, total $34,878.00)', action_executed: 'Convert 40200 DOGE -> USD (trim 27.50% down to 9%, ~$6,432.00)', action_result: 'Sold 40200 DOGE @ 0.1592 USD -> 6399.8 USD (closed)', status: 'success' },
+      { rule_id: 5007, created_at: ago(20 * HOUR + 10 * MIN), trigger_event: 'Price BTC/USDT reached 72180.00 >= target 72000 (2x 1m candles since last check; now 71640.00)', action_executed: 'Convert 50% (0.125 BTC) BTC -> USDT', action_result: 'Sold 0.125 BTC @ 72050 USDT -> 9006.3 USDT (closed)', status: 'success' },
+      { rule_id: 5005, created_at: ago(22 * HOUR), trigger_event: 'Order OQ4F7K... filled', action_executed: 'Withdraw 0.15 BTC to cold_storage_btc (filled amount)', action_result: 'Withdrew 0.15 BTC to cold_storage_btc (success) [tx 9f2c...a71]', status: 'success' },
+      { rule_id: 5015, created_at: ago(26 * HOUR), trigger_event: 'Order 62841057 filled', action_executed: 'Convert 120 TIA -> BTC', action_result: 'Filled: received 0.0175 BTC', status: 'success' },
+      { rule_id: 6003, created_at: ago(30 * HOUR), trigger_event: 'SOL = 12.20% of portfolio (cap 12%, total $99,536.00)', action_executed: 'Convert 2.10 SOL -> USDC (trim 12.20% down to 9%, ~$319.00)', action_result: 'Sold 2.1 SOL @ 151.8 USD -> 318.8 USDC (closed)', status: 'success' },
+      { rule_id: 5017, created_at: ago(34 * HOUR), trigger_event: 'Price SHIB/USD reached 0.0000301 >= target 0.00003 (2x 1m candles since last check; now 0.0000249)', action_executed: 'Convert all (25000000 SHIB) SHIB -> USD', action_result: 'Sold 25000000 SHIB @ 0.00003 USD -> 750 USD (closed)', status: 'success' },
+      { rule_id: 5019, created_at: ago(38 * HOUR), trigger_event: 'Order 3d7e91ab... filled', action_executed: 'Convert 6 LTC -> USD', action_result: 'Filled: received 504 USD', status: 'success' },
+      { rule_id: 5018, created_at: ago(42 * HOUR), trigger_event: 'Balance XLM = 8000 >= threshold 8000', action_executed: 'Convert 8000 XLM -> BTC', action_result: 'Filled: received 0.0135 BTC', status: 'success' },
+      { rule_id: 5012, created_at: ago(46 * HOUR), trigger_event: 'Price SOL/USDT reached 171.40 >= target 170 (1x 1m candles since last check; now 168.20)', action_executed: 'Convert 40% (18 SOL) SOL -> USDT', action_result: 'Sold 18 SOL @ 170.6 USDT -> 3070.8 USDT (closed)', status: 'success' },
+      { rule_id: 5011, created_at: ago(52 * HOUR), trigger_event: 'Order OY7M2K... filled', action_executed: 'Convert 150 LINK -> ETH', action_result: 'Filled: received 0.61 ETH', status: 'success' },
+      { rule_id: 6005, created_at: ago(72 * HOUR), trigger_event: 'LINK = 8.60% of portfolio (cap 18%)', action_executed: 'Skipped', action_result: 'LINK is under its 18% cap, so nothing was sold.', status: 'skipped' },
+      { rule_id: 6002, created_at: ago(90 * HOUR), trigger_event: 'ETH = 22.40% of portfolio (cap 22%, total $97,900.00)', action_executed: 'Convert 1.24 ETH -> USDC (trim 22.40% down to 18%, ~$4,314.00)', action_result: 'Sold 1.24 ETH @ 3470 USD -> 4302.8 USDC (closed)', status: 'success' },
+      { rule_id: 5014, created_at: ago(96 * HOUR), trigger_event: 'Balance USDT = 4000 >= threshold 4000', action_executed: 'Convert 4000 USDT -> BTC', action_result: 'Filled: received 0.0594 BTC', status: 'success' },
+      { rule_id: 6004, created_at: ago(96 * HOUR + 15 * MIN), trigger_event: 'BTC = 25.60% of portfolio (cap 28%)', action_executed: 'Skipped', action_result: 'BTC is under its 28% cap, so nothing was sold.', status: 'skipped' },
+      { rule_id: 5004, created_at: ago(120 * HOUR), trigger_event: 'Balance DOT = 300 >= threshold 300', action_executed: 'Convert 300 DOT -> ETH', action_result: 'Filled: received 0.62 ETH', status: 'success' },
+      { rule_id: 5010, created_at: ago(128 * HOUR), trigger_event: 'Order filled but conversion rejected', action_executed: 'Convert 5000 XRP -> USDT', action_result: 'Failed: amount below exchange minimum', status: 'error' },
     ];
   }
 
@@ -515,13 +669,18 @@ const DemoData = (() => {
     return {
       BTC: 0.0001, ETH: 0.0001, SOL: 0.01, ADA: 1, LINK: 0.01, XRP: 0.02,
       DOGE: 1, AVAX: 0.01, DOT: 0.1, LTC: 0.001, MATIC: 0.1, ATOM: 0.01,
-      UNI: 0.01, USDC: 0.01, USDT: 0.01,
+      UNI: 0.01, USDC: 0.01, USDT: 0.01, XLM: 0.1, FIL: 0.1, AAVE: 0.01,
+      NEAR: 0.1, OP: 0.1, GRT: 1, ARB: 0.1, INJ: 0.01, SUI: 0.1, TIA: 0.1,
+      FET: 1, BCH: 0.001, ALGO: 1, RENDER: 0.1, SHIB: 100000, ETC: 0.01,
+      HBAR: 1, IMX: 0.1, PEPE: 100000, MKR: 0.001, DAI: 0.1,
     };
   }
 
   // ── Watchlist (mutable for the session so add/remove feels real) ───────────
 
-  let watchSymbols = ['BTC/USD', 'ETH/USD', 'SOL/USD', 'LINK/USD'];
+  let watchSymbols = ['BTC/USD', 'ETH/USD', 'SOL/USD', 'LINK/USD', 'AVAX/USD',
+                      'INJ/USD', 'TIA/USD', 'RENDER/USD', 'DOGE/USD', 'XRP/USD',
+                      'SUI/USD', 'FET/USD'];
 
   function watchlist(): any[] {
     return watchSymbols.map((symbol, i) => ({ symbol, sort_order: i }));

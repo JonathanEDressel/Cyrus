@@ -458,7 +458,9 @@ class BalancerController {
     const unitPrice = row.amount > 0 ? row.usdValue / row.amount : 0;
     const amount = unitPrice > 0 ? Math.min(excess / unitPrice, row.amount) : 0;
     const verb = this.dryRun ? 'Would simulate' : 'Sell';
-    return `<span class="balancer-trim">${verb} ${this.fmtAmount(amount)} ${this.esc(row.asset)}`
+    // Four significant figures is plenty here — the exact fill size is decided
+    // at execution anyway, and eight decimals just makes the row hard to read.
+    return `<span class="balancer-trim">${verb} ${this.fmtTradeAmount(amount)} ${this.esc(row.asset)}`
       + ` → ${this.esc(row.convertTo || '?')} <span class="balancer-muted">(${this.fmtUsd(excess)})</span></span>`;
   }
 
@@ -598,6 +600,14 @@ class BalancerController {
     if (Math.abs(n) >= 1000) return '$' + n.toLocaleString(undefined, { maximumFractionDigits: 0 });
     if (Math.abs(n) >= 1) return '$' + n.toLocaleString(undefined, { maximumFractionDigits: 2 });
     return '$' + n.toLocaleString(undefined, { maximumFractionDigits: 4 });
+  }
+
+  /** Compact amount for the "would trim now" sentence: four significant
+   *  figures, since the exact fill size is decided at execution anyway and
+   *  eight decimals just makes the row hard to read. */
+  private fmtTradeAmount(n: number): string {
+    if (!isFinite(n) || n === 0) return '0';
+    return Number(n.toPrecision(4)).toLocaleString(undefined, { maximumFractionDigits: 8 });
   }
 
   private fmtAmount(n: number): string {

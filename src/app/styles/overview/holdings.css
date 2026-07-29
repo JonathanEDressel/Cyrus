@@ -4,6 +4,12 @@
  * (buttons, alerts, badges); this file carries what's specific to the page.
  */
 
+/* Ten columns don't fit the shared 1200px container without horizontal
+   scrolling; give this page more room on wide windows. */
+.holdings-page {
+  max-width: 1480px;
+}
+
 .holdings-page .section-header {
   cursor: default;
 }

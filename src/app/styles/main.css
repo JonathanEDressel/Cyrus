@@ -457,6 +457,12 @@ body.theme-light {
   border: 1px solid rgba(37, 99, 235, 0.35);
 }
 
+.exchange-robinhood {
+  background: rgba(0, 200, 5, 0.15);
+  color: #4ade80;
+  border: 1px solid rgba(0, 200, 5, 0.32);
+}
+
 .exchange-binance {
   background: rgba(234, 179, 8, 0.15);
   color: #fbbf24;
