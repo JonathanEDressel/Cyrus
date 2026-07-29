@@ -2,6 +2,10 @@
 
 A Windows desktop app for automating and monitoring cryptocurrency trading across multiple exchanges. Electron + TypeScript frontend, local Python Flask backend, SQLite storage. Your API keys never leave your machine.
 
+[![Sponsor JonathanEDressel](https://img.shields.io/badge/Sponsor-JonathanEDressel-ea4aaa?logo=githubsponsors&logoColor=white)](https://github.com/sponsors/JonathanEDressel)
+
+Cyrus is free for noncommercial use. If it saves you time, [sponsoring it on GitHub](https://github.com/sponsors/JonathanEDressel) keeps development going.
+
 ---
 
 ## Supported Exchanges
@@ -448,16 +452,8 @@ Third-party dependencies keep their own licenses; see the end of [LICENSE](LICEN
 
 ## Sponsors & Support
 
-Cyrus is free for noncommercial use. If it saves you time, these help keep it going.
-
-### GitHub Sponsors
-
-[![Sponsor JonathanEDressel](https://img.shields.io/badge/Sponsor-JonathanEDressel-ea4aaa?logo=githubsponsors&logoColor=white)](https://github.com/sponsors/JonathanEDressel)
-
-<!-- GitHub strips <iframe> from rendered Markdown, so the badge above is what
-     actually appears on github.com. The embed is kept for anywhere this file is
-     rendered by something that allows iframes. -->
-<iframe src="https://github.com/sponsors/JonathanEDressel/button" title="Sponsor JonathanEDressel" height="32" width="114" style="border: 0; border-radius: 6px;"></iframe>
+Cyrus is free for noncommercial use. If it saves you time, these help keep it going —
+alongside [GitHub Sponsors](https://github.com/sponsors/JonathanEDressel).
 
 ### Partners
 
