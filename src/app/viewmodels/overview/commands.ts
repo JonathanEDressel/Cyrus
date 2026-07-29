@@ -899,13 +899,11 @@ class CommandsController {
     placeholder.textContent = 'Select target asset...';
     toSelect.appendChild(placeholder);
 
-    const defaultAssets = [
-      'USDT', 'USDC', 'BUSD', 'DAI', 'TUSD', 'FDUSD',
-      'BTC', 'ETH', 'BNB', 'SOL', 'XRP', 'ADA', 'DOGE',
-      'AVAX', 'DOT', 'MATIC', 'LINK', 'ATOM', 'LTC', 'UNI',
-      'SHIB', 'TRX', 'ALGO', 'EUR', 'USD',
-    ];
-    const allTargets = new Set<string>([...defaultAssets, ...Object.keys(this.balances)]);
+    const allTargets = new Set<string>([
+      ...CommandsController.COMMON_ASSETS,
+      ...(this.tradableAssets[this.selectedConnectionId ?? -1] || []),
+      ...Object.keys(this.balances),
+    ]);
     if (triggerAsset) allTargets.delete(triggerAsset);
 
     for (const asset of Array.from(allTargets).sort((a, b) => a.localeCompare(b))) {
@@ -1059,20 +1057,36 @@ class CommandsController {
     this.updateRuleSummary();
   }
 
-  /** Cached per connection — the list is ~hundreds of codes and never changes
+  /** Offered when the exchange's own list can't be fetched — an older backend
+   *  without the /assets route, or an exchange that's unreachable. Without this
+   *  the picker silently collapses back to "holdings only". */
+  private static readonly COMMON_ASSETS = [
+    'USDT', 'USDC', 'USDG', 'PYUSD', 'DAI', 'TUSD', 'FDUSD', 'BUSD', 'USD', 'EUR',
+    'BTC', 'WBTC', 'ETH', 'SOL', 'XRP', 'ADA', 'DOGE', 'SHIB', 'PEPE', 'BNB',
+    'AVAX', 'DOT', 'MATIC', 'POL', 'LINK', 'ATOM', 'LTC', 'BCH', 'ETC', 'XLM',
+    'UNI', 'AAVE', 'MKR', 'TRX', 'ALGO', 'HBAR', 'FIL', 'GRT', 'IMX', 'NEAR',
+    'ARB', 'OP', 'SUI', 'TIA', 'INJ', 'RENDER', 'FET', 'TON', 'APT', 'KAS',
+  ];
+
+  /** Cached per connection — the list is hundreds of codes and never changes
    *  within a session, so it's fetched once rather than on every dropdown open. */
   private tradableAssets: Record<number, string[]> = {};
 
-  private async getTradableAssets(connId: number): Promise<string[]> {
-    if (this.tradableAssets[connId]) return this.tradableAssets[connId];
+  private async getTradableAssets(connId: number): Promise<{ assets: string[]; live: boolean }> {
+    const cached = this.tradableAssets[connId];
+    if (cached && cached.length > 0) return { assets: cached, live: true };
+
     try {
       const assets = await ExchangeController.getTradableAssets(connId);
-      this.tradableAssets[connId] = assets || [];
+      if (assets && assets.length > 0) {
+        this.tradableAssets[connId] = assets;
+        return { assets, live: true };
+      }
     } catch {
-      // Non-fatal: the picker still lists holdings, which is what it did before.
-      this.tradableAssets[connId] = [];
+      // Deliberately not cached: a backend that gains the route on its next
+      // restart should start working without reloading the whole app.
     }
-    return this.tradableAssets[connId];
+    return { assets: CommandsController.COMMON_ASSETS, live: false };
   }
 
   /** Append every tradable asset the user doesn't already hold, as a group. */
@@ -1080,8 +1094,8 @@ class CommandsController {
     const connId = this.selectedConnectionId;
     if (connId == null) return;
 
-    const all = await this.getTradableAssets(connId);
-    const rest = all.filter(a => !heldSet.has(a));
+    const { assets, live } = await this.getTradableAssets(connId);
+    const rest = assets.filter(a => !heldSet.has(a)).sort((a, b) => a.localeCompare(b));
     if (rest.length === 0) return;
 
     // Switching exchange mid-fetch rebuilds this select's contents in place, so
@@ -1089,8 +1103,14 @@ class CommandsController {
     // response would append another exchange's assets to the new list.
     if (!select.isConnected || this.selectedConnectionId !== connId) return;
 
+    // Guard against appending twice if two loads overlap.
+    select.querySelectorAll('optgroup[data-unheld]').forEach(g => g.remove());
+
     const group = document.createElement('optgroup');
-    group.label = `Not held — tradable on ${this.getSelectedExchangeLabel()}`;
+    group.setAttribute('data-unheld', '1');
+    group.label = live
+      ? `Not held — tradable on ${this.getSelectedExchangeLabel()}`
+      : 'Not held — common assets';
     for (const asset of rest) {
       const opt = document.createElement('option');
       opt.value = asset;

@@ -58,6 +58,14 @@ Select Robinhood in **Profile → Exchange Connections** and Cyrus now explains 
 
 It needs Python 3 and nothing else — no packages to install — and works with no internet connection at all. That's deliberate: generating your own keys offline means the private key exists nowhere until you choose to paste it. There's also a `--verify` mode that makes one signed request to Robinhood, so bad credentials fail with a clear explanation instead of a mysterious error inside the app.
 
+### 🪙 Build rules for coins you don't own yet
+
+**Monitor Asset** used to list only assets you currently hold, which meant a rule like *"when my USDG balance reaches 500, convert it"* couldn't be written until the first USDG had already arrived — exactly when you'd want the rule already in place.
+
+The picker now shows your holdings first, then a second group with everything else the exchange trades. That list comes from the exchange itself rather than a fixed set of coins, so newer tickers appear without waiting for an update — on Kraken it's over 600 assets. If the exchange can't be reached, the picker falls back to a built-in list of common coins and stablecoins instead of quietly shrinking back to your holdings.
+
+The "convert into" picker draws on the same list, so both sides of a rule offer the same coins.
+
 ### 🎨 Redesigned navigation
 
 The sidebar is now grouped into **Portfolio**, **Automation** and **Account** instead of one flat list of eight links. The current page is marked with a tinted pill and an accent bar rather than being a shade brighter than its neighbours, icons are aligned to a common line, and the sidebar sits on its own surface so the app reads as a panel and a canvas rather than one flat sheet.
