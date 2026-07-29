@@ -450,6 +450,15 @@ Third-party dependencies keep their own licenses; see the end of [LICENSE](LICEN
 
 Cyrus is free for noncommercial use. If it saves you time, these help keep it going.
 
+### GitHub Sponsors
+
+[![Sponsor JonathanEDressel](https://img.shields.io/badge/Sponsor-JonathanEDressel-ea4aaa?logo=githubsponsors&logoColor=white)](https://github.com/sponsors/JonathanEDressel)
+
+<!-- GitHub strips <iframe> from rendered Markdown, so the badge above is what
+     actually appears on github.com. The embed is kept for anywhere this file is
+     rendered by something that allows iframes. -->
+<iframe src="https://github.com/sponsors/JonathanEDressel/button" title="Sponsor JonathanEDressel" height="32" width="114" style="border: 0; border-radius: 6px;"></iframe>
+
 ### Partners
 
 Affiliate links — they cost you nothing extra. Also available in-app under **Partners**.
