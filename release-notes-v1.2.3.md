@@ -50,6 +50,14 @@ The flow chart on Automations (and on Overview) is now interactive. Click any ci
 - Clicking a circle on the Overview chart takes you to Automations with that rule already open.
 - Fully keyboard accessible, and balancer caps open the Balancer page rather than a dialog that can't edit them.
 
+### 🔑 Robinhood key generator
+
+Robinhood is the odd one out among the supported exchanges: it never gives you a secret key. You generate a keypair yourself, hand Robinhood the *public* half, and it returns an API key ID — which trips people up, because there's nothing to copy and paste from their site.
+
+Select Robinhood in **Profile → Exchange Connections** and Cyrus now explains that, and offers an optional key generator to download. Run it and it prints the public key to register with Robinhood and the private key to paste into Cyrus.
+
+It needs Python 3 and nothing else — no packages to install — and works with no internet connection at all. That's deliberate: generating your own keys offline means the private key exists nowhere until you choose to paste it. There's also a `--verify` mode that makes one signed request to Robinhood, so bad credentials fail with a clear explanation instead of a mysterious error inside the app.
+
 ### 🎨 Redesigned navigation
 
 The sidebar is now grouped into **Portfolio**, **Automation** and **Account** instead of one flat list of eight links. The current page is marked with a tinted pill and an accent bar rather than being a shade brighter than its neighbours, icons are aligned to a common line, and the sidebar sits on its own surface so the app reads as a panel and a canvas rather than one flat sheet.
