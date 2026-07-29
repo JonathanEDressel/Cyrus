@@ -109,6 +109,58 @@ def balance(conn_id):
         return handle_error(e)
 
 
+# Tradable assets per exchange, cached in-process: the list is identical for
+# every user of that exchange and load_markets() is a heavy call, so a fresh
+# ccxt client per request would otherwise refetch it every time a dropdown opens.
+_ASSETS_CACHE: dict = {}
+ASSETS_CACHE_TTL = 3600
+
+
+@exchange_data_bp.route('/<int:conn_id>/assets', methods=['GET'])
+@token_required
+@active_required
+def tradable_assets(conn_id):
+    """Every asset tradable on this connection's exchange.
+
+    Automation rules can legitimately name a coin you don't hold yet — "when my
+    USDG balance reaches 500, convert it" is a perfectly good rule to write
+    before the first USDG ever arrives — so the asset pickers need the
+    exchange's whole list, not just current balances.
+    """
+    try:
+        row = get_connection_row(request.user_id, conn_id)
+        if not row:
+            return not_found("Exchange connection not found")
+        exchange_name = row['exchange_name']
+
+        cached = _ASSETS_CACHE.get(exchange_name)
+        if cached and (time.time() - cached['at']) < ASSETS_CACHE_TTL:
+            return success_response(data=cached['assets'])
+
+        exchange, err = _get_validated_exchange(request.user_id, conn_id)
+        if err:
+            return err
+
+        exchange.load_markets()
+        assets = set()
+        for symbol, market in (exchange.markets or {}).items():
+            if market.get('active') is False:
+                continue
+            for key in ('base', 'quote'):
+                code = (market.get(key) or '').upper()
+                if code:
+                    assets.add(code)
+
+        ordered = sorted(assets)
+        _ASSETS_CACHE[exchange_name] = {'assets': ordered, 'at': time.time()}
+        return success_response(data=ordered)
+
+    except ccxt.AuthenticationError as e:
+        return _keys_invalid_response(str(e))
+    except Exception as e:
+        return handle_error(e)
+
+
 @exchange_data_bp.route('/<int:conn_id>/portfolio', methods=['GET'])
 @token_required
 @active_required

@@ -76,6 +76,13 @@ class ExchangeController {
     return response.data;
   }
 
+  static async getTradableAssets(connectionId: number): Promise<string[]> {
+    const token = AuthController.getToken();
+    if (!token) throw new Error('Not authenticated');
+    const response = await ExchangeData.getTradableAssets(token, connectionId);
+    return response.data;
+  }
+
   static async getPortfolio(connectionId: number): Promise<{ positions: Array<{ asset: string; amount: number; usd_value: number }>; total_usd: number }> {
     const token = AuthController.getToken();
     if (!token) throw new Error('Not authenticated');

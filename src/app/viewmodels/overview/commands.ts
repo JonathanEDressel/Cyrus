@@ -1059,6 +1059,55 @@ class CommandsController {
     this.updateRuleSummary();
   }
 
+  /** Cached per connection — the list is ~hundreds of codes and never changes
+   *  within a session, so it's fetched once rather than on every dropdown open. */
+  private tradableAssets: Record<number, string[]> = {};
+
+  private async getTradableAssets(connId: number): Promise<string[]> {
+    if (this.tradableAssets[connId]) return this.tradableAssets[connId];
+    try {
+      const assets = await ExchangeController.getTradableAssets(connId);
+      this.tradableAssets[connId] = assets || [];
+    } catch {
+      // Non-fatal: the picker still lists holdings, which is what it did before.
+      this.tradableAssets[connId] = [];
+    }
+    return this.tradableAssets[connId];
+  }
+
+  /** Append every tradable asset the user doesn't already hold, as a group. */
+  private async appendUnheldAssets(select: HTMLSelectElement, heldSet: Set<string>): Promise<void> {
+    const connId = this.selectedConnectionId;
+    if (connId == null) return;
+
+    const all = await this.getTradableAssets(connId);
+    const rest = all.filter(a => !heldSet.has(a));
+    if (rest.length === 0) return;
+
+    // Switching exchange mid-fetch rebuilds this select's contents in place, so
+    // isConnected still passes — compare the connection instead, or a late
+    // response would append another exchange's assets to the new list.
+    if (!select.isConnected || this.selectedConnectionId !== connId) return;
+
+    const group = document.createElement('optgroup');
+    group.label = `Not held — tradable on ${this.getSelectedExchangeLabel()}`;
+    for (const asset of rest) {
+      const opt = document.createElement('option');
+      opt.value = asset;
+      opt.textContent = asset;
+      group.appendChild(opt);
+    }
+    select.appendChild(group);
+  }
+
+  private getSelectedExchangeLabel(): string {
+    const connId = this.selectedConnectionId;
+    if (connId == null) return 'this exchange';
+    const conn = ExchangeStore.connections.find(c => c.id === connId);
+    const name = conn?.exchange_name || '';
+    return name ? name.charAt(0).toUpperCase() + name.slice(1) : 'this exchange';
+  }
+
   private async loadBalances(): Promise<void> {
     const triggerAssetSelect = document.getElementById('trigger-asset') as HTMLSelectElement;
     const thresholdInput = document.getElementById('trigger-threshold') as HTMLInputElement;
@@ -1076,12 +1125,24 @@ class CommandsController {
       placeholder.textContent = 'Select an asset...';
       triggerAssetSelect.appendChild(placeholder);
 
-      for (const [asset, amount] of Object.entries(this.balances).sort(([a], [b]) => a.localeCompare(b))) {
-        const opt = document.createElement('option');
-        opt.value = asset;
-        opt.textContent = `${asset} (Balance: ${parseFloat(amount).toFixed(8)})`;
-        triggerAssetSelect.appendChild(opt);
+      // Holdings first, since they're what you usually want...
+      const held = Object.entries(this.balances).sort(([a], [b]) => a.localeCompare(b));
+      if (held.length > 0) {
+        const group = document.createElement('optgroup');
+        group.label = 'Your holdings';
+        for (const [asset, amount] of held) {
+          const opt = document.createElement('option');
+          opt.value = asset;
+          opt.textContent = `${asset} (Balance: ${parseFloat(amount).toFixed(8)})`;
+          group.appendChild(opt);
+        }
+        triggerAssetSelect.appendChild(group);
       }
+
+      // ...then everything else the exchange trades. A balance rule on a coin
+      // you don't own yet is perfectly reasonable — it fires the first time one
+      // arrives — and it was impossible to write before.
+      await this.appendUnheldAssets(triggerAssetSelect, new Set(Object.keys(this.balances)));
 
       // const ownedAssets = Object.keys(this.balances);
       // if (ownedAssets.length > 0) {

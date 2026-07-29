@@ -177,6 +177,15 @@ const DemoData = (() => {
 
   // ── Balances + portfolio (same underlying holdings) ───────────────────────
 
+  /** Every asset the demo exchange "trades" - holdings plus unheld extras, so
+   *  the not-held group in the asset pickers has something in it. */
+  function tradableAssets(connId: number): string[] {
+    const extras = ['USDG', 'PYUSD', 'TUSD', 'DAI', 'EUR', 'GBP', 'WBTC', 'STETH',
+                    'TON', 'TAO', 'ONDO', 'JUP', 'WLD', 'SEI', 'APT', 'KAS'];
+    const held = Object.keys(HOLDINGS[connId] || {});
+    return Array.from(new Set([...Object.keys(PRICE), ...held, ...extras])).sort();
+  }
+
   function balance(connId: number): Record<string, string> {
     const held = HOLDINGS[connId] || {};
     const out: Record<string, string> = {};
@@ -804,6 +813,7 @@ const DemoData = (() => {
     connections,
     supportedExchanges,
     balance,
+    tradableAssets,
     portfolio,
     holdings,
     assetDetail,
@@ -849,6 +859,7 @@ class DemoMode {
       [ExchangeController, 'getWithdrawalAddresses', async (id: number) => DemoData.withdrawalAddresses(id)],
       [ExchangeController, 'getBalance', async (id: number) => DemoData.balance(id)],
       [ExchangeController, 'getPortfolio', async (id: number) => DemoData.portfolio(id)],
+      [ExchangeController, 'getTradableAssets', async (id: number) => DemoData.tradableAssets(id)],
 
       [AutomationController, 'getRules', async () => DemoData.rules()],
       [AutomationController, 'getAllocations', async (id: number) => DemoData.allocations(id)],

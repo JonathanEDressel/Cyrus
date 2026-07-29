@@ -69,6 +69,14 @@ class ExchangeData {
     );
   }
 
+  /** Every asset tradable on a connection's exchange, not just held ones. */
+  static async getTradableAssets(token: string, connectionId: number): Promise<ApiResponse<string[]>> {
+    return DataAccess.get<string[]>(
+      `${AppConfig.API_BASE}/exchange/${connectionId}/assets`,
+      token
+    );
+  }
+
   static async getPortfolio(token: string, connectionId: number): Promise<ApiResponse<PortfolioData>> {
     return DataAccess.get<PortfolioData>(
       `${AppConfig.API_BASE}/exchange/${connectionId}/portfolio`,
