@@ -331,6 +331,97 @@ def get_market_price(exchange: ccxt.Exchange, base_asset: str, quote_asset: str)
     )
 
 
+_EXTREME_TIMEFRAMES = ('1m', '3m', '5m', '15m')
+
+
+def _resolve_ohlcv_pair(exchange: ccxt.Exchange, base_asset: str,
+                        quote_asset: str) -> tuple[str | None, bool]:
+    """Find a listed market for base/quote, returning ``(symbol, inverted)``.
+
+    Mirrors ``get_market_price``'s quote fallbacks (Kraken lists USD, not USDT,
+    for a lot of pairs) but only needs the market to exist, not to have a price.
+    """
+    quotes_to_try = [quote_asset] + [
+        q for q in _STABLECOIN_FALLBACKS.get(quote_asset, []) if q != quote_asset
+    ]
+    markets = exchange.markets or {}
+    for quote in quotes_to_try:
+        if f"{base_asset}/{quote}" in markets:
+            return f"{base_asset}/{quote}", False
+        if f"{quote}/{base_asset}" in markets:
+            return f"{quote}/{base_asset}", True
+    return None, False
+
+
+def _smallest_timeframe(exchange: ccxt.Exchange) -> str:
+    """The finest candle interval this exchange offers, out of the useful ones."""
+    available = exchange.timeframes or {}
+    for timeframe in _EXTREME_TIMEFRAMES:
+        if timeframe in available:
+            return timeframe
+    return '1m'
+
+
+def get_price_extremes(exchange: ccxt.Exchange, base_asset: str, quote_asset: str,
+                       since_ms: int) -> dict:
+    """Highest and lowest traded price since *since_ms*, from candles.
+
+    ``fetch_ticker`` answers "what is the price right now", which is blind to
+    anything that happened between two polls — a spike that rises and falls
+    inside one poll interval is invisible to it. Candle highs and lows are the
+    record of what the price actually *reached* in that window, so a rule can
+    trigger on a wick it never sampled.
+
+    Returns ``{'high', 'low', 'last', 'symbol', 'inverted', 'candles', 'source'}``.
+    Raises when the exchange has no market or no candle history for the pair;
+    callers fall back to a ticker sample.
+    """
+    exchange.load_markets()
+    symbol, inverted = _resolve_ohlcv_pair(exchange, base_asset, quote_asset)
+    if not symbol:
+        raise ValueError(
+            f"No trading pair found for {base_asset}/{quote_asset} or "
+            f"{quote_asset}/{base_asset} on {exchange.id}"
+        )
+
+    timeframe = _smallest_timeframe(exchange)
+    candles = exchange.fetch_ohlcv(symbol, timeframe=timeframe, since=since_ms, limit=1000)
+    if not candles:
+        raise ValueError(f"No {timeframe} candles returned for {symbol} on {exchange.id}")
+
+    # Not every exchange honours `since`, and the candle that *contains* since is
+    # wanted even though it starts before it — keep anything still open at that
+    # point, and drop older candles so a stale wick can't trigger a rule.
+    span_ms = exchange.parse_timeframe(timeframe) * 1000
+    in_window = [c for c in candles if (c[0] + span_ms) > since_ms]
+    if not in_window:
+        in_window = candles[-1:]
+
+    highs = [c[2] for c in in_window if c[2]]
+    lows = [c[3] for c in in_window if c[3]]
+    closes = [c[4] for c in in_window if c[4]]
+    if not highs or not lows or not closes:
+        raise ValueError(f"Incomplete {timeframe} candle data for {symbol}")
+
+    high, low, last = max(highs), min(lows), closes[-1]
+    if inverted:
+        # Only the inverse pair is listed, so every price flips — and the
+        # inversion swaps the extremes: the cheapest quote/base is the dearest
+        # base/quote. Getting this backwards would compare a low to a target.
+        high, low, last = 1.0 / low, 1.0 / high, 1.0 / last
+
+    return {
+        'high': high,
+        'low': low,
+        'last': last,
+        'symbol': symbol,
+        'inverted': inverted,
+        'timeframe': timeframe,
+        'candles': len(in_window),
+        'source': 'candles',
+    }
+
+
 def get_ohlcv_price_map(exchange: ccxt.Exchange, base_asset: str,
                         since_ts_sec: int, timeframe: str = '30m',
                         bucket_seconds: int = 1800) -> dict:

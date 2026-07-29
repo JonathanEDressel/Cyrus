@@ -28,6 +28,28 @@ A new **Holdings** page showing what's behind each coin you own, not just its pr
 
 Market cap, supply and all-time highs come from CoinGecko's free public API. **Only the coin's ticker is ever sent — never your balances, amounts, or anything identifying you.** Figures are cached for ten minutes, and if the provider is unreachable the page falls back to the last cached numbers and tells you how old they are; your balances and prices stay live from your exchange throughout.
 
+### ⚡ Price rules now catch spikes they used to miss
+
+A price rule used to ask the exchange *"what is the price right now?"* once a minute. A spike that rose and fell between two checks was invisible to it — the rule simply never saw your target being hit.
+
+Rules now ask *"what did the price reach since I last looked?"*, reading the highs and lows of every minute in that window. **An eight-second spike to your target now triggers the rule; before, it would have been missed entirely.** Checks are contiguous, so there are no gaps between them, and the log records both the peak that fired the rule and the price at the moment it ran.
+
+Two things worth knowing:
+
+- This catches the *event*, not the *price*. The rule fires on the next check and places a market order, so on a violent spike you'll trigger on the peak but fill near wherever the market has settled. If you need to sell *at* an exact number during a spike, a limit order resting on the exchange is the right tool — pair it with an "order fills" rule to handle the proceeds.
+- Works on Kraken, Coinbase Advanced and Binance. Robinhood doesn't publish candle data, so its price rules continue to use single samples; the log labels which method was used.
+
+The balancer deliberately still uses point-in-time snapshots — rebalancing your whole portfolio off a momentary wick would be a bug, not a feature.
+
+### 🖱 Click a circle in the flow chart to edit its rule
+
+The flow chart on Automations (and on Overview) is now interactive. Click any circle to open the rule behind it, instead of hunting for the matching row in the table.
+
+- A circle with rules leaving it opens that rule; a destination circle — USDC, or a withdrawal wallet — opens the rules feeding into it.
+- Where several rules meet at one circle, Cyrus asks which one you meant rather than guessing.
+- Clicking a circle on the Overview chart takes you to Automations with that rule already open.
+- Fully keyboard accessible, and balancer caps open the Balancer page rather than a dialog that can't edit them.
+
 ### 🎨 Redesigned navigation
 
 The sidebar is now grouped into **Portfolio**, **Automation** and **Account** instead of one flat list of eight links. The current page is marked with a tinted pill and an accent bar rather than being a shade brighter than its neighbours, icons are aligned to a common line, and the sidebar sits on its own surface so the app reads as a panel and a canvas rather than one flat sheet.

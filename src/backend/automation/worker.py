@@ -58,6 +58,12 @@ class AutomationWorker:
         # rule_id -> reason key of the last skip we logged, so a rule sitting
         # under its threshold writes one log row instead of one per minute.
         self._skip_state = {}
+        # 'conn:PAIR' -> epoch seconds of the last successful price read. Price
+        # rules ask "what did the price reach since then", so the watermark is
+        # what makes the windows contiguous instead of leaving gaps between polls.
+        self._price_watermarks = {}
+        # Exchange ids with no candle endpoint (Robinhood), so we stop asking.
+        self._no_candles = set()
 
     def start(self):
         self._stop_event.clear()
@@ -719,6 +725,74 @@ class AutomationWorker:
             )
             print(f"[WORKER] Rule '{rule.rule_name}' failed: {e}")
 
+    # A restart shouldn't make a rule fire on a spike from while Cyrus was
+    # closed, so the look-back window is capped at a few cycles' worth.
+    MAX_PRICE_LOOKBACK_CYCLES = 3
+
+    def _read_price_window(self, exchange, user_id, cache_key: str, pair_key: str,
+                           base_asset: str, quote_asset: str, get_market_price) -> dict | None:
+        """What the price did since this pair was last checked.
+
+        Prefers candle highs/lows, which record what the price *reached* between
+        polls rather than what it happened to be at one instant. Degrades to a
+        single ticker sample when the exchange has no candle endpoint (Robinhood)
+        or the call fails — the old behaviour, and still better than skipping.
+
+        Returns None when no price could be read at all.
+        """
+        from helper.ExchangeClient import get_price_extremes
+
+        now = time.time()
+        watermark = self._price_watermarks.get(cache_key)
+        floor = now - self.POLL_INTERVAL * self.MAX_PRICE_LOOKBACK_CYCLES
+        since = max(watermark if watermark is not None else now - self.POLL_INTERVAL, floor)
+
+        if getattr(exchange, 'id', '') not in self._no_candles:
+            try:
+                window = get_price_extremes(exchange, base_asset, quote_asset, int(since * 1000))
+                self._price_watermarks[cache_key] = now
+                return window
+            except (DDoSProtection, RateLimitExceeded) as e:
+                # Don't burn the remaining budget on a second call for this pair.
+                self._note_error(f'candles {pair_key}', e)
+                print(f"[WORKER] Rate limited fetching candles {pair_key} for user {user_id}")
+                return None
+            except ExchangeNotAvailable as e:
+                self._note_error(f'candles {pair_key}', e)
+                print(f"[WORKER] Exchange unavailable fetching candles {pair_key} for user {user_id}")
+                return None
+            except Exception as e:
+                # No candle support (or none for this pair): remember per exchange
+                # so we stop paying for the attempt every cycle.
+                if 'not supported' in str(e).lower() or 'ohlcv' in str(e).lower():
+                    self._no_candles.add(getattr(exchange, 'id', ''))
+                    print(f"[WORKER] {getattr(exchange, 'id', '?')} has no candle data — "
+                          f"price rules will use ticker samples")
+                else:
+                    print(f"[WORKER] Candle read failed for {pair_key} ({e}) — falling back to ticker")
+
+        try:
+            price = get_market_price(exchange, base_asset=base_asset, quote_asset=quote_asset)
+        except (DDoSProtection, RateLimitExceeded) as e:
+            self._note_error(f'ticker {pair_key}', e)
+            print(f"[WORKER] Rate limited fetching ticker {pair_key} for user {user_id}")
+            return None
+        except ExchangeNotAvailable as e:
+            self._note_error(f'ticker {pair_key}', e)
+            print(f"[WORKER] Exchange unavailable fetching ticker {pair_key} for user {user_id}")
+            return None
+        except Exception as e:
+            self._note_error(f'ticker {pair_key}', e)
+            print(f"[WORKER] Failed to fetch ticker {pair_key} for user {user_id}: {e}")
+            return None
+
+        self._price_watermarks[cache_key] = now
+        return {
+            'high': price, 'low': price, 'last': price,
+            'symbol': pair_key, 'inverted': False,
+            'timeframe': None, 'candles': 0, 'source': 'ticker',
+        }
+
     def _poll_prices(self, price_rules, user_id, AutomationDbContext,
                      get_user_exchange, get_market_price, get_balance, convert):
         trigger_exchanges = {}
@@ -762,27 +836,14 @@ class AutomationWorker:
             pair_key = f"{rule.trigger_asset}/{rule.trigger_price_quote_asset}"
             cache_key = f"{conn_id}:{pair_key}"
             if cache_key not in market_prices:
-                try:
-                    market_prices[cache_key] = get_market_price(
-                        exchange,
-                        base_asset=rule.trigger_asset,
-                        quote_asset=rule.trigger_price_quote_asset,
-                    )
-                except (DDoSProtection, RateLimitExceeded) as e:
-                    self._note_error(f'ticker {pair_key}', e)
-                    print(f"[WORKER] Rate limited fetching ticker {pair_key} for user {user_id}")
-                    market_prices[cache_key] = None
-                except ExchangeNotAvailable as e:
-                    self._note_error(f'ticker {pair_key}', e)
-                    print(f"[WORKER] Exchange unavailable fetching ticker {pair_key} for user {user_id}")
-                    market_prices[cache_key] = None
-                except Exception as e:
-                    self._note_error(f'ticker {pair_key}', e)
-                    print(f"[WORKER] Failed to fetch ticker {pair_key} for user {user_id}: {e}")
-                    market_prices[cache_key] = None
+                market_prices[cache_key] = self._read_price_window(
+                    exchange, user_id, cache_key, pair_key,
+                    rule.trigger_asset, rule.trigger_price_quote_asset,
+                    get_market_price,
+                )
 
-            current_price = market_prices.get(cache_key)
-            if current_price is None:
+            window = market_prices.get(cache_key)
+            if window is None:
                 self._log_skip_once(
                     rule, 'price_unavailable', AutomationDbContext,
                     trigger_event=f"Price check for {pair_key} could not run",
@@ -793,20 +854,44 @@ class AutomationWorker:
                 continue
 
             threshold = float(rule.trigger_threshold)
-            if current_price < threshold:
+            # The peak reached since the last check, not the price at the instant
+            # we happened to look — a spike that came and went between polls
+            # still counts. Falls back to the sampled price when the exchange
+            # can't serve candles.
+            peak = window['high']
+            spot = window['last']
+
+            if peak < threshold:
                 self._log_skip_once(
                     rule, 'price_below_target', AutomationDbContext,
-                    trigger_event=f"Price {pair_key} = {current_price:.10g} (target {threshold:.10g})",
+                    trigger_event=(
+                        f"Price {pair_key} = {spot:.10g}, peak {peak:.10g} "
+                        f"(target {threshold:.10g})"
+                    ),
                     action_executed="Skipped",
-                    action_result=f"Price is below the target, so this rule did not run. "
-                                  f"Needs {pair_key} at {threshold:.10g} or higher.",
+                    action_result=f"Price has not reached the target since the last check, so "
+                                  f"this rule did not run. Needs {pair_key} at "
+                                  f"{threshold:.10g} or higher"
+                                  + (f" — highest seen was {peak:.10g}."
+                                     if window['source'] == 'candles' else "."),
                 )
                 continue
 
-            trigger_event = (
-                f"Price {rule.trigger_asset}/{rule.trigger_price_quote_asset} = "
-                f"{current_price:.10g} >= target {threshold:.10g}"
-            )
+            if window['source'] == 'candles':
+                # Record both the peak that triggered it and the price the market
+                # order will actually meet: on a sharp spike those differ, and the
+                # log should not imply the fill happened at the peak.
+                trigger_event = (
+                    f"Price {pair_key} reached {peak:.10g} >= target {threshold:.10g} "
+                    f"({window['candles']}x {window['timeframe']} candle"
+                    f"{'s' if window['candles'] != 1 else ''} since last check; "
+                    f"now {spot:.10g})"
+                )
+            else:
+                trigger_event = (
+                    f"Price {pair_key} = {spot:.10g} >= target {threshold:.10g} "
+                    f"(ticker sample)"
+                )
 
             # The rule is acting, so any previously-logged skip no longer
             # applies — forget it so the next one is recorded afresh.

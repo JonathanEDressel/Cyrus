@@ -507,14 +507,7 @@ class CommandsController {
         this.deleteRule(ruleId);
       } else if (action === 'edit') {
         const rule = this.allRules.find((r: any) => r.id === ruleId);
-        if (!rule) return;
-        // Allocation caps only make sense next to the rest of the portfolio, so
-        // they're edited on the Balancer page rather than in this modal.
-        if (rule.trigger_type === 'allocation_threshold') {
-          router.navigate('rebalancer');
-          return;
-        }
-        this.openEditModal(rule);
+        if (rule) this.editRule(rule);
       }
     });
 
@@ -1726,9 +1719,22 @@ class CommandsController {
       this.allRules = rules;
       this.applyRulesFilter();
       this.populateOrderDropdown();
+      this.openDeepLinkedRule();
     } catch (error: any) {
       this.showError(error.message || 'Failed to load rules');
     }
+  }
+
+  /** Open the editor for a rule someone clicked on another page's flow chart. */
+  private openDeepLinkedRule(): void {
+    const params = (window as any).__routeParams;
+    const requested = params?.editRuleId;
+    if (!requested) return;
+    // One-shot: without clearing it, every later reload would reopen the modal.
+    delete params.editRuleId;
+
+    const rule = this.allRules.find((r: any) => String(r.id) === String(requested));
+    if (rule) this.editRule(rule);
   }
 
   private applyRulesFilter(): void {
@@ -2159,7 +2165,24 @@ class CommandsController {
   private renderRuleFlow(rules: any[]): void {
     const chart = document.getElementById('rules-flow-chart');
     if (!chart) return;
-    RuleFlow.render(chart, rules, { exchangeName: (id) => ExchangeStore.getExchangeName(id) });
+    RuleFlow.render(chart, rules, {
+      exchangeName: (id) => ExchangeStore.getExchangeName(id),
+      // Circles are the same rules as the table rows, so clicking one opens the
+      // same editor. Where a circle covers several rules, RuleFlow asks which.
+      onSelectRule: (rule) => this.editRule(rule),
+    });
+  }
+
+  /** Open the right editor for a rule, from wherever it was clicked. */
+  private editRule(rule: any): void {
+    if (!rule) return;
+    // Allocation caps only make sense next to the rest of the portfolio, so
+    // they're edited on the Balancer page rather than in this modal.
+    if (rule.trigger_type === 'allocation_threshold') {
+      router.navigate('rebalancer');
+      return;
+    }
+    this.openEditModal(rule);
   }
 
   // ──────────────────────────────────────────────────────────────────────────

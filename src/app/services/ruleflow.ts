@@ -222,7 +222,7 @@ const RuleFlow = (() => {
     }
   }
 
-  function attachTooltip(container: HTMLElement): void {
+  function attachTooltip(container: HTMLElement): HTMLElement {
     let tip = document.getElementById('rf-tooltip');
     if (!tip) {
       tip = document.createElement('div');
@@ -234,7 +234,7 @@ const RuleFlow = (() => {
 
     // The container persists across re-renders (only its innerHTML changes), so
     // wire the delegated listeners exactly once to avoid stacking them.
-    if (container.dataset.rfTooltipWired) return;
+    if (container.dataset.rfTooltipWired) return tipEl;
     container.dataset.rfTooltipWired = '1';
 
     let hlKey = '';
@@ -255,18 +255,163 @@ const RuleFlow = (() => {
       const node = (e.target as HTMLElement).closest('.rf-node') as HTMLElement | null;
       if (!node) { tipEl.classList.add('d-none'); setHighlight(''); return; }
       const desc = node.getAttribute('data-desc') || '';
-      tipEl.innerHTML = desc.split('\n').map(line => `<div class="rf-tooltip-line">${esc(line)}</div>`).join('');
+      const lines = desc.split('\n')
+        .map(line => `<div class="rf-tooltip-line">${esc(line)}</div>`);
+      if (node.classList.contains('rf-clickable')) {
+        const count = countIds(node.getAttribute('data-out')) || countIds(node.getAttribute('data-in'));
+        lines.push(`<div class="rf-tooltip-hint">Click to edit${count > 1 ? ` (${count} rules)` : ''}</div>`);
+      }
+      tipEl.innerHTML = lines.join('');
       tipEl.style.left = `${(e as MouseEvent).clientX + 14}px`;
       tipEl.style.top = `${(e as MouseEvent).clientY + 14}px`;
       tipEl.classList.remove('d-none');
       setHighlight(node.getAttribute('data-key') || '');
     });
     container.addEventListener('mouseleave', () => { tipEl.classList.add('d-none'); setHighlight(''); });
+
+    return tipEl;
   }
 
-  function render(container: HTMLElement, rules: any[], opts?: { exchangeName?: (id: any) => string }): void {
+  function parseIds(attr: string | null): number[] {
+    if (!attr) return [];
+    return attr.split(',').map(s => Number(s)).filter(n => !isNaN(n));
+  }
+
+  function countIds(attr: string | null): number {
+    return parseIds(attr).length;
+  }
+
+  /** Close any open rule picker. */
+  function closePicker(): void {
+    document.getElementById('rf-picker')?.remove();
+  }
+
+  /**
+   * A circle can be the source of several rules (three coins converting into
+   * USDC all meet at one node), so when it is, ask which one rather than
+   * guessing.
+   */
+  function openPicker(anchor: HTMLElement, rules: any[], onPick: (rule: any) => void): void {
+    closePicker();
+
+    const picker = document.createElement('div');
+    picker.id = 'rf-picker';
+    picker.className = 'rf-picker';
+    picker.setAttribute('role', 'menu');
+    picker.innerHTML = `<div class="rf-picker-title">Edit which automation?</div>`
+      + rules.map((r, i) => `
+        <button type="button" class="rf-picker-item" role="menuitem" data-idx="${i}">
+          <span class="rf-picker-name">${esc(r.rule_name || `Rule ${r.id}`)}</span>
+          <span class="rf-picker-desc">${esc(describeRule(r))}</span>
+        </button>`).join('');
+
+    // Park it off-screen so measuring it doesn't flash at the wrong position.
+    picker.style.left = '-9999px';
+    picker.style.top = '0';
+    document.body.appendChild(picker);
+
+    // Anchor to the circle, then nudge back inside the viewport.
+    const box = anchor.getBoundingClientRect();
+    const pb = picker.getBoundingClientRect();
+    const left = Math.min(Math.max(8, box.left + box.width / 2 - pb.width / 2),
+                          window.innerWidth - pb.width - 8);
+    const below = box.bottom + 8;
+    const top = below + pb.height > window.innerHeight - 8
+      ? Math.max(8, box.top - pb.height - 8)
+      : below;
+    picker.style.left = `${left}px`;
+    picker.style.top = `${top}px`;
+
+    picker.addEventListener('click', (e) => {
+      const item = (e.target as HTMLElement).closest('.rf-picker-item') as HTMLElement | null;
+      if (!item) return;
+      const rule = rules[Number(item.getAttribute('data-idx'))];
+      closePicker();
+      if (rule) onPick(rule);
+    });
+
+    // Dismiss on Escape or a click elsewhere. Registered on the next frame so
+    // the click that opened this doesn't immediately close it.
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { closePicker(); teardown(); }
+    };
+    const onOutside = (e: MouseEvent) => {
+      if (!picker.contains(e.target as Node)) { closePicker(); teardown(); }
+    };
+    function teardown(): void {
+      document.removeEventListener('keydown', onKey);
+      document.removeEventListener('mousedown', onOutside);
+    }
+    requestAnimationFrame(() => {
+      document.addEventListener('keydown', onKey);
+      document.addEventListener('mousedown', onOutside);
+    });
+
+    (picker.querySelector('.rf-picker-item') as HTMLElement | null)?.focus();
+  }
+
+  /** Live per-container selection state, refreshed on every render.
+   *
+   * The listeners below are wired once (the container outlives its innerHTML),
+   * so they must not close over one render's rule map — after a reload the
+   * captured rules would be stale and clicking a circle would edit an old copy.
+   */
+  const selectionState = new WeakMap<HTMLElement, {
+    ruleById: Map<number, any>;
+    onSelectRule: (rule: any) => void;
+  }>();
+
+  /** Wire node clicks (and Enter/Space) to the host page's edit action. */
+  function attachSelection(container: HTMLElement, ruleById: Map<number, any>,
+                           onSelectRule: (rule: any) => void, tipEl: HTMLElement | null): void {
+    selectionState.set(container, { ruleById, onSelectRule });
+
+    if (container.dataset.rfSelectWired) return;
+    container.dataset.rfSelectWired = '1';
+
+    const activate = (node: HTMLElement): void => {
+      const state = selectionState.get(container);
+      if (!state) return;
+      // Prefer the rules leaving this circle; a terminal node (USDC, a wallet)
+      // has none, so fall back to the ones feeding into it — clicking a
+      // destination to edit what fills it is the obvious reading.
+      const ids = parseIds(node.getAttribute('data-out')).length
+        ? parseIds(node.getAttribute('data-out'))
+        : parseIds(node.getAttribute('data-in'));
+      const rules = ids.map(id => state.ruleById.get(id)).filter(Boolean);
+      if (rules.length === 0) return;
+
+      tipEl?.classList.add('d-none');
+      if (rules.length === 1) {
+        state.onSelectRule(rules[0]);
+        return;
+      }
+      openPicker(node, rules, state.onSelectRule);
+    };
+
+    container.addEventListener('click', (e) => {
+      const node = (e.target as HTMLElement).closest('.rf-node.rf-clickable') as HTMLElement | null;
+      if (node) activate(node);
+    });
+
+    container.addEventListener('keydown', (e) => {
+      const ke = e as KeyboardEvent;
+      if (ke.key !== 'Enter' && ke.key !== ' ') return;
+      const node = (ke.target as HTMLElement).closest('.rf-node.rf-clickable') as HTMLElement | null;
+      if (!node) return;
+      ke.preventDefault();
+      activate(node);
+    });
+  }
+
+  function render(container: HTMLElement, rules: any[], opts?: {
+    exchangeName?: (id: any) => string;
+    /** Provided by pages that can edit a rule — makes the circles clickable. */
+    onSelectRule?: (rule: any) => void;
+  }): void {
     if (!container) return;
     container.classList.add('rf-chart');
+    closePicker();
 
     // Skip rules with no exchange — they don't belong to any flow.
     const placeable = (rules || []).filter(r =>
@@ -343,7 +488,21 @@ const RuleFlow = (() => {
 
       // Compute badge for this node.
       const icon = n.kind === 'wallet' ? 'fa-wallet' : 'fa-coins';
-      return `<div class="rf-node ${kindClass}${paused ? ' rf-paused' : ''}" data-key="${escAttr(n.key)}" data-desc="${escAttr(desc)}">
+
+      // Which rules this circle can open for editing: the ones leaving it, and
+      // the ones arriving (used when nothing leaves).
+      const outIds = n.out.map(r => r.id).filter(id => id != null);
+      const inIds = n.inRules.map(r => r.id).filter(id => id != null);
+      const clickable = !!opts?.onSelectRule && (outIds.length > 0 || inIds.length > 0);
+      const count = outIds.length || inIds.length;
+      const a11y = clickable
+        ? ` tabindex="0" role="button" aria-label="${escAttr(
+            `Edit ${count === 1 ? 'the automation' : `one of ${count} automations`} for ${n.label}`)}"`
+        : '';
+
+      return `<div class="rf-node ${kindClass}${paused ? ' rf-paused' : ''}${clickable ? ' rf-clickable' : ''}"`
+        + ` data-key="${escAttr(n.key)}" data-desc="${escAttr(desc)}"`
+        + ` data-out="${outIds.join(',')}" data-in="${inIds.join(',')}"${a11y}>
           <i class="fa-solid ${icon} rf-node-icon"></i>
           <span class="rf-node-label">${esc(n.label)}</span>
         </div>`;
@@ -428,7 +587,16 @@ const RuleFlow = (() => {
         if (rowsEl) drawArrows(rowsEl, jEdges);
       });
     });
-    attachTooltip(container);
+
+    const tipEl = attachTooltip(container);
+
+    if (opts?.onSelectRule) {
+      const ruleById = new Map<number, any>();
+      for (const r of placeable) {
+        if (r.id != null) ruleById.set(Number(r.id), r);
+      }
+      attachSelection(container, ruleById, opts.onSelectRule, tipEl);
+    }
   }
 
   return { render, describeRule };

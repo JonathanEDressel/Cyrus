@@ -96,6 +96,27 @@
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
 }
 
+/* A circle that opens an editor says so: pointer cursor, a lift, and an accent
+   ring — otherwise nothing distinguishes it from a decorative node. */
+.rf-node.rf-clickable {
+  cursor: pointer;
+}
+
+.rf-node.rf-clickable:hover {
+  border-color: var(--accent-purple-light);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35),
+              0 0 0 3px rgba(99, 102, 241, 0.22);
+}
+
+.rf-node.rf-clickable:active {
+  transform: translateY(0);
+}
+
+.rf-node.rf-clickable:focus-visible {
+  outline: 2px solid var(--accent-cyan-light);
+  outline-offset: 3px;
+}
+
 .rf-node-icon {
   font-size: 1.05rem;
   line-height: 1;
@@ -195,6 +216,75 @@
   font-size: 0.82rem;
   line-height: 1.5;
   color: var(--text-secondary);
+}
+
+.rf-tooltip-hint {
+  margin-top: 0.45rem;
+  padding-top: 0.4rem;
+  border-top: 1px solid var(--border-primary);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  color: var(--accent-purple-dim);
+}
+
+/* ── Rule picker (a circle covering more than one automation) ──────────── */
+
+.rf-picker {
+  position: fixed;
+  z-index: 1100;
+  min-width: 260px;
+  max-width: 360px;
+  padding: 0.4rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
+  border-radius: 10px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+}
+
+.rf-picker-title {
+  padding: 0.35rem 0.55rem 0.5rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--text-muted);
+}
+
+.rf-picker-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  width: 100%;
+  padding: 0.5rem 0.55rem;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.rf-picker-item:hover,
+.rf-picker-item:focus-visible {
+  background: var(--hover-overlay);
+  outline: none;
+}
+
+.rf-picker-item:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--accent-cyan-light);
+}
+
+.rf-picker-name {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.rf-picker-desc {
+  font-size: 0.74rem;
+  line-height: 1.45;
+  color: var(--text-tertiary);
 }
 
 .rf-tooltip-line + .rf-tooltip-line {

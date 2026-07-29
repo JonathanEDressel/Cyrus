@@ -633,7 +633,14 @@ class HomeController {
       this.setCardValue('custom-commands-count', filteredRules.length.toString());
 
       const flowChart = document.getElementById('overview-flow-chart');
-      if (flowChart) RuleFlow.render(flowChart, filteredRules, { exchangeName: (id) => ExchangeStore.getExchangeName(id) });
+      if (flowChart) {
+        RuleFlow.render(flowChart, filteredRules, {
+          exchangeName: (id) => ExchangeStore.getExchangeName(id),
+          // Same affordance as the Automations page, but the editor lives there —
+          // hand the rule over and let that page open it.
+          onSelectRule: (rule) => router.navigate('commands', { editRuleId: String(rule.id) }),
+        });
+      }
     } catch {
       this.setCardValue('custom-commands-count', '--');
     }
