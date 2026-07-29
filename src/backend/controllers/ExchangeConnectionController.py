@@ -1,6 +1,7 @@
 from flask import Blueprint, request
 from controllers.ExchangeConnectionDbContext import ExchangeConnectionDbContext
-from helper.Security import token_required, encrypt_api_key, active_required
+from helper.Security import (token_required, encrypt_api_key, active_required,
+                            fingerprint_api_key)
 from helper.ErrorHandler import handle_error, bad_request, not_found
 from helper.Helper import success_response, created_response
 from helper.ExchangeRegistry import (
@@ -77,6 +78,22 @@ def add_connection():
         if is_sandbox and not meta.get('has_sandbox', False):
             return bad_request(f"{meta['name']} does not support sandbox mode")
 
+        # Several connections per exchange are allowed (a trading account and a
+        # cold-storage account, or a read-only key beside a withdraw-capable
+        # one), but the SAME key twice is always a mistake: every portfolio
+        # total would count that account twice and the balancer would compute
+        # its percentages against an inflated figure.
+        fingerprint = fingerprint_api_key(api_key)
+        existing = ExchangeConnectionDbContext.get_connection_by_fingerprint(
+            request.user_id, fingerprint)
+        if existing:
+            return bad_request(
+                f"These API keys are already connected as "
+                f"\"{existing['label']}\" ({existing['exchange_name'].title()}). "
+                f"Add a second connection only for a different account — the same "
+                f"account twice would be counted twice everywhere."
+            )
+
         api_enc = encrypt_api_key(api_key)
         priv_enc = encrypt_api_key(private_key)
         pass_enc = encrypt_api_key(passphrase) if passphrase else None
@@ -89,6 +106,7 @@ def add_connection():
             private_key_encrypted=priv_enc,
             passphrase_encrypted=pass_enc,
             is_sandbox=is_sandbox,
+            api_key_fingerprint=fingerprint,
         )
 
         row = ExchangeConnectionDbContext.get_connection(conn_id, request.user_id)
@@ -96,7 +114,7 @@ def add_connection():
 
     except Exception as e:
         if 'UNIQUE constraint' in str(e):
-            return bad_request("A connection with this exchange and label already exists")
+            return bad_request("You already have a connection to this exchange with that label. Give this one a different label.")
         return handle_error(e)
 
 
@@ -119,6 +137,15 @@ def update_connection(conn_id):
 
         if not api_key or not private_key:
             return bad_request("API key and private/secret key are required")
+
+        fingerprint = fingerprint_api_key(api_key)
+        clash = ExchangeConnectionDbContext.get_connection_by_fingerprint(
+            request.user_id, fingerprint, exclude_id=conn_id)
+        if clash:
+            return bad_request(
+                f"Those API keys are already used by \"{clash['label']}\" "
+                f"({clash['exchange_name'].title()})."
+            )
 
         api_enc = encrypt_api_key(api_key)
         priv_enc = encrypt_api_key(private_key)

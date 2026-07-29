@@ -87,7 +87,23 @@ def encrypt_api_key(api_key: str) -> str:
 def decrypt_api_key(encrypted_key: str) -> str:
     if not encrypted_key:
         return None
-    
+
     fernet = Fernet(_get_encryption_key())
     decrypted = fernet.decrypt(encrypted_key.encode('utf-8'))
     return decrypted.decode('utf-8')
+
+
+def fingerprint_api_key(api_key: str) -> str | None:
+    """A stable, non-reversible id for an API key, used to spot duplicates.
+
+    Fernet ciphertext is randomised, so two encryptions of the same key don't
+    match and can't be compared. This gives something that can be: SHA-256 over
+    the key, peppered with SECRET_KEY so the stored digest isn't a plain hash of
+    the credential. Changing SECRET_KEY invalidates fingerprints, which is
+    already true of the encrypted keys themselves.
+    """
+    if not api_key:
+        return None
+
+    pepper = current_app.config['SECRET_KEY'].encode('utf-8')
+    return hashlib.sha256(pepper + api_key.strip().encode('utf-8')).hexdigest()

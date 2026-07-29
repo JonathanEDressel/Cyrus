@@ -70,6 +70,13 @@ class ProfileController {
         }
       }
 
+      // Pre-fill a label: it's required, and with several connections per
+      // exchange it's the only thing distinguishing them.
+      const labelInput = document.getElementById('new-connection-label') as HTMLInputElement | null;
+      if (labelInput && !labelInput.value.trim() && exchange) {
+        labelInput.value = this.suggestConnectionLabel(exchange.id);
+      }
+
       this.updateKeygenPanel(exchange);
     });
 
@@ -186,26 +193,45 @@ class ProfileController {
     const select = document.getElementById('new-exchange-name') as HTMLSelectElement;
     if (!select) return;
 
-    const addedIds = new Set(this.connections.map(c => c.exchange_name));
-    const available = this.supportedExchanges.filter(ex => !addedIds.has(ex.id));
-
+    // Every supported exchange stays selectable. More than one connection per
+    // exchange is legitimate — a trading account beside a cold-storage one, or a
+    // read-only key beside a withdraw-capable one — and the schema has always
+    // keyed on (exchange, label). Adding the *same keys* twice is what's
+    // rejected, by the backend, on fingerprint.
     select.innerHTML = '';
     const placeholder = document.createElement('option');
     placeholder.value = '';
     placeholder.disabled = true;
     placeholder.selected = true;
-    placeholder.textContent = available.length === 0 ? 'All exchanges already added' : 'Select an exchange...';
+    placeholder.textContent = 'Select an exchange...';
     select.appendChild(placeholder);
 
-    for (const ex of available) {
+    for (const ex of this.supportedExchanges) {
+      const existing = this.connections.filter(c => c.exchange_name === ex.id).length;
       const opt = document.createElement('option');
       opt.value = ex.id;
-      opt.textContent = ex.name;
+      opt.textContent = existing > 0
+        ? `${ex.name} — ${existing} connected`
+        : ex.name;
       select.appendChild(opt);
     }
 
     const addBtn = document.getElementById('add-connection-btn') as HTMLButtonElement;
-    if (addBtn) addBtn.disabled = available.length === 0;
+    if (addBtn) addBtn.disabled = this.supportedExchanges.length === 0;
+  }
+
+  /** Suggest a label so a second connection doesn't collide with the first. */
+  private suggestConnectionLabel(exchangeId: string): string {
+    const labels = new Set(
+      this.connections.filter(c => c.exchange_name === exchangeId).map(c => c.label)
+    );
+    if (labels.size === 0) return 'Main';
+    for (const candidate of ['Second', 'Trading', 'Cold storage', 'Savings']) {
+      if (!labels.has(candidate)) return candidate;
+    }
+    let n = 2;
+    while (labels.has(`Account ${n}`)) n++;
+    return `Account ${n}`;
   }
 
   private async loadConnections(): Promise<void> {
@@ -290,9 +316,14 @@ class ProfileController {
       this.showError('keys', 'Both API key and private key are required');
       return;
     }
+    if (!label) {
+      this.showError('keys', 'Give this connection a label — it is how you tell '
+        + 'multiple connections to the same exchange apart.');
+      return;
+    }
 
     try {
-      await ExchangeController.addConnection(exchangeName, label || 'Default', apiKey, privateKey, passphrase || undefined, isSandbox);
+      await ExchangeController.addConnection(exchangeName, label, apiKey, privateKey, passphrase || undefined, isSandbox);
       this.showSuccess('keys', 'Exchange connection added. Validating...');
 
       // Clear form

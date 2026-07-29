@@ -28,6 +28,7 @@ def setup_database():
                 is_validated BOOLEAN DEFAULT 0,
                 keys_last_validated DATETIME NULL,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                api_key_fingerprint TEXT,
                 UNIQUE(user_id, exchange_name, label),
                 FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
             )

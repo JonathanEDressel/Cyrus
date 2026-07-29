@@ -58,6 +58,16 @@ Select Robinhood in **Profile → Exchange Connections** and Cyrus now explains 
 
 It needs Python 3 and nothing else — no packages to install — and works with no internet connection at all. That's deliberate: generating your own keys offline means the private key exists nowhere until you choose to paste it. There's also a `--verify` mode that makes one signed request to Robinhood, so bad credentials fail with a clear explanation instead of a mysterious error inside the app.
 
+### 🔌 Connect the same exchange more than once
+
+You can now add several connections to one exchange — a trading account beside a cold-storage account, or a read-only key beside one that's allowed to withdraw. Previously an exchange disappeared from the dropdown once you'd connected it, so a second account was impossible even though the **Label** field existed for exactly that purpose.
+
+Each connection is separate everywhere it matters: automations, balancer caps, open orders and portfolio history are all tied to a specific connection, and Holdings shows which account holds what when a coin is spread across several.
+
+**Don't connect the same account twice.** Connections are added together in your portfolio totals and in the Balancer's percentages, so the same account connected twice would count double — and the Balancer decides real trades from those percentages. Re-using the same API keys is now rejected outright, with a message naming the connection that already uses them. Keys are matched by a one-way fingerprint, so nothing extra about them is stored, and existing connections are fingerprinted when you upgrade.
+
+The **Label** field is also fixed. It was marked "optional" while the app required it, quietly filling in "Default" on your behalf — which would have collided the moment you added a second connection to the same exchange. It's now properly required, and pre-filled with a suggestion.
+
 ### 🪙 Build rules for coins you don't own yet
 
 **Monitor Asset** used to list only assets you currently hold, which meant a rule like *"when my USDG balance reaches 500, convert it"* couldn't be written until the first USDG had already arrived — exactly when you'd want the rule already in place.

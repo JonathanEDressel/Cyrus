@@ -21,24 +21,59 @@ class ExchangeConnectionDbContext:
     def create_connection(user_id: int, exchange_name: str, label: str,
                           api_key_encrypted: str, private_key_encrypted: str,
                           passphrase_encrypted: str | None = None,
-                          is_sandbox: bool = False) -> int:
+                          is_sandbox: bool = False,
+                          api_key_fingerprint: str | None = None) -> int:
         return execute_insert(
             '''INSERT INTO exchange_connections
-               (user_id, exchange_name, label, api_key_encrypted, private_key_encrypted, passphrase_encrypted, is_sandbox)
-               VALUES (?, ?, ?, ?, ?, ?, ?)''',
-            (user_id, exchange_name, label, api_key_encrypted, private_key_encrypted, passphrase_encrypted, int(is_sandbox))
+               (user_id, exchange_name, label, api_key_encrypted, private_key_encrypted,
+                passphrase_encrypted, is_sandbox, api_key_fingerprint)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)''',
+            (user_id, exchange_name, label, api_key_encrypted, private_key_encrypted,
+             passphrase_encrypted, int(is_sandbox), api_key_fingerprint)
         )
+
+    @staticmethod
+    def get_connection_by_fingerprint(user_id: int, fingerprint: str,
+                                      exclude_id: int | None = None) -> dict | None:
+        """Find an existing connection using the same API key.
+
+        The same credentials in two connections would double-count the account in
+        every portfolio total and skew the balancer's percentages, so adding them
+        twice is rejected rather than merely discouraged.
+        """
+        if not fingerprint:
+            return None
+        if exclude_id is not None:
+            return execute_query_one(
+                'SELECT * FROM exchange_connections '
+                'WHERE user_id = ? AND api_key_fingerprint = ? AND id != ?',
+                (user_id, fingerprint, exclude_id)
+            )
+        return execute_query_one(
+            'SELECT * FROM exchange_connections WHERE user_id = ? AND api_key_fingerprint = ?',
+            (user_id, fingerprint)
+        )
+
+    @staticmethod
+    def count_connections_for_exchange(user_id: int, exchange_name: str) -> int:
+        row = execute_query_one(
+            'SELECT COUNT(*) AS n FROM exchange_connections WHERE user_id = ? AND exchange_name = ?',
+            (user_id, exchange_name)
+        )
+        return int(row['n']) if row else 0
 
     @staticmethod
     def update_connection_keys(connection_id: int, user_id: int,
                                api_key_encrypted: str, private_key_encrypted: str,
-                               passphrase_encrypted: str | None = None) -> bool:
+                               passphrase_encrypted: str | None = None,
+                               api_key_fingerprint: str | None = None) -> bool:
         execute_non_query(
             '''UPDATE exchange_connections
                SET api_key_encrypted = ?, private_key_encrypted = ?, passphrase_encrypted = ?,
-                   is_validated = 0, keys_last_validated = NULL
+                   api_key_fingerprint = ?, is_validated = 0, keys_last_validated = NULL
                WHERE id = ? AND user_id = ?''',
-            (api_key_encrypted, private_key_encrypted, passphrase_encrypted, connection_id, user_id)
+            (api_key_encrypted, private_key_encrypted, passphrase_encrypted,
+             api_key_fingerprint, connection_id, user_id)
         )
         return True
 

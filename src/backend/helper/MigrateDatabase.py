@@ -224,6 +224,40 @@ def run_column_migrations():
         # the rebalance-down-to target are stored as separate percentages: acting
         # exactly down to the cap would re-fire on the next tick, so a rule needs
         # both a ceiling and somewhere lower to land.
+        # Fingerprint of each connection's API key, so the same credentials can't
+        # be added twice now that one exchange may hold several connections.
+        # Existing rows are backfilled by decrypting what's already stored.
+        if not _has_column(conn, 'exchange_connections', 'api_key_fingerprint'):
+            conn.execute('ALTER TABLE exchange_connections ADD COLUMN api_key_fingerprint TEXT')
+            conn.commit()
+            print("[MIGRATION] Added api_key_fingerprint column to exchange_connections")
+
+            try:
+                from helper.Security import decrypt_api_key, fingerprint_api_key
+                rows = conn.execute(
+                    'SELECT id, api_key_encrypted FROM exchange_connections '
+                    'WHERE api_key_encrypted IS NOT NULL'
+                ).fetchall()
+                filled = 0
+                for row in rows:
+                    try:
+                        plain = decrypt_api_key(row['api_key_encrypted'])
+                    except Exception:
+                        continue   # keys encrypted under a different SECRET_KEY
+                    fp = fingerprint_api_key(plain)
+                    if fp:
+                        conn.execute(
+                            'UPDATE exchange_connections SET api_key_fingerprint = ? WHERE id = ?',
+                            (fp, row['id'])
+                        )
+                        filled += 1
+                conn.commit()
+                print(f"[MIGRATION] Fingerprinted {filled} existing exchange connection(s)")
+            except Exception as e:
+                # Non-fatal: without fingerprints the duplicate check simply
+                # can't see pre-existing connections.
+                print(f"[MIGRATION] Could not backfill key fingerprints: {e}")
+
         if not _has_column(conn, 'automation_rules', 'trigger_allocation_percent'):
             conn.execute('ALTER TABLE automation_rules ADD COLUMN trigger_allocation_percent TEXT')
             conn.commit()

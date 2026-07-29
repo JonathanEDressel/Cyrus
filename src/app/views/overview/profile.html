@@ -82,8 +82,23 @@
           </div>
 
           <div class="form-group">
-            <label for="new-connection-label" class="form-label">Label (optional)</label>
-            <input id="new-connection-label" type="text" class="form-control" placeholder="e.g. Main Account, Trading" />
+            <label for="new-connection-label" class="form-label">Label</label>
+            <input id="new-connection-label" type="text" class="form-control" placeholder="e.g. Main Account, Trading" required />
+            <small class="form-text text-muted">
+              Names this connection. You can connect the same exchange more than once —
+              a trading account and a cold-storage account, say — and the label is how
+              you'll tell them apart.
+            </small>
+          </div>
+
+          <div class="dupe-warning">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+            <span>
+              <strong>Use a different account, not the same one twice.</strong>
+              Connections are added together in your portfolio and in the Balancer's
+              percentages, so the same account connected twice would count double.
+              Re-using API keys is blocked.
+            </span>
           </div>
           <div class="form-group">
             <label for="new-api-key" class="form-label">API Key</label>

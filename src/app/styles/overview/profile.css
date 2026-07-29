@@ -352,3 +352,31 @@ a.help-icon {
 
 body.theme-light .keygen-status-ok { color: #15803d; }
 body.theme-light .keygen-status-error { color: #b91c1c; }
+
+/* ── Duplicate-account warning on the add-connection form ─────────────────── */
+
+.dupe-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  margin: 0.25rem 0 1rem;
+  padding: 0.7rem 0.9rem;
+  border-radius: 8px;
+  background: rgba(245, 158, 11, 0.08);
+  border: 1px solid rgba(245, 158, 11, 0.25);
+  font-size: 0.8rem;
+  line-height: 1.55;
+  color: var(--text-tertiary);
+}
+
+.dupe-warning i {
+  color: #f59e0b;
+  margin-top: 0.15rem;
+  flex-shrink: 0;
+}
+
+.dupe-warning strong {
+  color: var(--text-secondary);
+}
+
+body.theme-light .dupe-warning i { color: #b45309; }
