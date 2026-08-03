@@ -115,7 +115,13 @@ class RobinhoodClient:
                     detail = resp.text or str(resp.status_code)
                 raise RobinhoodError(f"Robinhood API error: {detail}")
 
-            return resp.json()
+            try:
+                return resp.json()
+            except ValueError:
+                # A success with no JSON body is still a success — the cancel
+                # endpoint answers 200 with an empty or plain-text body, and
+                # raising here would report a completed action as failed.
+                return {}
 
         raise RobinhoodRateLimitError("Robinhood rate limit exceeded after all retries")
 

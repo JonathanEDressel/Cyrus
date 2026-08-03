@@ -1,6 +1,8 @@
 node_modules/
 dist/
 *.log
+# Rotated logs (cyrus.log.1, .2, …) don't match *.log
+src/backend/logs/
 .DS_Store
 
 # Build output

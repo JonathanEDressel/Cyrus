@@ -282,6 +282,11 @@ def _orders_table(orders: list) -> str:
     rows = []
     for o in orders:
         pair = escape(str(o.get("pair", "")))
+        # The report covers every connected exchange, so two venues can contribute
+        # an identical-looking row. Name the venue when we know it.
+        venue = escape(str(o.get("exchange") or ""))
+        if venue:
+            pair += (f'<span style="color:{MUTED};font-weight:400;"> · {venue}</span>')
         side = (o.get("side") or "").upper()
         side_color = "#22c55e" if side == "BUY" else "#ef4444" if side == "SELL" else MUTED
         amount = escape(str(o.get("amount", "")))

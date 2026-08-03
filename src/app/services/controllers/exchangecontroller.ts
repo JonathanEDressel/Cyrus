@@ -62,6 +62,27 @@ class ExchangeController {
     return response.data;
   }
 
+  static async createOrder(connectionId: number, order: CreateOrderRequest): Promise<any> {
+    const token = AuthController.getToken();
+    if (!token) throw new Error('Not authenticated');
+    const response = await ExchangeData.createOrder(token, connectionId, order);
+    return response.data;
+  }
+
+  static async getPairs(connectionId: number, asset: string, side?: 'buy' | 'sell'): Promise<PairsResponse> {
+    const token = AuthController.getToken();
+    if (!token) throw new Error('Not authenticated');
+    const response = await ExchangeData.getPairs(token, connectionId, asset, side);
+    return response.data;
+  }
+
+  static async cancelOrder(connectionId: number, orderId: string, symbol?: string): Promise<any> {
+    const token = AuthController.getToken();
+    if (!token) throw new Error('Not authenticated');
+    const response = await ExchangeData.cancelOrder(token, connectionId, orderId, symbol);
+    return response.data;
+  }
+
   static async getWithdrawalAddresses(connectionId: number): Promise<any[]> {
     const token = AuthController.getToken();
     if (!token) throw new Error('Not authenticated');

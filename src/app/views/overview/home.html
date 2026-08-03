@@ -1,43 +1,36 @@
-<div class="page-container">
+<div class="page-container ov-page">
 
-  <div class="overview-header">
-    <h1 class="page-title">Overview</h1>
-    <p class="page-subtitle" id="page-subtitle">A quick look at your account</p>
+  <div class="overview-header ov-header">
+    <div class="ov-header-text">
+      <h1 class="page-title">Overview</h1>
+      <p class="page-subtitle" id="page-subtitle">A quick look at your account</p>
+    </div>
+    <div class="ov-header-side">
+      <span class="ov-meta" id="ov-meta"></span>
+      <button class="ov-refresh-btn" id="ov-refresh" title="Refresh everything on this page">
+        <i class="fa-solid fa-rotate"></i>
+      </button>
+    </div>
   </div>
 
-  <div class="summary-cards">
-    <a href="#" class="summary-card summary-card-link" data-route="openorders" title="View open orders">
-      <div class="summary-icon"><i class="fa-solid fa-clock-rotate-left"></i></div>
-      <div class="summary-body">
-        <span class="summary-label">Open Orders</span>
-        <span class="summary-value" id="open-orders-count">--</span>
-      </div>
-      <i class="fa-solid fa-chevron-right summary-card-arrow"></i>
-    </a>
-
-    <a href="#" class="summary-card summary-card-link" data-route="commands" title="View automations">
-      <div class="summary-icon"><i class="fa-solid fa-bolt"></i></div>
-      <div class="summary-body">
-        <span class="summary-label">Automations</span>
-        <span class="summary-value" id="custom-commands-count">--</span>
-      </div>
-      <i class="fa-solid fa-chevron-right summary-card-arrow"></i>
-    </a>
-  </div>
+  <!-- Headline numbers. Every tile links to the page it summarises. -->
+  <div class="ov-stats" id="ov-stats"></div>
 
   <div class="overview-split">
-    <div class="overview-section portfolio-panel">
-      <div class="section-header">
+    <div class="overview-section ov-card portfolio-panel">
+      <div class="section-header" data-collapse="portfolio">
         <div class="section-header-left">
+          <i class="fa-solid fa-chevron-down collapse-chevron"></i>
           <h2 class="section-title">Portfolio</h2>
         </div>
+        <a href="#" class="btn-link-sm" data-route="holdings">Holdings <i class="fa-solid fa-arrow-right"></i></a>
       </div>
       <div id="portfolio-chart"></div>
       <!-- Portfolio value-over-time chart (disabled for now) -->
       <!-- <div id="portfolio-history"></div> -->
     </div>
 
-    <div class="overview-section" data-section="live-data">
+    <div class="overview-section ov-card" data-section="live-data">
       <div class="section-header">
         <div class="section-header-left">
           <h2 class="section-title">Live Data</h2>
@@ -69,9 +62,70 @@
     </div>
   </div>
 
-  <div class="overview-section" id="overview-flow-section">
-    <div class="section-header">
+  <div class="overview-split">
+    <div class="overview-section ov-card">
+      <div class="section-header" data-collapse="holdings">
+        <div class="section-header-left">
+          <i class="fa-solid fa-chevron-down collapse-chevron"></i>
+          <h2 class="section-title">Biggest Holdings</h2>
+          <span class="ov-chip d-none" id="ov-holdings-chip"></span>
+        </div>
+        <a href="#" class="btn-link-sm" data-route="holdings">Open <i class="fa-solid fa-arrow-right"></i></a>
+      </div>
+      <div class="ov-list" id="ov-holdings-list">
+        <p class="ov-loading">Valuing your holdings…</p>
+      </div>
+    </div>
+
+    <div class="overview-section ov-card">
+      <div class="section-header" data-collapse="limits">
+        <div class="section-header-left">
+          <i class="fa-solid fa-chevron-down collapse-chevron"></i>
+          <h2 class="section-title">Resting Limit Orders</h2>
+          <span class="ov-chip d-none" id="ov-limit-chip"></span>
+        </div>
+        <a href="#" class="btn-link-sm" data-route="limitorders">Open <i class="fa-solid fa-arrow-right"></i></a>
+      </div>
+      <div class="ov-list" id="ov-limit-list">
+        <p class="ov-loading">Loading orders…</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="overview-split">
+    <div class="overview-section ov-card">
+      <div class="section-header" data-collapse="caps">
+        <div class="section-header-left">
+          <i class="fa-solid fa-chevron-down collapse-chevron"></i>
+          <h2 class="section-title">Allocation Caps</h2>
+          <span class="ov-chip d-none" id="ov-caps-chip"></span>
+        </div>
+        <a href="#" class="btn-link-sm" data-route="rebalancer">Open <i class="fa-solid fa-arrow-right"></i></a>
+      </div>
+      <div class="ov-list" id="ov-caps-list">
+        <p class="ov-loading">Loading caps…</p>
+      </div>
+    </div>
+
+    <div class="overview-section ov-card">
+      <div class="section-header" data-collapse="activity">
+        <div class="section-header-left">
+          <i class="fa-solid fa-chevron-down collapse-chevron"></i>
+          <h2 class="section-title">Recent Activity</h2>
+          <span class="ov-worker" id="ov-worker"></span>
+        </div>
+        <a href="#" class="btn-link-sm" data-route="commands">Open <i class="fa-solid fa-arrow-right"></i></a>
+      </div>
+      <div class="ov-list" id="ov-activity-list">
+        <p class="ov-loading">Loading activity…</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="overview-section ov-card" id="overview-flow-section">
+    <div class="section-header" data-collapse="flow">
       <div class="section-header-left">
+        <i class="fa-solid fa-chevron-down collapse-chevron"></i>
         <h2 class="section-title">Flow</h2>
         <div class="orders-tab-strip" id="overview-flow-tab-strip">
           <button class="rules-tab-btn active" data-tab="automations">Automations</button>

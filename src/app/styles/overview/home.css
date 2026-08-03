@@ -21,20 +21,13 @@
   margin: 0;
 }
 
-.summary-cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 1rem;
-  margin-bottom: 2.5rem;
-}
-
 /* Portfolio panel beside the Live Data chart */
 .overview-split {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 1.25rem;
   align-items: stretch;
-  margin-bottom: 2rem;
+  margin-bottom: 1.25rem;
 }
 
 .overview-split .overview-section {
@@ -68,74 +61,6 @@
   overflow-x: auto;
   overflow-y: visible;
   padding-bottom: 0.5rem;
-}
-
-.summary-card {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-primary);
-  border-radius: 12px;
-  padding: 1.25rem 1.5rem;
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  transition: border-color 0.2s, box-shadow 0.2s;
-}
-
-.summary-card:hover {
-  border-color: var(--accent-cyan);
-  box-shadow: 0 0 0 1px rgba(6, 182, 212, 0.15);
-}
-
-.summary-icon {
-  width: 44px;
-  height: 44px;
-  border-radius: 10px;
-  background: rgba(6, 182, 212, 0.1);
-  color: var(--accent-cyan);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.2rem;
-  flex-shrink: 0;
-}
-
-.summary-body {
-  display: flex;
-  flex-direction: column;
-}
-
-.summary-label {
-  font-size: 0.8rem;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  font-weight: 600;
-}
-
-.summary-value {
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: var(--text-primary);
-  line-height: 1.2;
-}
-
-/* Clickable summary cards that navigate to their page */
-.summary-card-link {
-  text-decoration: none;
-  color: inherit;
-  cursor: pointer;
-}
-
-.summary-card-arrow {
-  margin-left: auto;
-  color: var(--text-muted);
-  font-size: 0.85rem;
-  transition: transform 0.2s, color 0.2s;
-}
-
-.summary-card-link:hover .summary-card-arrow {
-  color: var(--accent-cyan);
-  transform: translateX(3px);
 }
 
 .overview-section {
@@ -665,3 +590,566 @@
   font-size: 0.8rem;
   color: var(--text-muted);
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   Overview page (`.ov-*`)
+
+   Everything below is scoped to the Overview. home.css is also loaded by
+   Holdings, Balancer and Limit Orders for the shared page shell, so these
+   rules deliberately use their own prefix rather than touching the shared
+   classes above.
+   ═══════════════════════════════════════════════════════════════════ */
+
+.ov-page {
+  padding-top: 1.5rem;
+}
+
+/* ── Header ─────────────────────────────────────────────────────── */
+
+.ov-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.25rem;
+}
+
+.ov-header-side {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.ov-meta {
+  font-size: 0.78rem;
+  color: var(--text-dim);
+  text-align: right;
+}
+
+.ov-meta-warn {
+  color: #f59e0b;
+}
+
+.ov-refresh-btn {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
+  color: var(--text-muted);
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.ov-refresh-btn:hover {
+  color: var(--accent-cyan);
+  border-color: var(--accent-cyan);
+}
+
+.ov-refresh-btn.is-busy i {
+  animation: ov-spin 0.9s linear infinite;
+}
+
+@keyframes ov-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Stat tiles ─────────────────────────────────────────────────── */
+
+.ov-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(158px, 1fr));
+  gap: 0.7rem;
+  margin-bottom: 1.25rem;
+}
+
+.ov-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
+  border-radius: 12px;
+  padding: 0.7rem 0.85rem;
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+}
+
+.ov-stat:hover {
+  border-color: var(--accent-cyan);
+  box-shadow: 0 0 0 1px rgba(6, 182, 212, 0.14);
+  transform: translateY(-1px);
+}
+
+.ov-stat-label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.67rem;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.ov-stat-label i {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  transition: color 0.15s;
+}
+
+.ov-stat:hover .ov-stat-label i {
+  color: var(--accent-cyan);
+}
+
+.ov-stat-value {
+  font-size: 1.3rem;
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.ov-stat-sub {
+  font-size: 0.72rem;
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Panel cards ────────────────────────────────────────────────── */
+
+.ov-card {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
+  border-radius: 14px;
+  padding: 0.85rem 1rem 0.9rem;
+}
+
+.ov-card > .section-header {
+  margin-bottom: 0.7rem;
+}
+
+.ov-card .section-title {
+  font-size: 1rem;
+}
+
+/* The chart card supplies its own frame elsewhere; inside a panel the panel
+   is the frame. */
+.ov-card .chart-card {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  border-radius: 0;
+}
+
+.ov-card .chart-card:hover {
+  border: none;
+  box-shadow: none;
+}
+
+.ov-card .chart-header,
+.ov-card .time-range-selector {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.ov-card .time-range-selector {
+  background: transparent;
+}
+
+.ov-card .live-data-empty {
+  background: transparent;
+  padding: 2.75rem 1rem;
+}
+
+/* Present when openorders.css hasn't been loaded yet this session. */
+.orders-tab-strip {
+  display: flex;
+  gap: 0.2rem;
+}
+
+/* The full flow diagram runs to a few thousand pixels once several exchanges
+   are connected. Here it's a preview — box it in and let the Automations page
+   show it at full size. */
+.ov-page .flow-scroll-wrap {
+  max-height: 440px;
+  overflow-y: auto;
+}
+
+.ov-chip {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  color: var(--text-muted);
+  background: var(--bg-primary);
+  border: 1px solid var(--border-primary);
+  border-radius: 20px;
+  padding: 0.1rem 0.5rem;
+}
+
+.ov-worker {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+
+.ov-worker-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text-dimmer);
+}
+
+.ov-worker-up .ov-worker-dot   { background: #22c55e; }
+.ov-worker-down .ov-worker-dot { background: #ef4444; }
+
+/* ── Shared list scaffolding ────────────────────────────────────── */
+
+.ov-list {
+  display: flex;
+  flex-direction: column;
+  /* Two panels side by side stretch to the same height; letting the list grow
+     keeps their "+N more" footers on the same line. */
+  flex: 1;
+}
+
+.ov-list .ov-foot {
+  margin-top: auto;
+}
+
+.ov-list > * + * {
+  border-top: 1px solid var(--border-secondary);
+}
+
+.ov-row {
+  display: grid;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.5rem 0;
+  font-size: 0.85rem;
+  color: var(--text-tertiary);
+}
+
+.ov-loading,
+.ov-empty {
+  margin: 0;
+  padding: 1.5rem 0.5rem;
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--text-dim);
+}
+
+.ov-empty i {
+  display: block;
+  font-size: 1.4rem;
+  margin-bottom: 0.5rem;
+  opacity: 0.5;
+}
+
+.ov-empty a {
+  color: var(--accent-cyan);
+  text-decoration: none;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ov-empty a:hover {
+  text-decoration: underline;
+}
+
+.ov-foot {
+  padding: 0.5rem 0 0;
+  font-size: 0.74rem;
+  color: var(--text-dim);
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.ov-badge {
+  display: inline-block;
+  padding: 0.12em 0.45em;
+  border-radius: 5px;
+  background: rgba(6, 182, 212, 0.12);
+  color: var(--accent-cyan);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}
+
+.ov-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.ov-sub {
+  display: block;
+  font-size: 0.71rem;
+  color: var(--text-dim);
+  font-weight: 400;
+}
+
+.ov-up   { color: #22c55e; }
+.ov-down { color: #ef4444; }
+.ov-warn { color: #f59e0b; }
+
+/* ── Biggest holdings ───────────────────────────────────────────── */
+
+.ov-hold {
+  grid-template-columns: minmax(0, 1fr) 54px auto auto;
+}
+
+.ov-hold-name {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+}
+
+.ov-hold-name span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.ov-hold-price {
+  min-width: 74px;
+}
+
+.ov-hold-value {
+  min-width: 84px;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.ov-spark {
+  height: 22px;
+  display: block;
+}
+
+.ov-spark polyline {
+  fill: none;
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+}
+
+.ov-spark-up polyline   { stroke: #4ade80; }
+.ov-spark-down polyline { stroke: #f87171; }
+
+/* ── Resting limit orders ───────────────────────────────────────── */
+
+.ov-order {
+  grid-template-columns: 42px minmax(0, 1fr) auto auto;
+}
+
+.ov-side {
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-align: center;
+  border-radius: 5px;
+  padding: 0.18em 0;
+}
+
+.ov-side-buy {
+  color: #22c55e;
+  background: rgba(34, 197, 94, 0.12);
+}
+
+.ov-side-sell {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.12);
+}
+
+.ov-order-pair {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.ov-order-price { min-width: 76px; }
+.ov-order-total { min-width: 74px; }
+
+/* Buy / sell split shown above the order list. */
+.ov-split-bar {
+  display: flex;
+  gap: 0.4rem;
+  margin-bottom: 0.6rem;
+}
+
+.ov-split-half {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.05rem;
+  padding: 0.45rem 0.6rem;
+  border-radius: 9px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-primary);
+}
+
+.ov-split-label {
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.ov-split-value {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Allocation caps ────────────────────────────────────────────── */
+
+.ov-cap {
+  grid-template-columns: 58px minmax(60px, 1fr) auto;
+}
+
+.ov-cap-bar {
+  position: relative;
+  height: 7px;
+  border-radius: 4px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-primary);
+  overflow: hidden;
+}
+
+.ov-cap-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 4px 0 0 4px;
+  background: var(--accent-cyan);
+}
+
+.ov-cap-over .ov-cap-fill {
+  background: #f59e0b;
+}
+
+.ov-cap-paused .ov-cap-fill {
+  background: var(--text-dimmer);
+}
+
+.ov-cap-mark {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  width: 2px;
+  background: var(--text-muted);
+}
+
+.ov-cap-nums {
+  min-width: 96px;
+  font-size: 0.8rem;
+}
+
+.ov-tag {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+/* ── Recent activity ────────────────────────────────────────────── */
+
+.ov-act {
+  grid-template-columns: 8px minmax(0, 1fr) auto;
+  align-items: start;
+}
+
+.ov-act-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-top: 0.35rem;
+  background: var(--text-dimmer);
+}
+
+.ov-act-success .ov-act-dot { background: #22c55e; }
+.ov-act-error .ov-act-dot   { background: #ef4444; }
+.ov-act-skipped .ov-act-dot { background: #64748b; }
+
+.ov-act-body {
+  min-width: 0;
+}
+
+.ov-act-rule {
+  display: block;
+  font-weight: 600;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ov-act-detail {
+  display: block;
+  font-size: 0.76rem;
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ov-act-time {
+  font-size: 0.73rem;
+  color: var(--text-dim);
+  white-space: nowrap;
+  padding-top: 0.1rem;
+}
+
+/* ── Narrow layouts ─────────────────────────────────────────────── */
+
+@media (max-width: 1180px) {
+  .ov-hold {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+  }
+  .ov-hold .ov-spark {
+    display: none;
+  }
+}
+
+@media (max-width: 700px) {
+  .ov-hold-name span:last-child,
+  .ov-order-price {
+    display: none;
+  }
+  .ov-header-side {
+    width: 100%;
+    justify-content: space-between;
+  }
+}
+
+/* ── Light theme ────────────────────────────────────────────────── */
+
+body.theme-light .ov-badge {
+  background: rgba(8, 145, 178, 0.12);
+}
+
+body.theme-light .ov-spark-up polyline   { stroke: #15803d; }
+body.theme-light .ov-spark-down polyline { stroke: #b91c1c; }
+body.theme-light .ov-up   { color: #15803d; }
+body.theme-light .ov-down { color: #b91c1c; }
+body.theme-light .ov-warn { color: #b45309; }
+body.theme-light .ov-meta-warn { color: #b45309; }
+body.theme-light .ov-cap-over .ov-cap-fill { background: #d97706; }

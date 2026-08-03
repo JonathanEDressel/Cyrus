@@ -23,6 +23,9 @@ SUPPORTED_EXCHANGES: dict[str, dict] = {
         'supports_withdraw': True,
         # Portfolio balancer: needs USD-priceable balances plus market orders.
         'supports_rebalance': True,
+        # Kraken's private call-rate counter is the real constraint here, and
+        # 1s between orders is what it sustains. See ORDER_PACING notes below.
+        'order_pacing_ms': 1000,
         'has_sandbox': False,
         'website': 'https://www.kraken.com',
         'api_key_url': 'https://www.kraken.com/u/security/api',
@@ -38,6 +41,7 @@ SUPPORTED_EXCHANGES: dict[str, dict] = {
         'has_withdrawal_addresses': False,
         'supports_withdraw': False,
         'supports_rebalance': True,
+        'order_pacing_ms': 250,
         'has_sandbox': False,
         'website': 'https://www.coinbase.com',
         'api_key_url': 'https://www.coinbase.com/settings/api',
@@ -50,6 +54,7 @@ SUPPORTED_EXCHANGES: dict[str, dict] = {
         'has_withdrawal_addresses': False,
         'supports_withdraw': False,
         'supports_rebalance': True,
+        'order_pacing_ms': 250,
         'has_sandbox': False,
         'website': 'https://www.binance.com',
         'api_key_url': 'https://www.binance.com/en/my/settings/api-management',
@@ -64,6 +69,10 @@ SUPPORTED_EXCHANGES: dict[str, dict] = {
         # Rebalancing works, but Robinhood has no bulk-ticker endpoint, so
         # pricing the portfolio costs one request per held asset per cycle.
         'supports_rebalance': True,
+        # 100 requests/minute sustained (~1.67 tokens/s refill), and each
+        # placement costs a signed request or two, so 600ms is the sustainable
+        # floor rather than a guess.
+        'order_pacing_ms': 600,
         # Robinhood issues no secret: the user generates an Ed25519 keypair,
         # registers the public half, and pastes the private half here. The
         # Profile page offers a key generator when this is set.
@@ -119,6 +128,11 @@ WITHDRAWAL_MINIMUMS: dict[str, dict[str, float]] = {
 
 MINIMUM_WITHDRAWAL_CUSHION = 1.10
 
+# Fallback pacing for an exchange with no explicit `order_pacing_ms`. Chosen
+# pessimistically: too slow only costs the user time, too fast trips a throttle
+# part-way through a ladder.
+DEFAULT_ORDER_PACING_MS = 1000
+
 # Assets the portfolio balancer offers as a destination for trimmed positions.
 # Filtered per position against the exchange's actual market list, so a target
 # only appears when there's a tradable pair for it.
@@ -141,6 +155,7 @@ def get_supported_exchanges() -> list[dict]:
             'has_withdrawal_addresses': meta['has_withdrawal_addresses'],
             'supports_withdraw': meta.get('supports_withdraw', False),
             'supports_rebalance': meta.get('supports_rebalance', False),
+            'order_pacing_ms': meta.get('order_pacing_ms', DEFAULT_ORDER_PACING_MS),
             'needs_generated_keypair': meta.get('needs_generated_keypair', False),
             'has_sandbox': meta.get('has_sandbox', False),
             'website': meta.get('website', ''),
@@ -161,6 +176,24 @@ def get_minimum_withdrawal(exchange_name: str, asset: str) -> float:
 def supports_rebalance(exchange_name: str) -> bool:
     """True when the balancer can operate on *exchange_name*."""
     return SUPPORTED_EXCHANGES.get(exchange_name, {}).get('supports_rebalance', False)
+
+
+def get_order_pacing_ms(exchange_name: str) -> int:
+    """Recommended delay between consecutive order placements, in milliseconds.
+
+    Deliberately NOT ccxt's ``rateLimit``. That number is the generic REST weight
+    budget — Coinbase reports 34ms and Binance 50ms — but both exchanges throttle
+    *order entry* far more tightly than general requests, so pacing a ladder off
+    it would trip an order-rate limit rather than the weight limit. It also has
+    no answer at all for Robinhood, which isn't a ccxt exchange.
+
+    Callers multiply this by the rung count for a duration estimate and use it as
+    the loop delay, so it must be the *sustainable* rate: a ladder that starts
+    fast and then eats 429 back-offs is both slower and more alarming than one
+    that paces itself from the start.
+    """
+    meta = SUPPORTED_EXCHANGES.get(exchange_name, {})
+    return int(meta.get('order_pacing_ms') or DEFAULT_ORDER_PACING_MS)
 
 
 def get_all_minimums(exchange_name: str) -> dict[str, float]:

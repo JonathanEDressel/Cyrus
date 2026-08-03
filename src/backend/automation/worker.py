@@ -36,6 +36,7 @@ class AutomationWorker:
     POLL_INTERVAL = _poll_interval_from_env()
     SUPERVISOR_INTERVAL = 30   # how often to check that the poll thread lives
     STALL_FACTOR = 10          # cycles-worth of silence before shouting about it
+    REPORT_RETRY_SECONDS = 3600  # gap before retrying a failed monthly report
 
     def __init__(self, app: Flask):
         self.app = app
@@ -64,6 +65,9 @@ class AutomationWorker:
         self._price_watermarks = {}
         # Exchange ids with no candle endpoint (Robinhood), so we stop asking.
         self._no_candles = set()
+        # (user_id, period) -> epoch seconds of the last monthly-report attempt,
+        # so a bad SMTP password doesn't mean a retry every single cycle.
+        self._report_attempts = {}
 
     def start(self):
         self._stop_event.clear()
@@ -211,6 +215,7 @@ class AutomationWorker:
                     # Daily portfolio snapshots (feeds the monthly report's
                     # month-over-month change). Cheap no-op until a new day bucket.
                     self._snapshotter.run(self._stop_event)
+                    self._send_due_reports()
                     self._poll_cycle()
             except Exception as e:
                 self._note_error('cycle', e)
@@ -238,6 +243,46 @@ class AutomationWorker:
                 # except Exception as e:
                 #     print(f"[WORKER] snapshot tick error: {e}")
     
+    def _send_due_reports(self):
+        """Email last month's report to whoever is still owed it.
+
+        Running on the normal cycle means the report goes out within a minute of
+        the month rolling over. Because the test is "has this period ever been
+        sent" rather than "is it the 1st", it also catches up on the next start
+        when Cyrus wasn't running at the boundary.
+
+        Self-contained: a report problem must not stop rules from being polled.
+        """
+        try:
+            from controllers.ReportDbContext import ReportDbContext
+            from helper import monthly_report
+
+            period = monthly_report.previous_period()
+            owed = ReportDbContext.get_users_owed_report(period)
+            if not owed:
+                return
+
+            now = time.time()
+            for user_id in owed:
+                if self._stop_event.is_set():
+                    return
+
+                last_attempt = self._report_attempts.get((user_id, period))
+                if last_attempt is not None and now - last_attempt < self.REPORT_RETRY_SECONDS:
+                    continue
+                self._report_attempts[(user_id, period)] = now
+
+                try:
+                    to_addr = monthly_report.send_monthly_report(user_id, period)
+                    print(f"[REPORT] {period} report sent to {to_addr} (user {user_id})")
+                except Exception as e:
+                    self._note_error(f'monthly report {period}', e)
+                    print(f"[REPORT] Could not send the {period} report for user "
+                          f"{user_id}: {e} — will retry in an hour")
+        except Exception as e:
+            self._note_error('monthly reports', e)
+            print(f"[REPORT] Monthly report check failed: {e}")
+
     def _poll_cycle(self):
         from controllers.AutomationDbContext import AutomationDbContext
         from controllers.AuthDbContext import AuthDbContext
@@ -319,7 +364,24 @@ class AutomationWorker:
                     # Check if order was actually filled via closed orders.
                     # Pass the symbol so exchanges like Binance that require it work correctly.
                     pair = snapshot.get('pair') or None
-                    closed_orders = get_closed_orders(exchange, symbol=pair)
+                    try:
+                        closed_orders = get_closed_orders(exchange, symbol=pair)
+                    except (DDoSProtection, RateLimitExceeded, ExchangeNotAvailable):
+                        # Transient: leave the snapshot in place and let the
+                        # handler below log it as a retry-next-cycle.
+                        raise
+                    except Exception as e:
+                        # This one order can't be resolved, and repeating the call
+                        # next cycle would fail the same way — which used to
+                        # abandon every other disappeared order on the connection
+                        # and leave this snapshot behind to do it again forever.
+                        # Drop the snapshot and carry on with the rest.
+                        self._note_error(f'closed orders {pair or order_id}', e)
+                        print(f"[WORKER] Could not check whether {order_id} "
+                              f"({pair or 'unknown pair'}) filled for user {user_id}: {e} — "
+                              f"skipping this order")
+                        AutomationDbContext.delete_order_snapshot(user_id, order_id)
+                        continue
                     closed_order = next((o for o in closed_orders if o['id'] == order_id), None)
 
                     if closed_order and closed_order.get('status') == 'closed':

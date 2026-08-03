@@ -1,0 +1,1003 @@
+/* Limit Orders page.
+ *
+ * Builds on home.css (page shell + data table), commands.css (buttons, alerts,
+ * the .edit-rule-* modal shell) and openorders.css (.side-buy/.side-sell,
+ * .order-id-cell, .orders-tab-strip). Only what's specific to this page lives
+ * here, and it loads last so these rules win. */
+
+/* Nothing on this page collapses, so the header shouldn't invite a click.
+ * Scoped to the page's own id — the router never unloads a stylesheet, so an
+ * unscoped .section-header rule would follow the user to the collapsible
+ * sections on Overview and Holdings. */
+#limit-orders-page .section-header {
+  cursor: default;
+}
+
+/* ── Alert base styling for this route ───────────────────────────────
+ * `.alert` / `.alert-warning` have no base rule in scope here: only login.css
+ * defines them unscoped (and that sheet isn't loaded when a saved session skips
+ * the login screen), plus page-scoped copies in holdings.css and rebalancer.css.
+ * Only `.alert-success` is global (commands.css).
+ *
+ * The selector list is explicit rather than a single page-id scope because the
+ * modals are SIBLINGS of #limit-orders-page, not children — which is exactly why
+ * #cancel-order-error was rendering unstyled. An unscoped rule isn't an option
+ * either: the router never unloads a stylesheet, so it would follow the user to
+ * every other page. */
+#limit-orders-page .alert,
+.cancel-order-modal .alert,
+.create-limit-modal .alert {
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  margin-bottom: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  line-height: 1.45;
+}
+
+#limit-orders-page .alert-warning,
+.cancel-order-modal .alert-warning,
+.create-limit-modal .alert-warning {
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.25);
+  color: #f59e0b;
+}
+
+body.theme-light #limit-orders-page .alert-warning,
+body.theme-light .cancel-order-modal .alert-warning,
+body.theme-light .create-limit-modal .alert-warning {
+  color: #b45309;
+}
+
+/* These two keep their own spacing, hence margin-bottom: 0 above. */
+#limit-error,
+#limit-success {
+  margin-bottom: 1.5rem;
+}
+
+/* ── Table layout opt-out ────────────────────────────────────────────
+ * home.css turns `.data-table tbody` into `display: block` with each <tr>
+ * re-declared as its own table. Rows inserted into that hybrid layout paint
+ * unreliably in Chromium (the bug rebalancer.css documents), and these two
+ * tables are full of inputs and live status updates, so they opt out. */
+.limit-legs-table,
+.limit-progress-table {
+  table-layout: fixed;
+}
+
+.limit-legs-table thead,
+.limit-progress-table thead {
+  display: table-header-group;
+}
+
+.limit-legs-table tbody,
+.limit-progress-table tbody {
+  display: table-row-group;
+  max-height: none;
+  overflow: visible;
+}
+
+.limit-legs-table tbody tr,
+.limit-progress-table tbody tr {
+  display: table-row;
+}
+
+/* ── Wizard footer ───────────────────────────────────────────────────
+ * commands.css keys `margin-left: auto` off #wizard-next / #create-rule-btn by
+ * ID, so our buttons need their own rule or space-between spreads Back, Next and
+ * Submit apart instead of pinning the primary action right. */
+.wizard-footer #limit-wizard-next,
+.wizard-footer #limit-submit {
+  margin-left: auto;
+}
+
+/* ── Buy / Sell toggle ───────────────────────────────────────────── */
+
+.side-tab-count {
+  display: inline-block;
+  min-width: 1.25rem;
+  padding: 0.05rem 0.3rem;
+  border-radius: 999px;
+  background: var(--hover-overlay);
+  color: inherit;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.rules-tab-btn.active .side-tab-count {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+/* The active tab picks up the side's colour so which list you're looking at is
+ * obvious without reading the label — green buys, red sells. */
+.side-tab-buy.active {
+  background: #16a34a;
+}
+
+.side-tab-sell.active {
+  background: #dc2626;
+}
+
+/* ── Filter toolbar ──────────────────────────────────────────────── */
+
+.limit-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.limit-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1 1 260px;
+  max-width: 340px;
+}
+
+.limit-search-icon {
+  position: absolute;
+  left: 0.65rem;
+  font-size: 0.78rem;
+  color: var(--text-dim);
+  pointer-events: none;
+}
+
+.limit-filter-input {
+  width: 100%;
+  padding: 0.45rem 1.9rem 0.45rem 2rem;
+  border: 1px solid var(--border-primary);
+  border-radius: 8px;
+  background: var(--input-bg);
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  transition: border-color 0.2s;
+}
+
+.limit-filter-input:focus {
+  outline: none;
+  border-color: var(--accent-cyan);
+}
+
+.limit-filter-input::placeholder {
+  color: var(--text-dim);
+}
+
+.limit-filter-clear {
+  position: absolute;
+  right: 0.4rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.3rem;
+  height: 1.3rem;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.limit-filter-clear:hover {
+  background: var(--hover-overlay);
+  color: var(--text-primary);
+}
+
+.limit-filter-select {
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--border-primary);
+  border-radius: 8px;
+  background: var(--input-bg);
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.limit-filter-select:focus {
+  outline: none;
+  border-color: var(--accent-cyan);
+}
+
+.limit-filter-meta {
+  font-size: 0.78rem;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+/* ── Sortable headers ────────────────────────────────────────────── */
+
+#limit-orders-table th.sortable {
+  cursor: pointer;
+  user-select: none;
+  transition: color 0.15s;
+}
+
+#limit-orders-table th.sortable:hover {
+  color: var(--text-secondary);
+}
+
+#limit-orders-table th.sorted {
+  color: var(--accent-cyan);
+}
+
+#limit-orders-table .sort-icon {
+  margin-left: 0.2rem;
+  font-size: 0.7rem;
+  opacity: 0.35;
+}
+
+#limit-orders-table th.sorted .sort-icon {
+  opacity: 1;
+}
+
+#limit-orders-table th.sortable:hover .sort-icon {
+  opacity: 0.7;
+}
+
+/* ── Table ───────────────────────────────────────────────────────── */
+
+.limit-pair-cell {
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.limit-actions-col {
+  width: 7.5rem;
+  text-align: right;
+}
+
+/* Kraken synthetic-pair marker. Red rather than amber: unlike "partial", this
+   means the Cancel button in the same row is expected to fail. */
+.limit-synthetic-tag {
+  display: inline-block;
+  margin-left: 0.35rem;
+  padding: 0.05rem 0.4rem;
+  border-radius: 6px;
+  background: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  cursor: help;
+}
+
+.cancel-order-synthetic {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0.65rem 0.8rem;
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  border-radius: 8px;
+  background: rgba(239, 68, 68, 0.08);
+  color: #ef4444;
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+.limit-partial-tag {
+  display: inline-block;
+  margin-left: 0.35rem;
+  padding: 0.05rem 0.4rem;
+  border-radius: 6px;
+  background: rgba(234, 179, 8, 0.12);
+  color: #eab308;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.btn-cancel-order {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.65rem;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  border-radius: 6px;
+  background: rgba(239, 68, 68, 0.08);
+  color: #ef4444;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+
+.btn-cancel-order:hover {
+  background: rgba(239, 68, 68, 0.18);
+  border-color: rgba(239, 68, 68, 0.6);
+}
+
+.btn-cancel-order i {
+  font-size: 0.7rem;
+}
+
+/* ── Confirm modal ───────────────────────────────────────────────── */
+
+.cancel-order-modal {
+  width: 460px;
+}
+
+.cancel-order-summary {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border-primary);
+  border-radius: 8px;
+  background: var(--bg-primary);
+}
+
+.cancel-order-side {
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.cancel-order-pair {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.cancel-order-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  margin: 0;
+}
+
+.cancel-order-detail {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.45rem 0;
+  border-bottom: 1px solid var(--border-secondary);
+}
+
+.cancel-order-detail:last-child {
+  border-bottom: none;
+}
+
+.cancel-order-detail dt {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  flex-shrink: 0;
+}
+
+.cancel-order-detail dd {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--text-secondary);
+  text-align: right;
+  word-break: break-word;
+}
+
+.cancel-order-id {
+  font-family: 'Courier New', monospace;
+  font-size: 0.75rem !important;
+  color: var(--text-muted) !important;
+}
+
+.cancel-order-partial {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0.65rem 0.8rem;
+  border: 1px solid rgba(234, 179, 8, 0.25);
+  border-radius: 8px;
+  background: rgba(234, 179, 8, 0.08);
+  color: #eab308;
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+/* Destructive confirm button — the modal footer's counterpart to .btn-primary. */
+.btn-danger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.6rem 1.1rem;
+  border: none;
+  border-radius: 8px;
+  background: #dc2626;
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s, opacity 0.2s;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: #b91c1c;
+}
+
+.btn-danger:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ── Entry point ─────────────────────────────────────────────────────
+ * .section-header is space-between with two children, so tabs + button are
+ * wrapped rather than added as a third child (which would centre the tabs). */
+.limit-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.btn-new-limit {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.85rem;
+  border: none;
+  border-radius: 8px;
+  background: var(--accent-purple);
+  color: #fff;
+  font-size: 0.82rem;
+  font-weight: 600;
+  /* The page scopes `.section-header { cursor: default }`, which this inherits. */
+  cursor: pointer;
+  transition: background 0.2s, opacity 0.2s;
+  white-space: nowrap;
+}
+
+.btn-new-limit.is-buy { background: #16a34a; }
+.btn-new-limit.is-buy:hover:not(:disabled) { background: #15803d; }
+.btn-new-limit.is-sell { background: #dc2626; }
+.btn-new-limit.is-sell:hover:not(:disabled) { background: #b91c1c; }
+
+.btn-new-limit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.limit-btn-sm {
+  padding: 0.3rem 0.7rem;
+  font-size: 0.78rem;
+}
+
+.limit-empty-cta {
+  margin-left: 0.35rem;
+}
+
+/* ── Wizard modal ────────────────────────────────────────────────────── */
+
+.create-limit-modal {
+  width: 820px;
+}
+
+.limit-modal-alert {
+  margin-top: 0.25rem;
+}
+
+/* Pill group for the Buy/Sell and Single/Staggered toggles. Wraps
+   .rules-tab-btn, which supplies the button styling. */
+.limit-segmented {
+  display: inline-flex;
+  gap: 0.2rem;
+  padding: 0.25rem;
+  border-radius: 8px;
+  background: var(--bg-tertiary);
+  align-self: flex-start;
+}
+
+.limit-market-price {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.limit-market-price strong {
+  color: var(--text-primary);
+}
+
+.limit-market-price.is-stale {
+  color: #eab308;
+}
+
+/* Quote-pair chips */
+.limit-quote-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.limit-quote-chip {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.1rem;
+  padding: 0.4rem 0.7rem;
+  border: 1px solid var(--border-primary);
+  border-radius: 8px;
+  background: var(--input-bg);
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
+}
+
+.limit-quote-chip:hover:not(:disabled) {
+  border-color: var(--accent-cyan);
+}
+
+.limit-quote-chip.selected {
+  border-color: var(--accent-purple);
+  background: rgba(99, 102, 241, 0.12);
+  color: var(--text-primary);
+}
+
+.limit-quote-chip:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.limit-quote-chip-balance {
+  font-size: 0.68rem;
+  font-weight: 500;
+  color: var(--text-dim);
+}
+
+.limit-quote-chip.selected .limit-quote-chip-balance {
+  color: var(--text-muted);
+}
+
+/* Band + percent rows */
+.limit-band-row,
+.limit-pct-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.limit-band-mode {
+  margin-bottom: 0.4rem;
+}
+
+.limit-band-mode .rules-tab-btn {
+  font-size: 0.75rem;
+  padding: 0.25rem 0.6rem;
+}
+
+/* ── Wizard blocker note ─────────────────────────────────────────────
+ * The quiet running commentary on why Next is disabled. Sits left of the
+ * primary action, which keeps its margin-left:auto. */
+.limit-wizard-blocker {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4rem;
+  flex: 1;
+  min-width: 0;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  color: #eab308;
+}
+
+.limit-wizard-blocker i {
+  margin-top: 0.1rem;
+  flex-shrink: 0;
+}
+
+body.theme-light .limit-wizard-blocker {
+  color: #b45309;
+}
+
+/* Not `disabled`: the click is what surfaces the full red alert, so the button
+   stays live and only *looks* held back. */
+.btn-primary.is-blocked {
+  opacity: 0.55;
+}
+
+.limit-band-row input {
+  width: 5.5rem;
+}
+
+.limit-pct-row input {
+  width: 6rem;
+}
+
+.limit-band-arrow,
+.limit-band-unit,
+.limit-pct-unit {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.limit-pct-presets {
+  display: inline-flex;
+  gap: 0.25rem;
+  margin-left: 0.25rem;
+}
+
+.limit-pct-preset {
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--border-primary);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.limit-pct-preset:hover {
+  color: var(--text-primary);
+  border-color: var(--accent-cyan);
+}
+
+.limit-postonly-row {
+  margin-top: 0.25rem;
+}
+
+/* ── Legs table ──────────────────────────────────────────────────────── */
+
+.limit-legs-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.limit-legs-spacer {
+  flex: 1;
+}
+
+.limit-legs-estimate {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.limit-legs-wrap {
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.limit-legs-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+/* Price and amount hold inputs, so they get the room. */
+.limit-legs-table th:nth-child(1) { width: 5%; }
+.limit-legs-table th:nth-child(2) { width: 17%; }
+.limit-legs-table th:nth-child(3) { width: 22%; }
+.limit-legs-table th:nth-child(4) { width: 22%; }
+.limit-legs-table th:nth-child(5) { width: 17%; }
+.limit-legs-table th:nth-child(6) { width: 11%; }
+.limit-legs-table th:nth-child(7) { width: 6%; }
+
+.limit-legs-table tbody td,
+.limit-progress-table tbody td {
+  padding: 0.4rem 0.6rem;
+  vertical-align: middle;
+}
+
+.limit-num {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.35rem 0.45rem;
+  border: 1px solid var(--border-primary);
+  border-radius: 6px;
+  background: var(--input-bg);
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  font-family: 'Courier New', monospace;
+}
+
+.limit-num:focus {
+  outline: none;
+  border-color: var(--accent-cyan);
+}
+
+.limit-leg-num,
+.limit-leg-num-col {
+  width: 2.5rem;
+  color: var(--text-dim);
+  font-size: 0.78rem;
+}
+
+.limit-leg-pair {
+  font-weight: 600;
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+}
+
+.limit-leg-total,
+.limit-leg-offset {
+  font-size: 0.8rem;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+
+.limit-leg-actions,
+.limit-leg-actions-col {
+  text-align: right;
+}
+
+.limit-leg-remove {
+  border: none;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  padding: 0.2rem 0.35rem;
+  border-radius: 6px;
+  transition: color 0.15s, background 0.15s;
+}
+
+.limit-leg-remove:hover {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.limit-leg-row.limit-leg-bad .limit-num {
+  border-color: rgba(239, 68, 68, 0.6);
+}
+
+/* A hand-edited leg stays identifiable after a Regenerate. */
+.limit-leg-row.limit-leg-edited td:first-child {
+  box-shadow: inset 2px 0 0 var(--accent-cyan);
+}
+
+.limit-legs-summary {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  font-size: 0.83rem;
+  color: var(--text-muted);
+}
+
+.limit-legs-total.is-over {
+  color: #ef4444;
+  font-weight: 600;
+}
+
+.limit-legs-count {
+  margin-left: auto;
+  color: var(--text-dim);
+}
+
+/* ── Liquidity panel ─────────────────────────────────────────────────── */
+
+.limit-liquidity {
+  border: 1px solid var(--border-primary);
+  border-radius: 8px;
+  background: var(--bg-primary);
+}
+
+.limit-liquidity-summary {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.65rem 0.9rem;
+  cursor: pointer;
+  font-size: 0.83rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  list-style: none;
+}
+
+.limit-liquidity-summary::-webkit-details-marker {
+  display: none;
+}
+
+.limit-liquidity-summary::after {
+  content: '\f078';
+  font-family: 'Font Awesome 6 Free';
+  font-weight: 900;
+  margin-left: auto;
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  transition: transform 0.2s;
+}
+
+.limit-liquidity[open] .limit-liquidity-summary::after {
+  transform: rotate(180deg);
+}
+
+.limit-liquidity-body {
+  padding: 0 0.9rem 0.9rem;
+  font-size: 0.82rem;
+  line-height: 1.55;
+  color: var(--text-muted);
+}
+
+.limit-liquidity-body p {
+  margin: 0 0 0.7rem;
+}
+
+.limit-liquidity-tiers {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-bottom: 0.7rem;
+}
+
+.limit-liquidity-tier {
+  display: flex;
+  gap: 0.7rem;
+  align-items: baseline;
+}
+
+.limit-tier-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 6.5rem;
+  flex-shrink: 0;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.limit-tier-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.limit-tier-deepest  { background: #22c55e; }
+.limit-tier-deep     { background: #06b6d4; }
+.limit-tier-moderate { background: #818cf8; }
+.limit-tier-thin     { background: #eab308; }
+.limit-tier-sparse   { background: #ef4444; }
+
+.limit-liquidity-caveat {
+  margin: 0 !important;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--border-secondary);
+  font-size: 0.78rem;
+  color: var(--text-dim);
+}
+
+/* ── Icon + text callouts ────────────────────────────────────────────
+ * These are flex rows, which means EVERY child is its own flex item — including
+ * bare text nodes. A callout whose text contains an inline element (<strong>,
+ * <em>, <a>) therefore breaks into one line per fragment.
+ *
+ * So the markup contract is: exactly two children, `<i>` and a single `<span>`
+ * wrapping all the copy. Do not put loose text directly in one of these. */
+.limit-progress-note > i,
+.limit-batch-warning > i,
+.cancel-order-partial > i,
+.cancel-order-synthetic > i {
+  margin-top: 0.15rem;
+  flex-shrink: 0;
+}
+
+/* Amber, matching .cancel-order-partial so the two pre-confirm warnings read
+   as a family. */
+.limit-batch-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0.65rem 0.8rem;
+  border: 1px solid rgba(234, 179, 8, 0.25);
+  border-radius: 8px;
+  background: rgba(234, 179, 8, 0.08);
+  color: #eab308;
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+/* ── Progress panel ──────────────────────────────────────────────────── */
+
+.limit-progress-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.6rem;
+}
+
+/* Copied from holdings.css .holdings-supply-track/-fill — that sheet isn't
+   loaded on this route, so those classes can't simply be reused. */
+.limit-progress-track {
+  flex: 1;
+  min-width: 120px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--bg-tertiary);
+  overflow: hidden;
+}
+
+.limit-progress-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--accent-cyan);
+  transition: width 0.25s ease;
+}
+
+.limit-progress-fill.has-failures {
+  background: #eab308;
+}
+
+.limit-progress-count {
+  font-size: 0.83rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.limit-progress-eta {
+  font-size: 0.78rem;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.limit-progress-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin: 0 0 1rem;
+  padding: 0.65rem 0.8rem;
+  border: 1px solid rgba(234, 179, 8, 0.25);
+  border-radius: 8px;
+  background: rgba(234, 179, 8, 0.08);
+  color: #eab308;
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.limit-progress-table th:nth-child(1) { width: 5%; }
+.limit-progress-table th:nth-child(2) { width: 15%; }
+.limit-progress-table th:nth-child(3) { width: 20%; }
+.limit-progress-table th:nth-child(4) { width: 20%; }
+.limit-progress-table th:nth-child(5) { width: 15%; }
+.limit-progress-table th:nth-child(6) { width: 25%; }
+
+.limit-progress-footer {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 0.85rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.limit-progress-footer button {
+  margin-left: auto;
+}
+
+.limit-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.15em 0.55em;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.limit-status-queued  { background: rgba(148, 163, 184, 0.12); color: var(--text-muted); }
+.limit-status-placing { background: rgba(6, 182, 212, 0.12);  color: var(--accent-cyan); }
+.limit-status-placed  { background: rgba(34, 197, 94, 0.12);  color: #22c55e; }
+.limit-status-failed  { background: rgba(239, 68, 68, 0.12);  color: #ef4444; }
+.limit-status-skipped { background: rgba(148, 163, 184, 0.08); color: var(--text-dim); }
+
+.limit-progress-row.limit-progress-failed td {
+  color: #ef4444;
+}

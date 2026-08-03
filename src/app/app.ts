@@ -56,6 +56,22 @@ function applyTheme(theme: string): void {
     title: 'Open Orders',
   });
 
+  router.register('limitorders', {
+    view: 'app/views/overview/limitorders.html',
+    viewModel: '../dist/app/viewmodels/overview/limitorders.js',
+    // The page shell and table come from home.css, the buttons/alerts/modal
+    // shell from commands.css, and the side colours + order-id cell from
+    // openorders.css; limitorders.css loads last so its own rules win.
+    style: [
+      'app/styles/overview/home.css',
+      'app/styles/overview/commands.css',
+      'app/styles/overview/openorders.css',
+      'app/styles/overview/limitorders.css',
+    ],
+    showChrome: true,
+    title: 'Limit Orders',
+  });
+
   // Whitelisted Addresses page is hidden — withdraw rules read addresses
   // directly from the exchange, so this read-only view isn't needed.
   // router.register('whitelist', {

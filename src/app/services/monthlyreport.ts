@@ -1,17 +1,17 @@
 /**
- * MonthlyReport — assembles and sends the monthly portfolio report email.
+ * MonthlyReport — the Profile page's "send a test report" button.
  *
- * The charts live in the renderer, so we render each one into an offscreen host,
- * rasterise it to a PNG with html-to-image, gather the holdings/automation/order
- * data, and POST it to the backend, which composes the HTML email and sends it
- * via the user's own SMTP account. Execution logs for the month are pulled
- * server-side.
+ * The report is composed entirely in the backend (`helper/monthly_report.py`)
+ * from the DB and the exchanges, and the real monthly send is driven by the
+ * automation worker so it goes out when the month turns over rather than when
+ * someone happens to open this app. Nothing here contributes to its content —
+ * this just asks the backend to send one now, marked as a test.
  *
- * Note: portfolio/flow charts reflect *current* state (we can't reconstruct past
- * holdings); the execution log is the month's actual history.
+ * The chart-capture helpers below are parked, not live: no chart images are
+ * included in the email at the moment. They're kept because they're the working
+ * half of putting them back (render offscreen → rasterise → POST as data URLs).
  */
 const MonthlyReport = (() => {
-  let scheduledChecked = false;
 
   function currentPeriod(): string {
     const d = new Date();
@@ -172,106 +172,17 @@ const MonthlyReport = (() => {
     return { positions, total };
   }
 
-  async function gatherRules(): Promise<any[]> {
-    try {
-      const all = await AutomationController.getRules();
-      const isAll = ExchangeStore.isAllMode();
-      const activeId = ExchangeStore.activeMode;
-      return isAll ? all : all.filter((r: any) => r.trigger_exchange_id === activeId);
-    } catch {
-      return [];
-    }
-  }
-
-  /** Plain-English "when …" description of a rule's trigger. */
-  function describeTrigger(r: any): string {
-    switch (r.trigger_type) {
-      case 'order_filled':
-        if (r.trigger_pair && r.trigger_side) return `a ${r.trigger_side} order on ${r.trigger_pair} fills`;
-        if (r.trigger_order_id) return `order ${String(r.trigger_order_id).slice(0, 10)} fills`;
-        return 'an order fills';
-      case 'balance_threshold':
-        return `${r.trigger_asset} balance reaches ${r.trigger_threshold}`;
-      case 'price_threshold':
-        return `${r.trigger_asset} price reaches ${r.trigger_threshold} ${r.trigger_price_quote_asset || 'USD'}`;
-      case 'allocation_threshold':
-        return `${r.action_asset || r.trigger_asset} exceeds ${r.trigger_allocation_percent}% of the portfolio`;
-      default:
-        return r.trigger_type || '—';
-    }
-  }
-
-  /** Plain-English "then …" description of a rule's action. */
-  function describeAction(r: any): string {
-    if (r.action_type === 'withdraw_crypto') {
-      const amt = r.use_filled_amount ? 'the filled amount of' : (r.action_amount || '');
-      return `withdraw ${amt} ${r.action_asset || ''} to ${r.action_address_key || 'a saved address'}`
-        .replace(/\s+/g, ' ').trim();
-    }
-    if (r.action_type === 'convert_crypto') {
-      const mode = (r.action_amount_mode || '').toLowerCase();
-      let amt = '';
-      if (r.trigger_type === 'allocation_threshold') amt = `the excess above ${r.rebalance_target_percent}% of `;
-      else if (mode === 'percent') amt = `${r.action_amount}% of `;
-      else if (mode === 'fixed' && r.action_amount) amt = `${r.action_amount} `;
-      return `convert ${amt}${r.action_asset || ''} → ${r.convert_to_asset || ''}`
-        .replace(/\s+/g, ' ').trim();
-    }
-    return r.action_type || '—';
-  }
-
-  async function buildPayload(period: string, test: boolean): Promise<any> {
-    // Portfolio holdings & month-over-month change are computed server-side from
-    // the daily snapshots, so we only send automations + open orders here.
-    const rules = await gatherRules();
-    const orders: any[] = ExchangeStore.openOrders || [];
-
-    const automations = rules.map((r: any) => ({
-      name: r.rule_name || 'Automation',
-      trigger: describeTrigger(r),
-      action: describeAction(r),
-      status: r.is_active ? 'Active' : 'Paused',
-    }));
-
-    const open_orders = orders.map((o: any) => ({
-      pair: o.pair || '',
-      side: (o.side || '').toUpperCase(),
-      amount: o.volume || o.amount || '',
-      price: (o.price && Number(o.price) > 0) ? o.price : 'Market',
-      status: o.status || '',
-    }));
-
-    return {
-      period,
-      test,
-      automations,
-      open_orders,
-      rules_count: rules.length,
-      orders_count: orders.length,
-    };
-  }
-
-  /** Send a test report for the current month (not recorded as the monthly send). */
+  /**
+   * Send a test report for the current month. Not recorded as the month's send,
+   * so it doesn't stop the scheduled one going out.
+   *
+   * The backend fills in the content, which is the point: the test email is
+   * identical to what the worker will send, rather than a version assembled from
+   * whatever this window happens to have loaded.
+   */
   async function sendTest(): Promise<string> {
-    const payload = await buildPayload(currentPeriod(), true);
-    return ReportController.sendMonthly(payload);
+    return ReportController.sendMonthly({ period: currentPeriod(), test: true });
   }
 
-  /** Once per session: if last month's report is owed, build and send it. */
-  async function runScheduledIfDue(): Promise<void> {
-    if (scheduledChecked) return;
-    scheduledChecked = true;
-    try {
-      const status = await ReportController.getStatus();
-      if (!status || !status.due || !status.period) return;
-      const payload = await buildPayload(status.period, false);
-      await ReportController.sendMonthly(payload);
-      console.log(`[REPORT] Monthly report sent for ${status.period}`);
-    } catch (e) {
-      // Best-effort; will retry next session.
-      console.warn('[REPORT] Scheduled monthly report failed:', e);
-    }
-  }
-
-  return { sendTest, runScheduledIfDue };
+  return { sendTest };
 })();

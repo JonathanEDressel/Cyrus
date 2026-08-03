@@ -1,0 +1,476 @@
+<div class="page-container" id="limit-orders-page">
+  <div class="overview-header">
+    <h1 class="page-title">Limit Orders</h1>
+    <p class="page-subtitle" id="limit-page-subtitle">Your resting limit orders <span class="auto-refresh-label" id="limit-refresh-label"></span></p>
+  </div>
+
+  <div class="alert alert-warning d-none" id="limit-error">
+    <span id="limit-error-message"></span>
+  </div>
+
+  <div class="alert alert-success d-none" id="limit-success">
+    <span id="limit-success-message"></span>
+  </div>
+
+  <!-- Staggered-batch progress. Sits above the orders table so the real rows
+       below can be watched filling in. Ephemeral — see the note inside. -->
+  <div class="overview-section limit-progress-section d-none" id="limit-progress-section">
+    <div class="section-header">
+      <h2 class="section-title" id="limit-progress-title">Placing orders</h2>
+      <button class="btn-danger limit-btn-sm" id="limit-progress-stop">
+        <i class="fa-solid fa-stop"></i> Stop
+      </button>
+    </div>
+
+    <div class="limit-progress-bar">
+      <span class="limit-progress-track">
+        <span class="limit-progress-fill" id="limit-progress-fill" style="width:0%"></span>
+      </span>
+      <span class="limit-progress-count" id="limit-progress-count">0 of 0 placed</span>
+      <span class="limit-progress-eta" id="limit-progress-eta"></span>
+    </div>
+
+    <p class="limit-progress-note">
+      <i class="fa-solid fa-triangle-exclamation"></i>
+      <span>
+        Orders are sent one at a time from this page. <strong>Stop</strong> only prevents the
+        remaining orders from being sent — anything already placed stays resting on the
+        exchange and has to be cancelled individually. Leaving this page has the same effect.
+      </span>
+    </p>
+
+    <div class="data-table-wrapper">
+      <table class="data-table limit-progress-table">
+        <thead>
+          <tr>
+            <th class="limit-leg-num-col">#</th>
+            <th>Pair</th>
+            <th>Limit price</th>
+            <th>Amount</th>
+            <th>Status</th>
+            <th>Order ID</th>
+          </tr>
+        </thead>
+        <tbody id="limit-progress-tbody"></tbody>
+      </table>
+    </div>
+
+    <div class="limit-progress-footer d-none" id="limit-progress-footer">
+      <span id="limit-progress-summary"></span>
+      <button class="btn-secondary limit-btn-sm" id="limit-progress-dismiss">Dismiss</button>
+    </div>
+  </div>
+
+  <div class="overview-section">
+    <div class="section-header">
+      <h2 class="section-title" id="limit-count-title">Orders</h2>
+      <div class="limit-header-actions">
+        <div class="orders-tab-strip" id="limit-side-tabs">
+          <button class="rules-tab-btn side-tab-buy active" data-side="buy" title="Limit orders that buy">
+            <i class="fa-solid fa-arrow-trend-down"></i> Buy <span class="side-tab-count" id="buy-tab-count">0</span>
+          </button>
+          <button class="rules-tab-btn side-tab-sell" data-side="sell" title="Limit orders that sell">
+            <i class="fa-solid fa-arrow-trend-up"></i> Sell <span class="side-tab-count" id="sell-tab-count">0</span>
+          </button>
+        </div>
+        <button class="btn-new-limit is-buy" id="limit-new-order-btn"
+                title="Create a new resting limit order">
+          <i class="fa-solid fa-plus"></i>
+          <span id="limit-new-order-label">New buy limit order</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="limit-toolbar">
+      <div class="limit-search">
+        <i class="fa-solid fa-magnifying-glass limit-search-icon"></i>
+        <input type="text" id="limit-filter-input" class="limit-filter-input"
+               placeholder="Filter by pair or order ID..." autocomplete="off" spellcheck="false">
+        <button class="limit-filter-clear d-none" id="limit-filter-clear" title="Clear filter">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <select id="limit-filter-exchange" class="limit-filter-select d-none">
+        <option value="">All exchanges</option>
+      </select>
+      <span class="limit-filter-meta" id="limit-filter-meta"></span>
+    </div>
+
+    <div class="data-table-wrapper">
+      <table class="data-table" id="limit-orders-table">
+        <thead id="limit-thead"></thead>
+        <tbody id="limit-tbody">
+          <tr class="empty-row">
+            <td colspan="8">Loading orders...</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Cancel confirmation modal -->
+<div class="edit-rule-overlay d-none" id="cancel-order-overlay">
+  <div class="edit-rule-modal cancel-order-modal">
+    <div class="edit-rule-modal-header">
+      <div>
+        <h3>Cancel this order?</h3>
+        <span class="edit-rule-modal-subtitle">Review the details below — cancelling cannot be undone.</span>
+      </div>
+      <button class="edit-rule-modal-close" id="cancel-order-close" title="Close">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+    </div>
+
+    <div class="edit-rule-modal-body">
+      <div class="cancel-order-summary" id="cancel-order-summary">
+        <span class="cancel-order-side" id="cancel-order-side">BUY</span>
+        <span class="cancel-order-pair" id="cancel-order-pair"></span>
+      </div>
+
+      <dl class="cancel-order-details">
+        <div class="cancel-order-detail" id="cancel-order-exchange-row">
+          <dt>Exchange</dt>
+          <dd id="cancel-order-exchange"></dd>
+        </div>
+        <div class="cancel-order-detail">
+          <dt>Order type</dt>
+          <dd id="cancel-order-type"></dd>
+        </div>
+        <div class="cancel-order-detail">
+          <dt>Limit price</dt>
+          <dd id="cancel-order-price"></dd>
+        </div>
+        <div class="cancel-order-detail">
+          <dt>Volume</dt>
+          <dd id="cancel-order-volume"></dd>
+        </div>
+        <div class="cancel-order-detail">
+          <dt>Filled so far</dt>
+          <dd id="cancel-order-filled"></dd>
+        </div>
+        <div class="cancel-order-detail">
+          <dt>Estimated total</dt>
+          <dd id="cancel-order-total"></dd>
+        </div>
+        <div class="cancel-order-detail">
+          <dt>Opened</dt>
+          <dd id="cancel-order-opened"></dd>
+        </div>
+        <div class="cancel-order-detail">
+          <dt>Order ID</dt>
+          <dd class="cancel-order-id" id="cancel-order-id"></dd>
+        </div>
+      </dl>
+
+      <p class="cancel-order-partial d-none" id="cancel-order-partial-warning">
+        <i class="fa-solid fa-circle-info"></i>
+        <span>
+          This order is partially filled. Cancelling stops the remainder — the portion
+          already filled stays executed.
+        </span>
+      </p>
+
+      <p class="cancel-order-synthetic d-none" id="cancel-order-synthetic-warning">
+        <i class="fa-solid fa-triangle-exclamation"></i>
+        <span>
+          This is a Kraken <strong>synthetic-pair</strong> order — a pair Kraken routes
+          rather than lists directly. Kraken's API cannot cancel these: it fails trying to
+          resolve the pair. Cyrus will try, including through Kraken's batch-cancel
+          endpoint, but expect it to fail. Cancelling from
+          <strong>Kraken's own website or app</strong> is the reliable route.
+        </span>
+      </p>
+
+      <div class="alert alert-warning d-none" id="cancel-order-error"></div>
+    </div>
+
+    <div class="edit-rule-modal-footer">
+      <button class="btn-secondary" id="cancel-order-dismiss">Keep Order</button>
+      <button class="btn-danger" id="cancel-order-confirm">
+        <i class="fa-solid fa-ban"></i> Cancel Order
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Create limit order wizard.
+     Deliberately NOT a <form>: with a submit button, Enter in any numeric field
+     would fire the whole ladder as live orders. Every button is type="button". -->
+<div class="edit-rule-overlay d-none" id="create-limit-overlay">
+  <div class="edit-rule-modal create-limit-modal">
+
+    <div class="edit-rule-modal-header">
+      <div>
+        <h3 id="limit-wizard-title">New limit order</h3>
+        <span class="edit-rule-modal-subtitle" id="limit-wizard-step-label">
+          Step 1 of 3 &middot; What and where
+        </span>
+      </div>
+      <button class="edit-rule-modal-close" id="limit-wizard-close" title="Close">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+    </div>
+
+    <div class="wizard-progress" id="limit-wizard-progress">
+      <span class="wizard-dot active" data-step="1"><span class="wizard-dot-num">1</span> Setup</span>
+      <span class="wizard-dot-sep"></span>
+      <span class="wizard-dot" data-step="2"><span class="wizard-dot-num">2</span> Price &amp; size</span>
+      <span class="wizard-dot-sep"></span>
+      <span class="wizard-dot" data-step="3"><span class="wizard-dot-num">3</span> Review</span>
+    </div>
+
+    <div class="create-rule-form">
+      <div class="edit-rule-modal-body">
+
+        <!-- ───────── Step 1: setup ───────── -->
+        <div class="wizard-step" id="limit-step-setup">
+          <p class="wizard-step-intro">What are you trading, and where?</p>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label data-help="Buy orders rest below the current market price; sell orders rest above it. Either way the order waits until the market reaches your price.">Side</label>
+              <div class="limit-segmented" id="limit-side-toggle">
+                <button type="button" class="rules-tab-btn side-tab-buy" data-side="buy">Buy</button>
+                <button type="button" class="rules-tab-btn side-tab-sell" data-side="sell">Sell</button>
+              </div>
+            </div>
+            <div class="form-group" id="limit-conn-group">
+              <label for="limit-conn-select" data-help="Which connected exchange places these orders. Balances, available pairs and tick sizes all come from this exchange.">Exchange</label>
+              <select id="limit-conn-select"></select>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="limit-base-select" data-help="The coin being bought or sold. Selling only offers coins you hold.">Coin</label>
+              <select id="limit-base-select">
+                <option value="" disabled selected>Loading&hellip;</option>
+              </select>
+              <span class="form-hint" id="limit-base-hint"></span>
+            </div>
+            <div class="form-group">
+              <label data-help="Single places one order. Staggered spreads your total across several resting orders at different prices.">Order style</label>
+              <div class="limit-segmented" id="limit-mode-toggle">
+                <button type="button" class="rules-tab-btn active" data-mode="ladder">Staggered</button>
+                <button type="button" class="rules-tab-btn" data-mode="single">Single</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label data-help="Pick one or more quote currencies. With several selected, steps are assigned in strict rotation — step 1 to the first, step 2 to the second, and so on.">
+              Trading pairs
+            </label>
+            <div class="limit-quote-picker" id="limit-quote-picker"></div>
+            <span class="form-hint" id="limit-quote-hint"></span>
+          </div>
+        </div>
+
+        <!-- ───────── Step 2: price & size ───────── -->
+        <div class="wizard-step d-none" id="limit-step-params">
+          <p class="wizard-step-intro" id="limit-params-intro"></p>
+          <p class="limit-market-price" id="limit-market-price"></p>
+
+          <div id="limit-params-ladder">
+            <div class="form-row">
+              <div class="form-group">
+                <label for="limit-steps" data-help="How many resting orders to create. Each is a separate order on the exchange and must be cancelled individually.">Number of steps</label>
+                <input type="number" id="limit-steps" min="2" max="25" step="1" value="8">
+                <span class="form-hint" id="limit-steps-hint"></span>
+              </div>
+              <div class="form-group">
+                <label data-help="The band is split into equal slices and each step draws a random price inside its own slice, so the ladder is always in order and never crosses the market. Set it either as a percentage away from the market price, or as an exact price range.">Price band</label>
+                <div class="limit-segmented limit-band-mode" id="limit-band-mode">
+                  <button type="button" class="rules-tab-btn active" data-band="percent">% from market</button>
+                  <button type="button" class="rules-tab-btn" data-band="price">Exact prices</button>
+                </div>
+
+                <div class="limit-band-row" id="limit-band-percent-row">
+                  <input type="number" id="limit-band-start" step="any" min="0" value="1">
+                  <span class="limit-band-arrow">%&nbsp;&rarr;</span>
+                  <input type="number" id="limit-band-end" step="any" min="0" value="10">
+                  <span class="limit-band-unit">%</span>
+                </div>
+
+                <div class="limit-band-row d-none" id="limit-band-price-row">
+                  <input type="number" id="limit-price-start" step="any" min="0" placeholder="nearest">
+                  <span class="limit-band-arrow">&rarr;</span>
+                  <input type="number" id="limit-price-end" step="any" min="0" placeholder="furthest">
+                  <span class="limit-band-unit" id="limit-price-unit"></span>
+                </div>
+
+                <span class="form-hint" id="limit-band-hint"></span>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="limit-total-pct" data-help="Share of your available balance to commit across the whole ladder, split evenly between the steps. Every amount stays editable afterwards.">Total to use</label>
+              <div class="limit-pct-row">
+                <input type="number" id="limit-total-pct" min="0" max="100" step="any" value="25">
+                <span class="limit-pct-unit">%</span>
+                <span class="limit-pct-presets" id="limit-pct-presets">
+                  <button type="button" class="limit-pct-preset" data-pct="10">10%</button>
+                  <button type="button" class="limit-pct-preset" data-pct="25">25%</button>
+                  <button type="button" class="limit-pct-preset" data-pct="50">50%</button>
+                  <button type="button" class="limit-pct-preset" data-pct="100">Max</button>
+                </span>
+              </div>
+              <span class="form-hint" id="limit-total-hint"></span>
+            </div>
+          </div>
+
+          <div class="d-none" id="limit-params-single">
+            <div class="form-row">
+              <div class="form-group">
+                <label for="limit-single-price">Limit price</label>
+                <input type="number" id="limit-single-price" step="any" min="0">
+                <span class="form-hint" id="limit-single-price-hint"></span>
+              </div>
+              <div class="form-group">
+                <label for="limit-single-amount">Amount</label>
+                <input type="number" id="limit-single-amount" step="any" min="0">
+                <span class="form-hint" id="limit-single-amount-hint"></span>
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="limit-single-pct" data-help="Fills the amount above from a share of your available balance.">Or use a share of your balance</label>
+              <div class="limit-pct-row">
+                <input type="number" id="limit-single-pct" min="0" max="100" step="any" placeholder="e.g. 25">
+                <span class="limit-pct-unit">%</span>
+                <button type="button" class="btn-secondary limit-btn-sm" id="limit-single-apply-pct">Apply</button>
+              </div>
+            </div>
+          </div>
+
+          <label class="radio-label limit-postonly-row d-none" id="limit-postonly-row">
+            <input type="checkbox" id="limit-post-only" checked>
+            <span data-help="A post-only order is rejected instead of filling immediately if the market has moved onto your price. It guarantees you pay maker fees rather than taker fees.">Post-only (reject rather than fill immediately)</span>
+          </label>
+        </div>
+
+        <!-- ───────── Step 3: review ───────── -->
+        <div class="wizard-step d-none" id="limit-step-review">
+          <p class="wizard-step-intro">Every price and amount below is editable. Nothing is sent until you confirm.</p>
+
+          <div class="limit-legs-toolbar">
+            <span class="limit-legs-estimate" id="limit-estimate"></span>
+            <span class="limit-legs-spacer"></span>
+            <button type="button" class="btn-secondary limit-btn-sm" id="limit-regen-prices"
+                    title="Draw a fresh random price inside each step's slice. Amount edits are kept.">
+              <i class="fa-solid fa-dice"></i> Regenerate prices
+            </button>
+            <button type="button" class="btn-secondary limit-btn-sm" id="limit-reset-legs"
+                    title="Rebuild the whole ladder from step 2, discarding every edit.">
+              <i class="fa-solid fa-rotate-left"></i> Reset
+            </button>
+          </div>
+
+          <div class="data-table-wrapper limit-legs-wrap">
+            <table class="data-table limit-legs-table">
+              <thead>
+                <tr>
+                  <th class="limit-leg-num-col">#</th>
+                  <th>Pair</th>
+                  <th>Limit price</th>
+                  <th>Amount</th>
+                  <th>Est. total</th>
+                  <th>Offset</th>
+                  <th class="limit-leg-actions-col"></th>
+                </tr>
+              </thead>
+              <tbody id="limit-legs-tbody"></tbody>
+            </table>
+          </div>
+
+          <div class="limit-legs-summary" id="limit-legs-summary"></div>
+
+          <details class="limit-liquidity">
+            <summary class="limit-liquidity-summary">
+              <i class="fa-solid fa-water"></i> How quote-currency liquidity affects these orders
+            </summary>
+            <div class="limit-liquidity-body">
+              <p>
+                A limit order only fills if someone trades against it at your price, and how
+                likely that is depends on the <em>pair</em>, not just the coin. The same coin can
+                have a deep order book against one quote currency and almost nothing against
+                another. Splitting a ladder across several quote currencies spreads that risk,
+                but it also means some legs sit in thinner books, where they may rest far longer
+                or fill only partially.
+              </p>
+              <p>
+                During a fast move, price can jump through several of your levels in one or two
+                prints. In a deep book those levels fill on the way past. In a thin one the market
+                can trade above your sell — or below your buy — without ever matching it, because
+                there was not enough size at your exact price. The same mechanic cuts the other
+                way: an outlying level can fill in full during a brief spike and then look badly
+                priced once things settle.
+              </p>
+              <div class="limit-liquidity-tiers">
+                <div class="limit-liquidity-tier">
+                  <span class="limit-tier-label"><span class="limit-tier-dot limit-tier-deepest"></span>Deepest</span>
+                  <span><strong>USD</strong>, <strong>USDT</strong> — the reference books on nearly
+                  every venue. Tightest spreads and the best chance of a full fill.</span>
+                </div>
+                <div class="limit-liquidity-tier">
+                  <span class="limit-tier-label"><span class="limit-tier-dot limit-tier-deep"></span>Deep</span>
+                  <span><strong>USDC</strong> — close to USDT depth on US venues such as Coinbase
+                  and Kraken; noticeably thinner on offshore venues where USDT dominates.</span>
+                </div>
+                <div class="limit-liquidity-tier">
+                  <span class="limit-tier-label"><span class="limit-tier-dot limit-tier-moderate"></span>Moderate</span>
+                  <span><strong>BTC</strong>, <strong>ETH</strong> — deep for large-cap alts, but the
+                  quote asset moves too, so your effective USD level drifts with BTC or ETH.</span>
+                </div>
+                <div class="limit-liquidity-tier">
+                  <span class="limit-tier-label"><span class="limit-tier-dot limit-tier-thin"></span>Thinner</span>
+                  <span><strong>FDUSD</strong>, <strong>PYUSD</strong>, <strong>TUSD</strong>,
+                  <strong>DAI</strong> — each is deep on the venue that promotes it (FDUSD on
+                  Binance, PYUSD where PayPal pairs are listed) and sparse everywhere else.</span>
+                </div>
+                <div class="limit-liquidity-tier">
+                  <span class="limit-tier-label"><span class="limit-tier-dot limit-tier-sparse"></span>Sparse</span>
+                  <span><strong>BUSD</strong>, <strong>USDD</strong> — BUSD has been wound down and
+                  delisted on most venues; USDD trades thinly. Expect wide spreads and partial
+                  fills. Not good ladder rails.</span>
+                </div>
+              </div>
+              <p class="limit-liquidity-caveat">
+                Depth also varies by exchange, not just by quote currency. Cyrus lists the pairs
+                your exchange actually offers and the minimums it enforces; it does not measure
+                how much size is sitting in the book right now.
+              </p>
+            </div>
+          </details>
+
+          <p class="limit-batch-warning">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+            <span>
+              These orders are placed one at a time from this page. If you navigate away before
+              the batch finishes, the remaining orders are never sent — and anything already
+              placed stays resting on the exchange.
+            </span>
+          </p>
+        </div>
+
+        <div class="alert alert-warning limit-modal-alert d-none" id="limit-modal-error"></div>
+      </div>
+
+      <div class="edit-rule-modal-footer wizard-footer">
+        <button type="button" class="btn-secondary d-none" id="limit-wizard-back">
+          <i class="fa-solid fa-arrow-left"></i> Back
+        </button>
+        <span class="limit-wizard-blocker d-none" id="limit-wizard-blocker">
+          <i class="fa-solid fa-circle-exclamation"></i>
+          <span id="limit-wizard-blocker-text"></span>
+        </span>
+        <button type="button" class="btn-primary" id="limit-wizard-next">
+          Next <i class="fa-solid fa-arrow-right"></i>
+        </button>
+        <button type="button" class="btn-primary d-none" id="limit-submit">
+          <i class="fa-solid fa-paper-plane"></i> <span id="limit-submit-label">Place orders</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

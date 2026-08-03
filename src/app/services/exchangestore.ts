@@ -48,6 +48,20 @@ class ExchangeStore {
     return { orders, addresses };
   }
 
+  /**
+   * Drop the cached orders/addresses for a connection (or all of them) so the
+   * next getConnectionData call refetches. Call this after an action that
+   * changes exchange-side state — cancelling an order, for instance — or other
+   * pages keep serving the pre-action snapshot for the rest of the TTL.
+   */
+  static invalidateConnectionData(connId?: number): void {
+    if (connId === undefined) {
+      ExchangeStore.exchangeDataCache.clear();
+    } else {
+      ExchangeStore.exchangeDataCache.delete(connId);
+    }
+  }
+
   /** Load & cache validated connections and supported-exchange metadata.
    * Call once after login / on profile changes. */
   static async loadConnections(): Promise<void> {
