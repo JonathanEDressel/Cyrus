@@ -40,6 +40,12 @@ interface LegMarket {
   price: number;
   availableBase: number;
   availableQuote: number;
+  /** Backend's call on whether this quote is dollar-like. Two stable quotes can
+   *  share one spend axis; USDT and BTC cannot. */
+  stableQuote: boolean;
+  /** Set when MIN_AMOUNT_OVERRIDES replaced the exchange's own `min_amount`, so
+   *  the figure can be labelled rather than silently contradicting the API. */
+  minAmountOverridden: boolean;
 }
 
 /** One rung of the ladder (or the single order). */
@@ -71,8 +77,101 @@ interface Batch {
   failed: number;
 }
 
+/**
+ * One row of a distribution plot. Price runs down the side and volume across, the
+ * way an order book is drawn, so a row is positioned by price and sized by volume.
+ * Both plots on this page draw from these.
+ */
+interface DistRow {
+  /** Vertical position, 0 at the bottom of the plot and 1 at the top. */
+  frac: number;
+  /** What this row contributes, in whatever unit the plot is measuring. */
+  value: number;
+  /** Hover text — the plot itself carries no per-row labels. */
+  title: string;
+  /** Drawn hatched: this step can't be placed as it currently stands. */
+  bad?: boolean;
+}
+
+/** In-flight state for a drag of the median line. Vertical travel only. */
+interface DistDrag {
+  pointerId: number;
+  y: number;
+  /** Lean at pointerdown — the drag is applied as a delta from it. */
+  lean: number;
+  /** Shape at pointerdown, possibly seeded once the drag really starts. */
+  shape: number;
+  /** Plot height at pointerdown, so a re-render mid-drag can't change the scale. */
+  height: number;
+  /** Cleared until the pointer travels far enough to count as a drag. */
+  moved: boolean;
+}
+
+/**
+ * One bar of a flow chart: a coin's volume resting against one pair on one
+ * exchange. Split by exchange as well as pair so a bar's colour can mean exactly
+ * one venue — the same pair on two exchanges is two bars, not an averaged one.
+ */
+interface FlowBar {
+  quote: string;
+  pair: string;
+  exchange: string;
+  /** Base units still resting against this pair. */
+  amount: number;
+  orders: number;
+  partials: number;
+  /** What the pair pays out if it all fills, in that pair's quote currency. */
+  proceeds: number;
+}
+
+/** One coin's worth of bars. Every bar inside a group shares a unit. */
+interface FlowGroup {
+  base: string;
+  total: number;
+  bars: FlowBar[];
+}
+
+/** A named shape, so the common cases are one click rather than a careful drag. */
+interface DistPreset {
+  lean: number;
+  shape: number;
+}
+
+/**
+ * The smallest order one step can place on a market, and which of the exchange's
+ * two published floors decided it. Carrying the source matters: a minimum order
+ * VALUE converted into coins is not the same claim as a minimum order SIZE, and
+ * quoting one as the other sends people hunting for a limit that isn't there.
+ */
+interface StepFloor {
+  /** The floor expressed in base coin — what the table's Amount column must clear. */
+  amount: number;
+  source: 'size' | 'value';
+  /** Both limits exactly as the exchange publishes them, 0 when not published.
+   *  Reported together: only one of them binds, but seeing both is what lets a
+   *  figure be checked against the exchange's own docs. */
+  minAmount: number;
+  /** …unless MIN_AMOUNT_OVERRIDES replaced the size one, which the text says. */
+  minAmountOverridden: boolean;
+  minCost: number;
+  pair: string;
+  base: string;
+  quote: string;
+  /** The rung this was measured at; 0 when the market couldn't be priced. */
+  price: number;
+  priceDecimals: number;
+  amountDecimals: number;
+}
+
 class LimitOrdersController {
   private static readonly MAX_STEPS = 250;
+  /**
+   * Steps allowed per selected trading pair. Steps rotate through the selected
+   * pairs, so each extra pair brings its own room: 2 pairs allow 100 steps, 5
+   * pairs hit MAX_STEPS. The absolute cap stays — 250 placements at the pacing
+   * below is already several minutes of one-at-a-time requests.
+   */
+  private static readonly PER_PAIR_STEPS = 50;
   private static readonly MIN_OFFSET_PCT = 0.05;
   private static readonly MAX_OFFSET_PCT = 3000000;
   /** Per-placement round-trip cost, on top of the exchange's own pacing. */
@@ -87,6 +186,84 @@ class LimitOrdersController {
    * of the proceeds, not the amount sold.
    */
   private static readonly BUY_FEE_HEADROOM = 0.995;
+
+  /**
+   * Minimum order sizes that override what the exchange reports, keyed
+   * `exchange:BASE` — per asset, because that is how Kraken defines `ordermin`
+   * (the same figure on SHIB/USD, SHIB/USDT and SHIB/EUR).
+   *
+   * SHIB is here because Kraken's AssetPairs endpoint reports 770000 while the
+   * Kraken app shows 210532 to the account actually placing these orders. LUNA
+   * is the same story: the endpoint reports 100000, the app shows 21000.
+   *
+   * On Kraken, base code LUNA is Terra CLASSIC — the chain that collapsed in
+   * 2022, trading around $0.00005. Kraken never adopted the LUNC rename and
+   * lists no LUNA2, so there is no Terra 2.0 on this venue to confuse it with.
+   * LUNC is listed alongside it only because CCXT unifies some venues' codes to
+   * that ticker and the backend passes CCXT's code through; both spellings point
+   * at the same asset here. The keys are exchange-scoped, so this cannot leak
+   * onto a venue where LUNA means Terra 2.0.
+   *
+   * READ BEFORE ADDING ONE. Cyrus does not decide what the exchange accepts —
+   * the order endpoint does. An entry that is LOWER than the real floor makes a
+   * ladder look valid here and get rejected rung by rung during placement, after
+   * earlier rungs are already resting on the book. That is a worse failure than
+   * being blocked up front. Check the exchange's own figure first:
+   *
+   *   https://api.kraken.com/0/public/AssetPairs?pair=SHIBUSD   -> ordermin
+   *
+   * and delete the entry once the reported value agrees, so this table can't
+   * quietly outlive the discrepancy it was added for.
+   */
+  private static readonly MIN_AMOUNT_OVERRIDES: Record<string, number> = {
+    'kraken:SHIB': 210532,
+    'kraken:LUNA': 21000,
+    'kraken:LUNC': 21000,
+  };
+
+  /**
+   * How hard `distShape` bites. Weight for a step falls off exponentially with
+   * its distance from `distLean`, and this is the exponent's scale: at shape 1
+   * the far end of the band keeps e^-5 ≈ 0.7% of the heaviest step's weight,
+   * which is about as lopsided as a ladder can get and still be a ladder.
+   */
+  private static readonly DIST_SHARPNESS = 5;
+  /**
+   * Shape applied on the first sideways drag from an even split. With every step
+   * weighted identically there is nothing to lean, so a drag would move the line
+   * and change no numbers — which reads as a broken control.
+   */
+  private static readonly DIST_SEED_SHAPE = 0.35;
+  /** Below this, the split is even and the readback says so instead of guessing. */
+  private static readonly DIST_FLAT_EPSILON = 0.02;
+  /**
+   * Ladders longer than this refresh the legs table on release rather than on
+   * every frame of a drag. Rewriting a few hundred inputs per frame is the one
+   * genuinely expensive part; the chart and the totals still track live.
+   */
+  private static readonly DIST_LIVE_ROW_LIMIT = 60;
+  /**
+   * Named shapes. These cover what people actually want from a ladder, and
+   * having them one click away is what lets the drag stay single-axis: the line
+   * moves the median and nothing else.
+   */
+  private static readonly DIST_PRESETS: Record<string, DistPreset> = {
+    even:   { lean: 0.5, shape: 0 },
+    near:   { lean: 0,   shape: 0.55 },
+    far:    { lean: 1,   shape: 0.55 },
+    middle: { lean: 0.5, shape: 0.7 },
+    ends:   { lean: 0.5, shape: -0.7 },
+  };
+  /** Headroom above the furthest rung, so the top bar isn't flush with the frame. */
+  private static readonly DIST_AXIS_PAD = 1.08;
+  /** Row thickness as a percentage of plot height; CSS clamps the extremes. */
+  private static readonly DIST_ROW_FILL = 80;
+  private static readonly DIST_MAX_ROW_PCT = 6;
+  /**
+   * How long a market price fetched for the read-only plot stays usable. Matched
+   * to the order poll, so the marker never claims to be fresher than the bars.
+   */
+  private static readonly SHAPE_PRICE_TTL = 240000;
 
   private unsubscribe: (() => void) | null = null;
   private side: 'buy' | 'sell' = 'buy';
@@ -104,6 +281,17 @@ class LimitOrdersController {
   private filterExchange = '';
   private sortKey: SortKey = 'opened';
   private sortDir: 'asc' | 'desc' = 'desc';
+
+  /** Pair charted under the table. '' until the first render picks one. */
+  private shapePair = '';
+  /**
+   * Market prices for the read-only plot's marker, keyed `connId:PAIR`. The
+   * orders in the store carry no price for the market itself, so this is fetched
+   * on demand; a null entry means the lookup came back without one, and the
+   * marker is simply left off rather than guessed at.
+   */
+  private shapePrices: Map<string, { price: number | null; at: number }> = new Map();
+  private shapePricePending: Set<string> = new Set();
 
   // ── Wizard state ────────────────────────────────────────────────────────
   private step: 1 | 2 | 3 = 1;
@@ -127,8 +315,24 @@ class LimitOrdersController {
 
   /** symbol -> market grid for the currently selected coin/exchange. */
   private markets: Record<string, LegMarket> = {};
+  /** True while the pair grid is being fetched; the picker shows a spinner. */
+  private loadingPairs = false;
+  /** Bumped per fetch so a slow response that lost a race can identify itself. */
+  private pairsRequest = 0;
   private pacingMs = 1000;
   private supportsPostOnly = false;
+
+  // ── Ladder volume distribution ──────────────────────────────────────────
+  // Two numbers describe the whole shape, and the legs' amounts are derived
+  // from them rather than the other way round — so a shape survives a price
+  // regeneration, and "Even split" is just distShape = 0.
+  /** Where the weight leans, 0 = nearest the market, 1 = furthest. */
+  private distLean = 0.5;
+  /** 0 = even split (the default), >0 concentrates at the lean, <0 pushes to both ends. */
+  private distShape = 0;
+  private distDrag: DistDrag | null = null;
+  /** Pending rAF handle, so a drag coalesces to one recompute per frame. */
+  private distRaf = 0;
 
   private legs: LimitLeg[] = [];
   private legSeq = 0;
@@ -143,8 +347,10 @@ class LimitOrdersController {
     this.bindSideTabs();
     this.bindFilters();
     this.bindSorting();
+    this.bindShapePicker();
     this.bindModal();
     this.bindWizard();
+    this.bindDist();
     this.render();
 
     // The wizard markup ships in the view, so every data-help is in the DOM
@@ -176,6 +382,10 @@ class LimitOrdersController {
     if (this.escHandler) {
       document.removeEventListener('keydown', this.escHandler);
       this.escHandler = null;
+    }
+    if (this.distRaf) {
+      window.cancelAnimationFrame(this.distRaf);
+      this.distRaf = 0;
     }
     this.disarmUnloadGuard();
   }
@@ -353,6 +563,8 @@ class LimitOrdersController {
     this.renderRows(orders, isAll);
     this.updateCountTitle(orders.length);
     this.renderFilterMeta(orders.length);
+    this.renderFlow();
+    this.renderShape();
     // Idempotent and DOM-only — safe to run on every store update. The legs and
     // progress tables are deliberately NOT touched here: a background poll must
     // never rebuild a table the user is typing into.
@@ -449,6 +661,422 @@ class LimitOrdersController {
     el.textContent = `Showing ${shown} of ${total}`;
   }
 
+  // ---------------------------------------------------------------------------
+  // Sell flow — where each coin's volume is going
+  // ---------------------------------------------------------------------------
+
+  /** Comma-grouped coin amount, at a precision that suits its size. */
+  private fmtGrouped(value: number): string {
+    // A million SHIB doesn't need decimals; a fraction of a BTC needs eight.
+    const dp = value >= 1e6 ? 0 : value >= 1000 ? 2 : value >= 1 ? 4 : 8;
+    return value.toLocaleString(undefined, { maximumFractionDigits: dp });
+  }
+
+  /** Comma-grouped quote amount for a bar label — money, so 2 decimals at most. */
+  private fmtFlowValue(value: number): string {
+    const dp = value >= 1000 ? 0 : value >= 1 ? 2 : 6;
+    return value.toLocaleString(undefined, { maximumFractionDigits: dp });
+  }
+
+  /**
+   * Quote assets close enough to a dollar to be added together.
+   *
+   * Mirrors the backend's own list. A chart whose bars are all dollar-priced can
+   * carry a combined total; one that mixes in EUR or a BTC-quoted pair cannot,
+   * and says so rather than summing things that aren't the same money.
+   */
+  private static readonly DOLLAR_QUOTES =
+    /^(Z?USD|USDT|USDC|USDS|USDD|USDG|DAI|TUSD|PYUSD|FDUSD|BUSD|RLUSD)$/;
+
+  private flowComparable(group: FlowGroup): boolean {
+    return group.bars.every(
+      bar => LimitOrdersController.DOLLAR_QUOTES.test(bar.quote.toUpperCase()));
+  }
+
+  /** Sell volume folded into one entry per coin, then one bar per pair. */
+  private flowGroups(orders: LimitOrder[]): FlowGroup[] {
+    const byBase = new Map<string, Map<string, FlowBar>>();
+
+    for (const order of orders) {
+      const base = this.baseAsset(order);
+      const quote = this.quoteAsset(order);
+      const amount = this.restingVolume(order);
+      if (!base || !quote || !(amount > 0)) continue;
+
+      if (!byBase.has(base)) byBase.set(base, new Map());
+      const bars = byBase.get(base)!;
+      // Keyed by pair AND venue: one bar must belong to one exchange, or its
+      // colour would have to stand for two of them at once.
+      const key = `${quote} ${order.exchangeName || ''}`;
+      const bar = bars.get(key) || {
+        quote, pair: order.pair, exchange: order.exchangeName || '',
+        amount: 0, orders: 0, partials: 0, proceeds: 0,
+      };
+      bar.amount += amount;
+      bar.orders += 1;
+      if (this.filledFraction(order) > 0) bar.partials += 1;
+      bar.proceeds += amount * this.toNumber(order.price);
+      bars.set(key, bar);
+    }
+
+    return Array.from(byBase.entries())
+      .map(([base, bars]) => {
+        const list = Array.from(bars.values()).sort((a, b) => b.amount - a.amount);
+        return { base, total: list.reduce((sum, b) => sum + b.amount, 0), bars: list };
+      })
+      // Coins split across the most pairs first — those are the ones this chart
+      // exists to show. Totals can't order them: they're in different units.
+      .sort((a, b) => b.bars.length - a.bars.length || a.base.localeCompare(b.base));
+  }
+
+  /** "Coinbase Advanced" -> "coinbaseadvanced", matching the badge classes. */
+  private exchangeSlug(name: string): string {
+    return (name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  }
+
+  private flowChartHtml(group: FlowGroup, showVenues: boolean): string {
+    // Both the bar and its label measure the payout, so a taller bar always
+    // carries the bigger number. Heighting by coins while labelling in currency
+    // would let a taller bar show a smaller figure whenever the pairs' prices
+    // differ, which reads as a bug.
+    const max = Math.max(...group.bars.map(bar => bar.proceeds));
+    const columns = group.bars.map(bar => {
+      const pct = max > 0 ? bar.proceeds / max * 100 : 0;
+      // No tooltip, so the label carries what a reader needs and aria-label
+      // carries the rest for a screen reader.
+      const aria = `${bar.pair} on ${bar.exchange || 'this exchange'}: `
+                 + `${this.fmtGrouped(bar.amount)} ${group.base} in ${bar.orders} `
+                 + `order${bar.orders === 1 ? '' : 's'}, converting into `
+                 + `${this.fmtMoney(bar.proceeds, bar.quote)}`;
+      const venue = showVenues && bar.exchange
+        ? `<span class="limit-flow-venue">${this.escapeHtml(bar.exchange)}</span>` : '';
+      return `<div class="limit-flow-col" role="img"`
+        + ` data-exchange="${this.escapeAttr(this.exchangeSlug(bar.exchange))}"`
+        + ` aria-label="${this.escapeAttr(aria)}">`
+        + `<div class="limit-flow-slot">`
+        + `<span class="limit-flow-value">`
+        + `${this.escapeHtml(this.fmtFlowValue(bar.proceeds))}</span>`
+        + `<span class="limit-flow-bar" style="height:${pct.toFixed(2)}%"></span>`
+        + `</div>`
+        + `<span class="limit-flow-label">${this.escapeHtml(bar.quote)}${venue}</span>`
+        + `</div>`;
+    }).join('');
+
+    const pairs = group.bars.length;
+    // Only totalled when every bar is dollar-priced — see flowComparable().
+    const comparable = this.flowComparable(group);
+    const payout = group.bars.reduce((sum, bar) => sum + bar.proceeds, 0);
+    const totalHtml = comparable
+      ? `<span class="limit-flow-chart-payout">&asymp; `
+        + `${this.escapeHtml(this.fmtFlowValue(payout))}</span>`
+      : '';
+    const note = comparable ? '' :
+      `<p class="limit-flow-note">Bars are each pair's own currency `
+      + `(${this.escapeHtml(group.bars.map(b => b.quote).join(', '))}), so their heights `
+      + `aren't directly comparable and there's no combined total.</p>`;
+
+    return `<div class="limit-flow-chart">
+      <div class="limit-flow-chart-head">
+        <span class="limit-flow-coin">${this.escapeHtml(group.base)}</span>
+        ${totalHtml}
+        <span class="limit-flow-chart-total">
+          from ${this.escapeHtml(this.fmtGrouped(group.total))} ${this.escapeHtml(group.base)}
+          <em>across ${pairs} pair${pairs === 1 ? '' : 's'}</em>
+        </span>
+      </div>
+      <div class="limit-flow-plot">${columns}</div>
+      ${note}
+    </div>`;
+  }
+
+  private renderFlow(): void {
+    const section = document.getElementById('limit-flow-section');
+    const host = document.getElementById('limit-flow-charts');
+    if (!section || !host) return;
+
+    // Sell side only, and driven by the same filtered set as the table so the
+    // charts and the rows above them always describe the same orders.
+    // Priced orders only: an unpriceable one has no payout to draw a bar from.
+    const groups = this.side === 'sell'
+      ? this.flowGroups(this.filteredForSide('sell')
+          .filter(order => this.toNumber(order.price) > 0))
+      : [];
+
+    section.classList.toggle('d-none', groups.length === 0);
+    if (groups.length === 0) return;
+
+    const coins = groups.length;
+    const bars = groups.reduce((sum, group) => sum + group.bars.length, 0);
+    this.setText('limit-flow-meta',
+      `${coins} coin${coins === 1 ? '' : 's'} · ${bars} bar${bars === 1 ? '' : 's'}`);
+
+    // Bars are coloured by venue, so name the venues once here rather than on
+    // every column — and only bother when there is more than one to tell apart.
+    const venues = Array.from(new Set(
+      groups.flatMap(group => group.bars.map(bar => bar.exchange)).filter(Boolean))).sort();
+    const showVenues = venues.length > 1;
+    const legend = document.getElementById('limit-flow-legend');
+    if (legend) {
+      legend.classList.toggle('d-none', !showVenues);
+      legend.innerHTML = showVenues
+        ? venues.map(name =>
+            `<span class="limit-flow-key" data-exchange="`
+            + `${this.escapeAttr(this.exchangeSlug(name))}">`
+            + `<i aria-hidden="true"></i>${this.escapeHtml(name)}</span>`).join('')
+        : '';
+    }
+
+    const split = groups.filter(group => group.bars.length > 1).length;
+    this.setText('limit-flow-intro', split > 0
+      ? `${split} of these coin${split === 1 ? ' is' : 's are'} split across more than one `
+        + 'bar. Each bar is what one pair pays out if every order on it fills, in that '
+        + "pair's own currency."
+      : "Each coin is resting against a single pair. Bars are what that pair pays out if "
+        + 'every order on it fills.');
+
+    host.innerHTML = groups.map(group => this.flowChartHtml(group, showVenues)).join('');
+  }
+
+  // ---------------------------------------------------------------------------
+  // Resting-order distribution (read-only, under the table)
+  //
+  // A real price histogram, not one bar per order: three orders stacked at one
+  // price and a fourth far away have to LOOK stacked, and evenly spaced bars
+  // would draw them as though they were spread out.
+  // ---------------------------------------------------------------------------
+
+  private bindShapePicker(): void {
+    const select = document.getElementById('limit-shape-pair') as HTMLSelectElement | null;
+    select?.addEventListener('change', () => {
+      this.shapePair = select.value;
+      this.renderShape();
+    });
+  }
+
+  /** What is still waiting to fill — a part-filled order only rests its remainder. */
+  private restingVolume(order: LimitOrder): number {
+    return Math.max(0, this.toNumber(order.volume) - this.filledFraction(order));
+  }
+
+  /**
+   * The market price for a pair, for the marker line.
+   *
+   * The order store carries no price for the market itself, so this is fetched
+   * on demand and cached briefly. Returns undefined while a lookup is in flight
+   * or has never run, and null when one came back without a usable price — in
+   * both cases the caller leaves the marker off rather than guessing.
+   */
+  private shapeMarketPrice(connId: number, pair: string): number | null | undefined {
+    const key = `${connId}:${pair}`;
+    const hit = this.shapePrices.get(key);
+    if (hit && Date.now() - hit.at < LimitOrdersController.SHAPE_PRICE_TTL) return hit.price;
+    if (this.shapePricePending.has(key)) return undefined;
+
+    this.shapePricePending.add(key);
+    // One request covers every quote for this coin, so cache them all — switching
+    // the picker between BTC/USD and BTC/USDT then costs nothing.
+    void ExchangeController.getPairs(connId, pair.split('/')[0])
+      .then(res => {
+        const at = Date.now();
+        for (const meta of res?.pairs || []) {
+          const price = Number(meta.price) || 0;
+          this.shapePrices.set(`${connId}:${meta.symbol}`, { price: price > 0 ? price : null, at });
+        }
+        if (!this.shapePrices.has(key)) this.shapePrices.set(key, { price: null, at });
+      })
+      .catch(() => this.shapePrices.set(key, { price: null, at: Date.now() }))
+      .finally(() => {
+        this.shapePricePending.delete(key);
+        // The marker is the only thing waiting on this, so a plain re-render is
+        // enough — and the teardown guard keeps a late response off a dead page.
+        if (!this.torndown) this.renderShape();
+      });
+    return undefined;
+  }
+
+  /**
+   * How many price slices to cut the range into.
+   *
+   * Grows with the order count so a handful of orders don't get lost in mostly
+   * empty rows, and stops well before the rows get too thin to read.
+   */
+  private shapeBinCount(orders: number): number {
+    return Math.min(24, Math.max(5, Math.ceil(Math.sqrt(orders) * 4)));
+  }
+
+  private renderShape(): void {
+    const section = document.getElementById('limit-shape-section');
+    const bars = document.getElementById('limit-shape-bars');
+    if (!section || !bars) return;
+
+    // Driven by the same filtered set as the table, so the picture and the rows
+    // above it always describe the same orders.
+    const orders = this.filteredForSide(this.side)
+      .filter(o => this.toNumber(o.price) > 0 && this.restingVolume(o) > 0);
+    const pairs = Array.from(new Set(orders.map(o => o.pair).filter(Boolean))).sort();
+
+    section.classList.toggle('d-none', pairs.length === 0);
+    if (pairs.length === 0) return;
+
+    // Keep the current pick where it survives; otherwise show whichever pair has
+    // the most resting orders, since that's the one with a shape worth reading.
+    if (!pairs.includes(this.shapePair)) {
+      this.shapePair = pairs.reduce((best, pair) =>
+        orders.filter(o => o.pair === pair).length > orders.filter(o => o.pair === best).length
+          ? pair : best, pairs[0]);
+    }
+    this.syncShapeOptions(pairs);
+
+    const own = orders.filter(o => o.pair === this.shapePair)
+      .sort((a, b) => this.toNumber(a.price) - this.toNumber(b.price));
+    const base = this.baseAsset(own[0]);
+    const quote = this.quoteAsset(own[0]);
+    const low = this.toNumber(own[0].price);
+    const high = this.toNumber(own[own.length - 1].price);
+
+    const market = this.shapeMarketPrice(own[0].connectionId, this.shapePair);
+    // Stretch the axis to take in the market price when there is one, so the
+    // gap between it and the nearest order is visible rather than cropped away.
+    const axisLow = Math.min(low, market || low);
+    const axisHigh = Math.max(high, market || high);
+    const span = axisHigh - axisLow;
+
+    const binCount = span > 0 ? this.shapeBinCount(own.length) : 1;
+    const bins: Array<{ volume: number; orders: number; notional: number }> =
+      Array.from({ length: binCount }, () => ({ volume: 0, orders: 0, notional: 0 }));
+    for (const order of own) {
+      const price = this.toNumber(order.price);
+      const index = span > 0
+        ? Math.min(binCount - 1, Math.floor((price - axisLow) / span * binCount))
+        : 0;
+      const volume = this.restingVolume(order);
+      bins[index].volume += volume;
+      bins[index].orders += 1;
+      bins[index].notional += volume * price;
+    }
+
+    const binPrice = (i: number) => axisLow + span * (i / binCount);
+    // The running total has to be read from the market outward, so the rows are
+    // ordered by which end the market sits at. Until the price lookup lands the
+    // side answers it just as well: a buy rests below the market, a sell above.
+    const marketAtTop = market != null && market > 0
+      ? market >= (axisLow + axisHigh) / 2
+      : this.side === 'buy';
+    const binOrder = bins.map((_, i) => i);
+    if (marketAtTop) binOrder.reverse();
+
+    const rows: DistRow[] = binOrder.map(i => ({
+      frac: (i + 0.5) / binCount,
+      value: bins[i].volume,
+      title: [
+        `${this.fmtNum(binPrice(i), 8)} – ${this.fmtNum(binPrice(i + 1), 8)} ${quote}`,
+        bins[i].orders === 0 ? 'No orders in this band'
+          : `${bins[i].orders} order${bins[i].orders === 1 ? '' : 's'}`,
+        bins[i].volume > 0 ? `${this.fmtNum(bins[i].volume, 8)} ${base} resting` : '',
+        bins[i].notional > 0 ? `Worth ${this.fmtMoney(bins[i].notional, quote)} if it fills` : '',
+      ].filter(Boolean).join('\n'),
+    })).filter(row => row.value > 0);
+
+    const plot = document.getElementById('limit-shape-plot');
+    plot?.classList.toggle('is-sell', this.side === 'sell');
+    plot?.classList.toggle('is-buy', this.side === 'buy');
+
+    bars.innerHTML = this.distRowsHtml(rows,
+      LimitOrdersController.DIST_ROW_FILL / binCount);
+
+    // Full precision belongs in the tooltips; the gutter only has room for
+    // enough digits to tell the levels apart.
+    const dp = this.axisDecimals(span);
+    const axisHost = document.getElementById('limit-shape-yaxis');
+    if (axisHost) {
+      axisHost.innerHTML = this.distAxisHtml([0, 0.5, 1], frac =>
+        this.fmtNum(axisLow + span * frac, dp));
+    }
+
+    this.placeMarketLine('limit-shape-market', 'limit-shape-market-label',
+      market != null && market > 0 && span > 0 ? (market - axisLow) / span : null,
+      market != null ? `Market ${this.fmtNum(market, dp)} ${quote}` : '');
+
+    this.renderShapeText(own, base, quote, axisLow, span, market, binCount, rows);
+  }
+
+  /** Enough digits to separate adjacent ticks, without filling the gutter. */
+  private axisDecimals(span: number): number {
+    if (!(span > 0)) return 2;
+    if (span >= 100) return 0;
+    if (span >= 1) return 2;
+    if (span >= 0.01) return 4;
+    return 8;
+  }
+
+  /**
+   * `axisLow` / `span` describe the plotted axis, which is stretched to take in
+   * the market price — so a row's `frac` has to be read back against those, not
+   * against the cheapest and dearest orders.
+   */
+  private renderShapeText(own: LimitOrder[], base: string, quote: string,
+                          axisLow: number, span: number,
+                          market: number | null | undefined,
+                          binCount: number, rows: DistRow[]): void {
+    const low = this.toNumber(own[0].price);
+    const high = this.toNumber(own[own.length - 1].price);
+    const dp = this.axisDecimals(span);
+    const title = document.getElementById('limit-shape-title');
+    if (title) title.textContent = `Where your resting ${this.side} orders sit`;
+
+    const exchanges = Array.from(new Set(own.map(o => o.exchangeName).filter(Boolean)));
+    const intro = document.getElementById('limit-shape-intro');
+    if (intro) {
+      intro.textContent = `${own.length} resting ${this.side} order`
+        + `${own.length === 1 ? '' : 's'} on ${this.shapePair}`
+        + (exchanges.length > 1 ? ` across ${exchanges.join(' and ')}` : '')
+        + `, from ${this.fmtNum(low, dp)} to ${this.fmtNum(high, dp)} ${quote}`
+        + ` in ${binCount} price band${binCount === 1 ? '' : 's'}.`;
+    }
+
+    const volumes = rows.map(row => row.value);
+    const total = volumes.reduce((sum, v) => sum + v, 0);
+    // Rows are already market-outward, which is the order the median has to be
+    // counted in for "half of it fills by here" to mean anything.
+    const median = this.distMedianIndex(volumes);
+    const medianPrice = axisLow + span * (rows[median] ? rows[median].frac : 0.5);
+    const parts = [`${this.fmtNum(total, 8)} ${base} resting`];
+
+    if (market != null && market > 0) {
+      // The decision-relevant number: how far the market has to travel before
+      // half of what is resting has filled.
+      const move = (medianPrice / market - 1) * 100;
+      parts.push(`half of it fills on a ${Math.abs(move).toFixed(1)}% move `
+        + `${move >= 0 ? 'up' : 'down'}`);
+    } else {
+      parts.push(`half of it ${this.side === 'buy' ? 'at or above' : 'at or below'} `
+        + `${this.fmtNum(medianPrice, dp)} ${quote}`);
+    }
+    this.setText('limit-shape-readback', parts.join(' · '));
+  }
+
+  /** Same "only rebuild when the set really changed" rule as the exchange filter. */
+  private syncShapeOptions(pairs: string[]): void {
+    const select = document.getElementById('limit-shape-pair') as HTMLSelectElement | null;
+    if (!select) return;
+
+    const existing = Array.from(select.options).map(o => o.value);
+    const unchanged = existing.length === pairs.length
+      && existing.every((v, i) => v === pairs[i]);
+    if (!unchanged) {
+      select.innerHTML = '';
+      for (const pair of pairs) {
+        const opt = document.createElement('option');
+        opt.value = pair;
+        opt.textContent = pair;
+        select.appendChild(opt);
+      }
+    }
+    select.value = this.shapePair;
+    // One pair is the whole answer — a picker with a single choice is just noise.
+    select.classList.toggle('d-none', pairs.length <= 1);
+  }
+
   private renderRows(orders: LimitOrder[], isAll: boolean): void {
     const tbody = document.getElementById('limit-tbody');
     if (!tbody) return;
@@ -529,14 +1157,46 @@ class LimitOrdersController {
   // Confirm modal
   // ---------------------------------------------------------------------------
 
+  /**
+   * Close-on-backdrop that a drag can't trigger.
+   *
+   * `click` fires on the nearest common ancestor of where the pointer went down
+   * and where it came up. So dragging something inside the dialog — the
+   * distribution line, the shape slider, a text selection — and releasing past
+   * the dialog's edge lands a click whose target is the overlay itself, which
+   * used to close the wizard and throw away the whole ladder.
+   *
+   * Requiring BOTH ends of the gesture to be on the backdrop leaves a genuine
+   * click-off working and makes every drag safe, wherever it ends up. Pointer
+   * events rather than mouse ones because the line uses pointer capture; those
+   * still bubble to here, so the guard sees the real target either way.
+   */
+  private bindBackdropClose(overlayId: string, close: () => void): void {
+    const overlay = document.getElementById(overlayId);
+    if (!overlay) return;
+
+    let downOnBackdrop = false;
+    let upOnBackdrop = false;
+    overlay.addEventListener('pointerdown', (e) => {
+      downOnBackdrop = e.target === overlay;
+    });
+    overlay.addEventListener('pointerup', (e) => {
+      upOnBackdrop = e.target === overlay;
+    });
+    overlay.addEventListener('click', () => {
+      const backdrop = downOnBackdrop && upOnBackdrop;
+      // Cleared whatever happens, so one stray half-gesture can't arm the next.
+      downOnBackdrop = upOnBackdrop = false;
+      if (backdrop) close();
+    });
+  }
+
   private bindModal(): void {
     document.getElementById('cancel-order-close')?.addEventListener('click', () => this.closeModal());
     document.getElementById('cancel-order-dismiss')?.addEventListener('click', () => this.closeModal());
     document.getElementById('cancel-order-confirm')?.addEventListener('click', () => this.confirmCancel());
 
-    document.getElementById('cancel-order-overlay')?.addEventListener('click', (e) => {
-      if ((e.target as HTMLElement).id === 'cancel-order-overlay') this.closeModal();
-    });
+    this.bindBackdropClose('cancel-order-overlay', () => this.closeModal());
 
     // One document-level handler for BOTH overlays, topmost first. A second
     // listener would leak one handler per navigation, since teardown() only
@@ -690,10 +1350,28 @@ class LimitOrdersController {
     return Number((n * tick).toFixed(this.decimalsFromTick(tick)));
   }
 
+  /**
+   * Is `value` already on the exchange's grid?
+   *
+   * Asked as "does re-snapping change it?" rather than by measuring how far
+   * `value / tick` sits from a whole number. That comparison needs a tolerance,
+   * and no fixed one works: a meme-coin ladder sells millions of units against a
+   * 1e-8 tick, which puts the quotient around 1e14 — where a double's own
+   * spacing is ~0.016, tens of thousands of times the 1e-6 epsilon this used to
+   * allow. Every rung of a SHIB ladder came back off-tick and turned red.
+   *
+   * Round-tripping has no tolerance to get wrong, and it is exactly consistent
+   * with how the values are produced: every price and amount in the ladder comes
+   * out of roundToTick(), and a hand-typed one is snapped by it on commit.
+   */
   private isOnTick(value: number, tick: number): boolean {
     if (!(tick > 0)) return true;
-    const units = value / tick;
-    return Math.abs(units - Math.round(units)) < 1e-6;
+    return this.roundToTick(value, tick, 'round') === value;
+  }
+
+  /** A tick as the exchange would write it — "0.00000001", never "1e-8". */
+  private fmtTick(tick: number): string {
+    return this.fmtNum(tick, this.decimalsFromTick(tick));
   }
 
   /**
@@ -739,9 +1417,22 @@ class LimitOrdersController {
     return 0;
   }
 
+  /** The exchange's key in MIN_AMOUNT_OVERRIDES — "Kraken" -> "kraken". */
+  private exchangeKey(): string {
+    if (this.wizardConnId == null) return '';
+    return ExchangeStore.getExchangeName(this.wizardConnId)
+      .toLowerCase().replace(/[^a-z0-9]/g, '');
+  }
+
   private normalizeMarket(raw: PairMeta): LegMarket {
     const priceTick = Number(raw.price_tick) || 0;
     const amountTick = Number(raw.amount_tick) || 0;
+    const reportedMin = Number(raw.min_amount) || 0;
+    const override = LimitOrdersController.MIN_AMOUNT_OVERRIDES[
+      `${this.exchangeKey()}:${String(raw.base).toUpperCase()}`];
+    // Only counts as an override when it actually differs — once the exchange
+    // catches up, the label stops appearing on its own.
+    const overridden = override != null && override !== reportedMin;
     return {
       symbol: String(raw.symbol),
       base: String(raw.base),
@@ -754,11 +1445,13 @@ class LimitOrdersController {
         ? (raw.price_decimals as number) : this.decimalsFromTick(priceTick),
       amountDecimals: Number.isInteger(raw.amount_decimals as number)
         ? (raw.amount_decimals as number) : this.decimalsFromTick(amountTick),
-      minAmount: Number(raw.min_amount) || 0,
+      minAmount: override != null ? override : reportedMin,
       minCost: Number(raw.min_cost) || 0,
       price: Number(raw.price) || 0,
       availableBase: Number(raw.available_base) || 0,
       availableQuote: Number(raw.available_quote) || 0,
+      stableQuote: raw.stable_quote === true,
+      minAmountOverridden: overridden,
     };
   }
 
@@ -800,9 +1493,7 @@ class LimitOrdersController {
       ?.addEventListener('click', () => this.wizardBack());
     document.getElementById('limit-submit')
       ?.addEventListener('click', () => void this.submitBatch());
-    document.getElementById('create-limit-overlay')?.addEventListener('click', (e) => {
-      if ((e.target as HTMLElement).id === 'create-limit-overlay') this.closeCreateModal();
-    });
+    this.bindBackdropClose('create-limit-overlay', () => this.closeCreateModal());
 
     document.getElementById('limit-side-toggle')?.addEventListener('click', (e) => {
       const btn = (e.target as HTMLElement).closest('[data-side]') as HTMLElement | null;
@@ -962,6 +1653,10 @@ class LimitOrdersController {
     this.markets = {};
     this.singlePrice = null;
     this.singleAmount = null;
+    // A fresh wizard starts on an even split, so nothing carries over from a
+    // ladder shaped earlier in the session.
+    this.distLean = 0.5;
+    this.distShape = 0;
 
     const mode = ExchangeStore.activeMode;
     this.wizardConnId = typeof mode === 'number'
@@ -1136,17 +1831,36 @@ class LimitOrdersController {
   }
 
   private async onCoinChanged(): Promise<void> {
+    if (!this.base || this.wizardConnId == null) {
+      this.loadingPairs = false;
+      this.renderQuotePicker();
+      return;
+    }
+
+    // The previous coin's chips are cleared before the fetch, not after. Leaving
+    // them up during the load shows another coin's markets as live, selectable
+    // options — and a click during that window would select a pair that is about
+    // to stop existing.
+    const request = ++this.pairsRequest;
+    this.loadingPairs = true;
+    this.markets = {};
     this.renderQuotePicker();
-    if (!this.base || this.wizardConnId == null) return;
-    const hint = document.getElementById('limit-quote-hint');
-    if (hint) hint.textContent = 'Loading pairs…';
+
     try {
       await this.loadPairs(this.wizardConnId, this.base);
     } catch (err: any) {
-      if (hint) hint.textContent = '';
-      this.showModalError(err?.message || 'Could not load trading pairs for this coin.');
+      if (request === this.pairsRequest) {
+        this.loadingPairs = false;
+        this.renderQuotePicker();
+        this.showModalError(err?.message || 'Could not load trading pairs for this coin.');
+      }
       return;
     }
+
+    // A superseded request must neither install its results nor clear the
+    // spinner — the newer fetch it lost to is still running.
+    if (request !== this.pairsRequest) return;
+    this.loadingPairs = false;
     // Drop selections the new coin doesn't offer — carrying "USD" over to a coin
     // with no USD market would fail validation with no visible cause.
     const offered = Object.values(this.markets).map(m => m.quote);
@@ -1168,6 +1882,18 @@ class LimitOrdersController {
     const host = document.getElementById('limit-quote-picker');
     const hint = document.getElementById('limit-quote-hint');
     if (!host) return;
+
+    // Checked before anything reads `markets`: during a load it is empty, and
+    // every branch below would otherwise report "no markets on this exchange".
+    if (this.loadingPairs) {
+      host.innerHTML =
+        `<span class="limit-quote-loading" role="status" aria-live="polite">`
+        + `<i class="fa-solid fa-circle-notch limit-spinner" aria-hidden="true"></i>`
+        + `<span>Loading ${this.escapeHtml(this.base)} trading pairs…</span></span>`;
+      if (hint) hint.textContent = '';
+      this.renderBlocker();
+      return;
+    }
 
     const symbols = Object.keys(this.markets);
     if (!this.base) {
@@ -1217,6 +1943,10 @@ class LimitOrdersController {
   private validateSetup(): string | null {
     if (this.wizardConnId == null) return 'Choose which exchange to place these orders on.';
     if (!this.base) return 'Choose the coin to trade.';
+    // Holds Next while the fetch is out. Without this the checks below run
+    // against an empty grid and reject the coin for having no markets, which is
+    // a lie the user then has to watch correct itself.
+    if (this.loadingPairs) return `Loading ${this.base} trading pairs…`;
     if (this.selectedQuotes.length === 0) return 'Select at least one trading pair.';
 
     const exchange = ExchangeStore.getExchangeName(this.wizardConnId);
@@ -1266,7 +1996,13 @@ class LimitOrdersController {
       ?.classList.toggle('d-none', this.bandMode !== 'price');
 
     const unit = document.getElementById('limit-price-unit');
-    if (unit) unit.textContent = this.selectedQuotes[0] || '';
+    if (unit) {
+      // With several dollar quotes the range is one set of numbers applied to
+      // every pair, so name them all rather than implying it's only the first.
+      unit.textContent = this.selectedQuotes.length > 1
+        ? this.selectedQuotes.join(' / ')
+        : (this.selectedQuotes[0] || '');
+    }
 
     // Post-only is meaningless where the exchange has no such flag (Robinhood),
     // and sending it there would make every leg fail with a 400.
@@ -1288,10 +2024,20 @@ class LimitOrdersController {
     const market = this.markets[`${this.base}/${this.selectedQuotes[0]}`];
     if (!market || !(market.price > 0)) return;
     const sign = this.wizardSide === 'sell' ? 1 : -1;
+    // Seed off the pair that constrains the range hardest — the dearest market
+    // for a sell, the cheapest for a buy. Stablecoin quotes sit a hair apart, and
+    // seeding off whichever happened to be selected first can land a start price
+    // that's already through another pair's market.
+    const prices = this.selectedQuotes
+      .map(quote => this.markets[`${this.base}/${quote}`]?.price || 0)
+      .filter(price => price > 0);
+    const anchor = prices.length === 0 ? market.price
+      : this.wizardSide === 'sell' ? Math.max(...prices) : Math.min(...prices);
+
     this.startPrice = this.roundToTick(
-      market.price * (1 + sign * this.startPct / 100), market.priceTick, 'round');
+      anchor * (1 + sign * this.startPct / 100), market.priceTick, 'round');
     this.endPrice = this.roundToTick(
-      market.price * (1 + sign * this.endPct / 100), market.priceTick, 'round');
+      anchor * (1 + sign * this.endPct / 100), market.priceTick, 'round');
 
     const startInput = document.getElementById('limit-price-start') as HTMLInputElement | null;
     const endInput = document.getElementById('limit-price-end') as HTMLInputElement | null;
@@ -1345,10 +2091,22 @@ class LimitOrdersController {
     const stepsHint = document.getElementById('limit-steps-hint');
     if (stepsHint && this.mode === 'ladder') {
       const n = this.stepCount > 0 ? this.stepCount : 0;
+      const max = this.maxSteps();
+      const pairs = Math.max(1, this.selectedQuotes.length);
+      // The exchange's minimum order size usually bites long before the per-pair
+      // cap does, so name whichever ceiling is actually in force.
+      const afford = this.affordableSteps();
+      const room = afford && afford.max < max
+        ? `your balance covers up to ${Math.max(0, afford.max)} here`
+        : `up to ${max} with ${pairs} pair${pairs === 1 ? '' : 's'} selected`;
       stepsHint.textContent = n > 0
-        ? `${n} order${n === 1 ? '' : 's'}, ${this.estimateText(n)} to place`
-        : '';
+        ? `${n} order${n === 1 ? '' : 's'}, ${this.estimateText(n)} to place — ${room}`
+        : `Between 2 and ${max} — ${LimitOrdersController.PER_PAIR_STEPS} per selected pair`;
     }
+
+    // Keep the spinner's own ceiling in step with the pair selection.
+    const stepsInput = document.getElementById('limit-steps') as HTMLInputElement | null;
+    if (stepsInput) stepsInput.max = String(this.maxSteps());
 
     const bandHint = document.getElementById('limit-band-hint');
     if (bandHint) {
@@ -1368,10 +2126,13 @@ class LimitOrdersController {
     const market = this.markets[`${this.base}/${this.selectedQuotes[0]}`];
     if (this.bandMode === 'price') {
       if (!(this.startPrice! > 0) || !(this.endPrice! > 0) || !market) return '';
-      const quote = market.quote;
       const from = this.fmtNum(this.startPrice!, market.priceDecimals);
       const to = this.fmtNum(this.endPrice!, market.priceDecimals);
-      return `Steps spread between ${from} and ${to} ${quote}`;
+      const pairs = this.selectedQuotes.length;
+      return `Steps spread between ${from} and ${to}`
+        + (pairs > 1
+          ? `, rotating through ${this.selectedQuotes.join(', ')} — the same range on each`
+          : ` ${market.quote}`);
     }
     if (!(this.startPct > 0) || !(this.endPct > this.startPct)) return '';
     const direction = this.wizardSide === 'sell' ? 'above' : 'below';
@@ -1454,10 +2215,162 @@ class LimitOrdersController {
     this.hideModalError();
   }
 
+  /**
+   * The rung nearest the market, which is the worst case for both sides: it is
+   * the cheapest rung of a sell ladder (so it needs the most coins to clear a
+   * minimum order VALUE) and the dearest of a buy ladder (so it costs the most
+   * to clear a minimum order SIZE).
+   */
+  private nearestPriceFor(market: LegMarket): number {
+    if (this.bandMode === 'price') return this.startPrice || 0;
+    if (!(market.price > 0)) return 0;
+    const sign = this.wizardSide === 'sell' ? 1 : -1;
+    return market.price * (1 + sign * this.startPct / 100);
+  }
+
+  /**
+   * The smallest amount one step can legally place, and WHICH limit says so.
+   *
+   * Exchanges publish two separate floors and a step has to clear both: a
+   * minimum order size in the base coin, and a minimum order value in the quote.
+   * They can disagree wildly — Kraken lets you sell 50,000 SHIB by size, but a
+   * $10 value floor needs about 770,000 of them at current prices.
+   *
+   * Which one binds has to travel with the number. Reporting the larger figure
+   * as though it were the size minimum contradicts what the exchange publishes
+   * and sends people looking for a limit that doesn't exist.
+   */
+  private stepFloor(market: LegMarket, price: number): StepFloor {
+    const bySize = market.minAmount > 0 ? market.minAmount : 0;
+    const byValue = market.minCost > 0 && price > 0 ? market.minCost / price : 0;
+    const value = byValue > bySize;
+    return {
+      amount: Math.max(bySize, byValue),
+      source: value ? 'value' : 'size',
+      minAmount: market.minAmount > 0 ? market.minAmount : 0,
+      minAmountOverridden: market.minAmountOverridden,
+      minCost: market.minCost > 0 ? market.minCost : 0,
+      pair: market.symbol,
+      base: market.base,
+      quote: market.quote,
+      price,
+      priceDecimals: market.priceDecimals,
+      amountDecimals: market.amountDecimals,
+    };
+  }
+
+  /**
+   * Both published limits, and which one is actually stopping you.
+   *
+   * Naming only the binding one invites exactly the wrong conclusion when it's
+   * the value floor: converted into coins it looks like a size minimum that
+   * contradicts the exchange's own published figure. Printing both — as the
+   * exchange states them, in their own units — is what makes the number
+   * checkable rather than something to argue with.
+   */
+  private stepFloorText(floor: StepFloor): string {
+    const size = floor.minAmount > 0
+      ? `${this.fmtNum(floor.minAmount, floor.amountDecimals)} ${floor.base} minimum order size`
+        + `${floor.minAmountOverridden ? ' (set in Cyrus, not read from the exchange)' : ''}`
+      : '';
+    const value = floor.minCost > 0
+      ? `${this.fmtMoney(floor.minCost, floor.quote)} minimum order value`
+      : '';
+    const converted = floor.source === 'value' && floor.price > 0
+      ? ` — about ${this.fmtApproxAmount(floor.amount)} ${floor.base} at `
+        + `${this.fmtNum(floor.price, floor.priceDecimals)}`
+      : '';
+
+    if (size && value) {
+      return `${floor.pair} has a ${size} and a ${value}. The `
+           + `${floor.source === 'value' ? 'value' : 'size'} one is stricter here${converted}`;
+    }
+    if (value) return `${floor.pair}'s ${value}${converted}`;
+    return `${floor.pair}'s ${size}`;
+  }
+
+  /**
+   * A converted floor, at a precision worth reading.
+   *
+   * This figure is an estimate that moves with the price, so eight decimals on
+   * three quarters of a million coins is noise pretending to be precision.
+   * Rounded UP, because understating a minimum is the one direction that would
+   * make the advice wrong.
+   */
+  private fmtApproxAmount(value: number): string {
+    const dp = value >= 1000 ? 0 : value >= 1 ? 2 : 8;
+    const scale = 10 ** dp;
+    return this.fmtNum(Math.ceil(value * scale) / scale, dp);
+  }
+
+  /**
+   * How many steps the budget can actually pay for at those floors.
+   *
+   * Splitting a balance across more steps makes each one smaller, so past a
+   * point every rung lands under the exchange's minimum and the whole ladder
+   * comes back rejected. Catching that here turns a screen of red rows into one
+   * number to change. Worked out for an even split; a leaned shape gives its
+   * lightest step less than an even share, so it needs fewer still — which the
+   * caller says out loud rather than silently assuming.
+   */
+  private affordableSteps(): { max: number; floor: StepFloor } | null {
+    if (this.mode !== 'ladder' || this.selectedQuotes.length === 0) return null;
+
+    if (this.wizardSide === 'sell') {
+      const budget = this.available(this.base) * this.totalPct / 100;
+      if (!(budget > 0)) return null;
+      // Steps rotate through every selected pair, so the strictest market is the
+      // one that decides.
+      let binding: StepFloor | null = null;
+      for (const quote of this.selectedQuotes) {
+        const market = this.markets[`${this.base}/${quote}`];
+        if (!market) continue;
+        const floor = this.stepFloor(market, this.nearestPriceFor(market));
+        if (!binding || floor.amount > binding.amount) binding = floor;
+      }
+      if (!binding || !(binding.amount > 0)) return null;
+      return { max: Math.floor(budget / binding.amount), floor: binding };
+    }
+
+    // Buys hold a separate budget per quote asset, and rotation hands each quote
+    // roughly the same number of steps — so the poorest quote caps the ladder.
+    let worst = Infinity;
+    let binding: StepFloor | null = null;
+    for (const quote of this.selectedQuotes) {
+      const market = this.markets[`${this.base}/${quote}`];
+      if (!market) continue;
+      const floor = this.stepFloor(market, this.nearestPriceFor(market));
+      const spend = floor.amount * floor.price;
+      const budget = this.available(quote) * this.totalPct / 100
+                   * LimitOrdersController.BUY_FEE_HEADROOM;
+      if (!(spend > 0) || !(budget > 0)) continue;
+      const steps = Math.floor(budget / spend);
+      if (steps < worst) { worst = steps; binding = floor; }
+    }
+    if (!Number.isFinite(worst) || !binding) return null;
+    return { max: worst * this.selectedQuotes.length, floor: binding };
+  }
+
+  /**
+   * Steps allowed right now: PER_PAIR_STEPS for every selected pair, held under
+   * the absolute cap. Steps rotate through the pairs, so each pair selected adds
+   * its own room on the exchange rather than crowding the same book.
+   */
+  private maxSteps(): number {
+    const pairs = Math.max(1, this.selectedQuotes.length);
+    return Math.min(LimitOrdersController.MAX_STEPS,
+                    LimitOrdersController.PER_PAIR_STEPS * pairs);
+  }
+
   private validateLadderParams(): string | null {
-    if (!Number.isInteger(this.stepCount) || this.stepCount < 2
-        || this.stepCount > LimitOrdersController.MAX_STEPS) {
-      return `Number of steps must be a whole number between 2 and ${LimitOrdersController.MAX_STEPS}.`;
+    const max = this.maxSteps();
+    if (!Number.isInteger(this.stepCount) || this.stepCount < 2 || this.stepCount > max) {
+      const pairs = Math.max(1, this.selectedQuotes.length);
+      return `Number of steps must be a whole number between 2 and ${max} — that's `
+           + `${LimitOrdersController.PER_PAIR_STEPS} per selected pair, and you have `
+           + `${pairs} selected${max === LimitOrdersController.MAX_STEPS
+               ? ` (${LimitOrdersController.MAX_STEPS} is the overall limit)` : ''}. `
+           + 'Select another pair for more room.';
     }
     const bandProblem = this.bandMode === 'price'
       ? this.validatePriceBand() : this.validatePercentBand();
@@ -1465,6 +2378,22 @@ class LimitOrdersController {
 
     if (!(this.totalPct > 0) || this.totalPct > 100) {
       return 'Total to use must be between 0 and 100%.';
+    }
+
+    // Caught here rather than as a table full of rejected rows: past this point
+    // every step is under the exchange's floor, and no amount of editing
+    // individual rows fixes it — the step count or the budget has to change.
+    const afford = this.affordableSteps();
+    if (afford && this.stepCount > afford.max) {
+      const shape = this.distIsEven() ? '' :
+        ' A leaned shape needs fewer still, since its lightest step gets less than an even share.';
+      return afford.max < 2
+        ? `${this.stepFloorText(afford.floor)}, and the balance you've set aside can't cover `
+          + 'even two steps that size. Raise "Total to use", or place a single order '
+          + 'instead of a ladder.'
+        : `Splitting this across ${this.stepCount} steps puts each one under the minimum: `
+          + `${this.stepFloorText(afford.floor)}. Use at most ${afford.max} `
+          + `step${afford.max === 1 ? '' : 's'}, or raise "Total to use".${shape}`;
     }
 
     for (const quote of this.selectedQuotes) {
@@ -1510,13 +2439,25 @@ class LimitOrdersController {
     return null;
   }
 
+  /** Selected quotes the backend does NOT consider dollar-priced. */
+  private nonDollarQuotes(): string[] {
+    return this.selectedQuotes.filter(
+      quote => !this.markets[`${this.base}/${quote}`]?.stableQuote);
+  }
+
   private validatePriceBand(): string | null {
-    // One absolute range cannot mean the same thing on two pairs quoted in
-    // different currencies, so exact prices are single-pair only. A percentage
-    // band is what makes a multi-pair ladder meaningful.
-    if (this.selectedQuotes.length > 1) {
-      return 'Exact prices apply to one pair only — a single price range cannot cover '
-           + `${this.selectedQuotes.join(', ')}. Pick one pair, or switch back to "% from market".`;
+    // An absolute range only means the same thing across pairs quoted in
+    // comparable money. USD, USDT and USDC are all dollars, so 100–120 is the
+    // same ladder on each and rotating across them is exactly what this is for.
+    // A BTC- or EUR-quoted pair in the same selection is not: "100" would be
+    // three different orders, and one of them would be nonsense.
+    const offbeat = this.nonDollarQuotes();
+    if (this.selectedQuotes.length > 1 && offbeat.length > 0) {
+      const isAre = offbeat.length === 1 ? 'is' : 'are';
+      return `Exact prices need every selected pair priced in comparable money. `
+           + `${offbeat.join(', ')} ${isAre} not dollar-priced, so one price range cannot `
+           + `cover ${this.selectedQuotes.join(', ')}. Deselect `
+           + `${offbeat.length === 1 ? 'it' : 'them'}, or switch back to "% from market".`;
     }
     if (!(this.startPrice! > 0) || !(this.endPrice! > 0)) {
       return 'Enter both ends of the price range.';
@@ -1525,31 +2466,36 @@ class LimitOrdersController {
       return 'The two ends of the range have to differ, or every step lands on one price.';
     }
 
-    const symbol = `${this.base}/${this.selectedQuotes[0]}`;
-    const market = this.markets[symbol];
-    if (!market) return `No ${symbol} market on this exchange.`;
-
     // "start" is the end nearest the market, so a sell ladder runs upward and a
     // buy ladder downward. Getting this backwards would invert the ladder.
-    if (this.wizardSide === 'sell') {
-      if (this.endPrice! <= this.startPrice!) {
-        return 'For a sell ladder the second price must be higher than the first — '
-             + 'the range runs away from the market, upward.';
-      }
-      if (market.price > 0 && this.startPrice! <= market.price) {
-        return `A sell at ${this.fmtNum(this.startPrice!, market.priceDecimals)} is at or below `
-             + `the current ${this.fmtNum(market.price, market.priceDecimals)} ${market.quote} `
-             + 'market price, so it would fill immediately instead of resting.';
-      }
-    } else {
-      if (this.endPrice! >= this.startPrice!) {
-        return 'For a buy ladder the second price must be lower than the first — '
-             + 'the range runs away from the market, downward.';
-      }
-      if (market.price > 0 && this.startPrice! >= market.price) {
-        return `A buy at ${this.fmtNum(this.startPrice!, market.priceDecimals)} is at or above `
-             + `the current ${this.fmtNum(market.price, market.priceDecimals)} ${market.quote} `
-             + 'market price, so it would fill immediately instead of resting.';
+    if (this.wizardSide === 'sell' && this.endPrice! <= this.startPrice!) {
+      return 'For a sell ladder the second price must be higher than the first — '
+           + 'the range runs away from the market, upward.';
+    }
+    if (this.wizardSide === 'buy' && this.endPrice! >= this.startPrice!) {
+      return 'For a buy ladder the second price must be lower than the first — '
+           + 'the range runs away from the market, downward.';
+    }
+
+    // Checked against EVERY selected pair, not just the first. Dollar
+    // stablecoins track each other closely but never exactly, so a near end that
+    // rests clear of BTC/USD can still be through BTC/USDT — and those legs
+    // would take instead of rest.
+    for (const quote of this.selectedQuotes) {
+      const symbol = `${this.base}/${quote}`;
+      const market = this.markets[symbol];
+      if (!market) return `No ${symbol} market on this exchange.`;
+      if (!(market.price > 0)) continue;
+
+      const through = this.wizardSide === 'sell'
+        ? this.startPrice! <= market.price
+        : this.startPrice! >= market.price;
+      if (through) {
+        return `A ${this.wizardSide} at ${this.fmtNum(this.startPrice!, market.priceDecimals)} is `
+             + `at or ${this.wizardSide === 'sell' ? 'below' : 'above'} the current `
+             + `${this.fmtNum(market.price, market.priceDecimals)} ${symbol} market price, so `
+             + `${this.selectedQuotes.length > 1 ? `the ${quote} steps would` : 'it would'} `
+             + 'fill immediately instead of resting.';
       }
     }
     return null;
@@ -1606,10 +2552,12 @@ class LimitOrdersController {
     if (!market) return null;
     const n = Math.max(1, this.stepCount);
 
-    // Exact-price mode slices the absolute range directly. Only ever reachable
-    // with a single pair selected (validateLadderParams enforces that), because
-    // one absolute range can't be meaningful across pairs quoted in different
-    // currencies.
+    // Exact-price mode slices the absolute range directly, by global step index.
+    // With several dollar-quoted pairs selected the rotation interleaves them
+    // through that one range — USDT takes slices 0, 3, 6…, USDC 1, 4, 7… — so
+    // each pair's own rungs stay in order and the combined ladder covers the
+    // range evenly. validatePriceBand() is what guarantees the pairs are priced
+    // in comparable money before any of this means anything.
     if (this.bandMode === 'price') {
       if (!(this.startPrice! > 0) || !(this.endPrice! > 0)) return null;
       const lo = this.startPrice! + (this.endPrice! - this.startPrice!) * (i / n);
@@ -1654,38 +2602,552 @@ class LimitOrdersController {
   }
 
   /**
-   * Even split of the budget across steps.
+   * Share the budget across the steps according to the distribution shape.
    *
    * Sell: one base-asset budget shared by every step.
    * Buy:  a budget PER QUOTE ASSET — USDT and USDC are different money, so each
-   *       quote's own balance is divided among only the steps rotated onto it.
+   *       quote's own balance is divided among only the steps rotated onto it,
+   *       and the shape is renormalised inside that group.
    *
-   * Everything floors to the amount tick, so the sum is always within budget.
+   * The weights sum to 1 and everything floors to the amount tick, so the total
+   * is always within budget however the ladder is leaned. At the default shape
+   * every weight is identical, which is the plain even split.
    */
   private splitAmounts(): void {
+    const weights = this.distWeights(this.legs.length);
+
     if (this.wizardSide === 'sell') {
       const budget = this.available(this.base) * this.totalPct / 100;
-      const per = budget / Math.max(1, this.legs.length);
-      for (const leg of this.legs) {
+      this.legs.forEach((leg, i) => {
         const market = this.markets[leg.pair];
-        leg.amount = market ? this.roundToTick(per, market.amountTick, 'floor') : null;
-      }
+        leg.amount = market
+          ? this.roundToTick(budget * weights[i], market.amountTick, 'floor')
+          : null;
+      });
       return;
     }
 
-    const countByQuote: Record<string, number> = {};
-    for (const leg of this.legs) {
+    const weightByQuote: Record<string, number> = {};
+    this.legs.forEach((leg, i) => {
       const quote = leg.pair.split('/')[1];
-      countByQuote[quote] = (countByQuote[quote] || 0) + 1;
-    }
-    for (const leg of this.legs) {
+      weightByQuote[quote] = (weightByQuote[quote] || 0) + weights[i];
+    });
+    this.legs.forEach((leg, i) => {
       const market = this.markets[leg.pair];
-      if (!market || !(leg.price! > 0)) { leg.amount = null; continue; }
+      if (!market || !(leg.price! > 0)) { leg.amount = null; return; }
       const budget = this.available(market.quote) * this.totalPct / 100
                    * LimitOrdersController.BUY_FEE_HEADROOM;
-      const spendHere = budget / Math.max(1, countByQuote[market.quote]);
+      const group = weightByQuote[market.quote] || 0;
+      const spendHere = group > 0 ? budget * (weights[i] / group) : 0;
       leg.amount = this.roundToTick(spendHere / leg.price!, market.amountTick, 'floor');
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Create wizard — volume distribution
+  //
+  // Drawn the way an order book is: price down the side, volume across. That
+  // makes the market price a line on the axis rather than something you have to
+  // infer, and it makes the drag handle a PRICE level — the one thing a ladder
+  // is really about — instead of an abstract position along a band.
+  // ---------------------------------------------------------------------------
+
+  private clampLean(value: number): number {
+    return Math.min(1, Math.max(0, value));
+  }
+
+  private clampShape(value: number): number {
+    return Math.min(1, Math.max(-1, value));
+  }
+
+  private distIsEven(): boolean {
+    return Math.abs(this.distShape) < LimitOrdersController.DIST_FLAT_EPSILON;
+  }
+
+  /**
+   * The share of the budget each step gets, summing to 1.
+   *
+   * Weight decays exponentially with a step's distance from `distLean`, so a
+   * positive shape piles volume up around the lean and a negative one hollows it
+   * out toward both ends. Shape 0 makes every exponent 0, so every weight is 1 —
+   * the even split, exactly as before this control existed.
+   */
+  private distWeights(count: number): number[] {
+    const n = Math.max(1, count);
+    if (n === 1) return [1];
+    const raw: number[] = [];
+    for (let i = 0; i < n; i++) {
+      // Bar centres, so the first and last steps sit inside the band rather than
+      // on its edges — otherwise a lean of 0 could only ever be reached by the
+      // first step and the control would feel like it ran out of travel early.
+      const x = (i + 0.5) / n;
+      raw.push(Math.exp(-LimitOrdersController.DIST_SHARPNESS * this.distShape
+                        * Math.abs(x - this.distLean)));
     }
+    const sum = raw.reduce((total, w) => total + w, 0);
+    return sum > 0 ? raw.map(w => w / sum) : raw.map(() => 1 / n);
+  }
+
+  /**
+   * What a bar measures.
+   *
+   * A sell commits coins, so the bars are base amount. A buy commits money, and
+   * its amount is spend/price — so plotting amount would draw an even-money buy
+   * ladder as a rising ramp, purely because the cheaper rungs buy more coins.
+   * Spend is the quantity the user actually chose, so spend is what's drawn.
+   */
+  private legMetric(leg: LimitLeg): number {
+    const amount = leg.amount || 0;
+    return this.wizardSide === 'sell' ? amount : amount * (leg.price || 0);
+  }
+
+  /** Reads as the tail of "what that step commits — …". */
+  private distMetricLabel(): string {
+    if (this.wizardSide === 'sell') return `${this.base} sold`;
+    const quotes = Array.from(new Set(this.legs.map(leg => leg.pair.split('/')[1])));
+    return quotes.length === 1
+      ? `${quotes[0]} spent`
+      : "spend, in each pair's own quote currency";
+  }
+
+  /**
+   * Set when the bars are measured in currencies that can't share a scale.
+   *
+   * A buy ladder rotating across USDT and USDC is fine — both are dollars. One
+   * rotating across USDT and BTC is not, and saying so is better than drawing a
+   * BTC bar next to a USDT bar as if the lengths meant the same thing.
+   */
+  private distMetricWarning(): string {
+    if (this.wizardSide !== 'buy') return '';
+    const quotes = Array.from(new Set(this.legs.map(leg => leg.pair.split('/')[1])));
+    if (quotes.length <= 1) return '';
+    const allStable = quotes.every(q => this.markets[`${this.base}/${q}`]?.stableQuote);
+    if (allStable) return '';
+    return `Bars measure the spend on each step, but ${quotes.join(', ')} are different `
+         + 'currencies — compare lengths within one currency, not across them. The table '
+         + 'below gives each step its own figure.';
+  }
+
+  /** A leg's signed distance from its own pair's market price, in percent. */
+  private legOffsetPct(leg: LimitLeg): number | null {
+    const market = this.markets[leg.pair];
+    if (!market || !(market.price > 0) || leg.price == null) return null;
+    return (leg.price / market.price - 1) * 100;
+  }
+
+  /**
+   * The vertical scale for the ladder plot.
+   *
+   * Measured in percent from the market rather than in price, because a ladder
+   * can rotate across pairs quoted in different currencies and only the
+   * percentage is comparable between them. Higher price is always up, so the
+   * market line lands at the bottom for a sell and the top for a buy — which is
+   * the fastest read there is of which way the ladder runs.
+   *
+   * `priced` false means no pair could be priced: the rows fall back to even
+   * spacing by step and the market line is left off rather than invented.
+   */
+  private distAxis(): { priced: boolean; span: number; marketFrac: number } {
+    const offsets = this.legs.map(leg => this.legOffsetPct(leg))
+      .filter((o): o is number => o != null);
+    if (offsets.length === 0) {
+      return { priced: false, span: 0, marketFrac: this.wizardSide === 'sell' ? 0 : 1 };
+    }
+    const span = Math.max(...offsets.map(Math.abs))
+               * LimitOrdersController.DIST_AXIS_PAD || 1;
+    return { priced: true, span, marketFrac: this.wizardSide === 'sell' ? 0 : 1 };
+  }
+
+  /** Where a given offset sits on the axis: 0 at the bottom, 1 at the top. */
+  private distFracFor(offsetPct: number, span: number): number {
+    if (!(span > 0)) return 0.5;
+    const frac = this.wizardSide === 'sell'
+      ? offsetPct / span               // sells run up from the market at the bottom
+      : 1 - Math.abs(offsetPct) / span; // buys run down from the market at the top
+    return Math.min(1, Math.max(0, frac));
+  }
+
+  /**
+   * The row the running total crosses halfway at — the median.
+   *
+   * Taken from the values actually plotted rather than from the weights, so the
+   * line still marks the real middle of the volume after a hand edit in the
+   * table, and after the per-quote renormalisation a buy ladder goes through.
+   * Rows must be in near-to-far order.
+   */
+  private distMedianIndex(values: number[]): number {
+    const total = values.reduce((sum, v) => sum + v, 0);
+    if (!(total > 0)) return Math.floor(values.length / 2);
+    let running = 0;
+    for (let i = 0; i < values.length; i++) {
+      running += values[i];
+      if (running >= total / 2) return i;
+    }
+    return values.length - 1;
+  }
+
+  /** Share of the total sitting in the half of the band nearest the market. */
+  private distNearShare(values: number[]): number {
+    const total = values.reduce((sum, v) => sum + v, 0);
+    if (!(total > 0)) return 0.5;
+    const n = values.length;
+    let near = 0;
+    for (let i = 0; i < n; i++) {
+      const x = (i + 0.5) / n;
+      // An odd count leaves one row straddling the midpoint; split it evenly
+      // rather than handing the whole thing to one side.
+      if (x < 0.5) near += values[i];
+      else if (x === 0.5) near += values[i] / 2;
+    }
+    return near / total;
+  }
+
+  // ── Shared plot drawing ───────────────────────────────────────────────────
+
+  private distRowsHtml(rows: DistRow[], heightPct: number): string {
+    const max = Math.max(...rows.map(r => r.value), 0);
+    return rows.map(row => {
+      const width = max > 0 ? row.value / max * 100 : 0;
+      return `<span class="limit-dist-row${row.bad ? ' is-bad' : ''}"`
+        + ` style="bottom:${(row.frac * 100).toFixed(3)}%;`
+        + `height:${heightPct.toFixed(3)}%;width:${Math.max(0, width).toFixed(2)}%"`
+        + ` title="${this.escapeAttr(row.title)}"></span>`;
+    }).join('');
+  }
+
+  /** Tick labels down the side of a plot. `label` renders one for a given frac. */
+  private distAxisHtml(fracs: number[], label: (frac: number) => string): string {
+    return fracs.map(frac =>
+      `<span class="limit-dist-tick" style="bottom:${(frac * 100).toFixed(3)}%">`
+      + `${this.escapeHtml(label(frac))}</span>`).join('');
+  }
+
+  private placeMarketLine(id: string, labelId: string, frac: number | null, text: string): void {
+    const line = document.getElementById(id);
+    if (!line) return;
+    line.classList.toggle('d-none', frac == null);
+    if (frac == null) return;
+    line.style.bottom = `${(Math.min(1, Math.max(0, frac)) * 100).toFixed(3)}%`;
+    this.setText(labelId, text);
+  }
+
+  // ── The ladder plot ───────────────────────────────────────────────────────
+
+  private renderDist(): void {
+    const host = document.getElementById('limit-dist');
+    const bars = document.getElementById('limit-dist-bars');
+    if (!host || !bars) return;
+
+    // A single order has no distribution, and neither does a one-rung ladder.
+    const show = this.mode === 'ladder' && this.legs.length > 1;
+    host.classList.toggle('d-none', !show);
+    if (!show) return;
+
+    const n = this.legs.length;
+    const axis = this.distAxis();
+    const values = this.legs.map(leg => this.legMetric(leg));
+    const badCount = this.legs.filter(leg => this.legProblem(leg) !== null).length;
+
+    const rows: DistRow[] = this.legs.map((leg, i) => {
+      const market = this.markets[leg.pair];
+      const offset = this.legOffsetPct(leg);
+      const problem = this.legProblem(leg);
+      return {
+        // Without a price to measure from, fall back to even spacing by step.
+        frac: axis.priced && offset != null
+          ? this.distFracFor(offset, axis.span)
+          : (this.wizardSide === 'sell' ? (i + 0.5) / n : 1 - (i + 0.5) / n),
+        value: values[i],
+        bad: problem !== null,
+        title: [
+          `Step ${i + 1} of ${n} · ${leg.pair}`,
+          leg.price == null ? 'No price yet'
+            : `Price ${this.fmtNum(leg.price, market ? market.priceDecimals : 8)}`
+              + ` (${this.legOffsetText(leg)} from market)`,
+          `Amount ${this.fmtNum(leg.amount || 0, market ? market.amountDecimals : 8)} ${this.base}`,
+          `Est. total ${this.legTotalText(leg)}`,
+          problem || '',
+        ].filter(Boolean).join('\n'),
+      };
+    });
+
+    const plot = document.getElementById('limit-dist-plot');
+    plot?.classList.toggle('is-sell', this.wizardSide === 'sell');
+    plot?.classList.toggle('is-buy', this.wizardSide === 'buy');
+
+    const heightPct = Math.min(LimitOrdersController.DIST_MAX_ROW_PCT,
+                               LimitOrdersController.DIST_ROW_FILL / n);
+    bars.innerHTML = this.distRowsHtml(rows, heightPct);
+
+    this.renderDistAxis(axis);
+    this.placeMarketLine('limit-dist-market', 'limit-dist-market-label',
+                         axis.priced ? axis.marketFrac : null, this.marketLineText());
+    this.placeDistHandle(rows, values);
+    this.renderDistReadback(values, badCount, axis);
+    this.syncDistControls();
+  }
+
+  private marketLineText(): string {
+    const quotes = Array.from(new Set(this.selectedQuotes));
+    if (quotes.length === 1) {
+      const market = this.markets[`${this.base}/${quotes[0]}`];
+      if (market && market.price > 0) {
+        return `Market ${this.fmtNum(market.price, market.priceDecimals)} ${market.quote}`;
+      }
+    }
+    return 'Market price';
+  }
+
+  private renderDistAxis(axis: { priced: boolean; span: number }): void {
+    const host = document.getElementById('limit-dist-yaxis');
+    if (!host) return;
+    if (!axis.priced) {
+      host.innerHTML = this.distAxisHtml([0, 1], frac =>
+        frac === (this.wizardSide === 'sell' ? 0 : 1) ? 'nearest' : 'furthest');
+      return;
+    }
+    // Percent from the market, not price: a ladder can rotate across pairs quoted
+    // in different currencies, and only the percentage means the same on each.
+    // Three ticks, not five — the market line already labels the near end, and the
+    // hover text carries every exact figure.
+    const sign = this.wizardSide === 'sell' ? 1 : -1;
+    host.innerHTML = this.distAxisHtml([0, 0.5, 1], frac => {
+      const distance = this.wizardSide === 'sell' ? frac : 1 - frac;
+      const pct = sign * distance * axis.span;
+      return `${pct > 0 ? '+' : ''}${pct.toFixed(pct === 0 ? 0 : 1)}%`;
+    });
+  }
+
+  /**
+   * Sit the line on the median row.
+   *
+   * It is placed from the plotted values, not from the drag position, so it can
+   * never claim a level the bars don't show — including mid-drag, where it is
+   * the bars that the pointer is really steering.
+   */
+  private placeDistHandle(rows: DistRow[], values: number[]): void {
+    const handle = document.getElementById('limit-dist-handle');
+    if (!handle) return;
+    const median = this.distMedianIndex(values);
+    const row = rows[median];
+
+    handle.style.bottom = `${((row ? row.frac : 0.5) * 100).toFixed(3)}%`;
+    handle.setAttribute('aria-valuemin', '1');
+    handle.setAttribute('aria-valuemax', String(rows.length));
+    handle.setAttribute('aria-valuenow', String(median + 1));
+    handle.setAttribute('aria-valuetext',
+      `Half the volume rests at step ${median + 1} of ${rows.length} or nearer the market.`);
+
+    const leg = this.legs[median];
+    const market = leg ? this.markets[leg.pair] : undefined;
+    this.setText('limit-dist-grip-tag', leg && leg.price != null && market
+      ? `${this.fmtNum(leg.price, market.priceDecimals)} ${market.quote}`
+      : `Step ${median + 1}`);
+  }
+
+  private renderDistReadback(values: number[], bad: number,
+                             axis: { priced: boolean; span: number }): void {
+    const n = values.length;
+    const median = this.distMedianIndex(values);
+    const nearPct = Math.round(this.distNearShare(values) * 100);
+    const parts: string[] = [];
+
+    if (this.distIsEven()) {
+      parts.push(`Even split — ${n} steps, the same ${this.wizardSide === 'sell'
+        ? 'amount' : 'spend'} on each`);
+    } else {
+      const offset = this.legs[median] ? this.legOffsetPct(this.legs[median]) : null;
+      parts.push(axis.priced && offset != null
+        ? `Half the volume rests within ${Math.abs(offset).toFixed(1)}% of the market`
+        : `Heaviest at step ${median + 1} of ${n}`);
+      parts.push(`${nearPct}% in the near half of the band`);
+    }
+    if (bad > 0) {
+      parts.push(`${bad} step${bad === 1 ? '' : 's'} unplaceable at this shape`);
+    }
+    this.setText('limit-dist-readback', parts.join(' · '));
+    this.setText('limit-dist-metric', this.distMetricLabel());
+    // The panel is shut by default, so the summary has to say whether anything in
+    // there is doing something — otherwise a leaned ladder looks like an even one.
+    this.setText('limit-dist-state', this.distStateLabel());
+
+    const note = document.getElementById('limit-dist-note');
+    if (note) {
+      const warning = this.distMetricWarning();
+      note.textContent = warning;
+      note.classList.toggle('d-none', warning === '');
+    }
+  }
+
+  /** Plain-language shape, for the collapsed summary. */
+  private distStateLabel(): string {
+    if (this.distIsEven()) return 'Even split';
+    if (this.distShape < 0) return 'Weighted to both ends';
+    if (this.distLean <= 0.25) return 'Weighted near the market';
+    if (this.distLean >= 0.75) return 'Weighted far from the market';
+    return 'Weighted to the middle of the band';
+  }
+
+  /** Push the current shape back into the chips and the slider. */
+  private syncDistControls(): void {
+    const presets = LimitOrdersController.DIST_PRESETS;
+    const active = Object.keys(presets).find(name => {
+      const preset = presets[name];
+      // Lean is irrelevant once the shape is flat — every step weighs the same.
+      const leanMatches = Math.abs(preset.shape) < LimitOrdersController.DIST_FLAT_EPSILON
+        || Math.abs(preset.lean - this.distLean) < 0.02;
+      return leanMatches && Math.abs(preset.shape - this.distShape) < 0.02;
+    });
+    document.querySelectorAll('#limit-dist-shapes [data-preset]').forEach(chip => {
+      chip.classList.toggle('active', chip.getAttribute('data-preset') === active);
+    });
+
+    const slider = document.getElementById('limit-dist-shape') as HTMLInputElement | null;
+    if (slider && document.activeElement !== slider) {
+      slider.value = String(Math.round(this.distShape * 100));
+    }
+  }
+
+  // ── Controls ──────────────────────────────────────────────────────────────
+
+  private bindDist(): void {
+    const handle = document.getElementById('limit-dist-handle');
+    const plot = document.getElementById('limit-dist-plot');
+    if (!handle || !plot) return;
+
+    handle.addEventListener('pointerdown', (e) => {
+      const rect = plot.getBoundingClientRect();
+      this.distDrag = {
+        pointerId: e.pointerId,
+        y: e.clientY,
+        lean: this.distLean, shape: this.distShape,
+        height: rect.height || 1,
+        moved: false,
+      };
+      handle.classList.add('is-dragging');
+      // Capture on the handle: the rows underneath are re-rendered on every
+      // frame, so a pointer that wandered onto one would lose its target.
+      try { handle.setPointerCapture(e.pointerId); } catch {}
+      handle.focus();
+      e.preventDefault();
+    });
+
+    handle.addEventListener('pointermove', (e) => {
+      const drag = this.distDrag;
+      if (!drag || e.pointerId !== drag.pointerId) return;
+      const dy = e.clientY - drag.y;
+      // A few pixels of slop, so a click on the handle isn't a shape change.
+      if (!drag.moved && Math.abs(dy) < 3) return;
+      if (!drag.moved) {
+        drag.moved = true;
+        if (Math.abs(drag.shape) < LimitOrdersController.DIST_FLAT_EPSILON) {
+          drag.shape = LimitOrdersController.DIST_SEED_SHAPE;
+          this.distShape = drag.shape;
+        }
+      }
+      // Vertical only, and as a delta from where the drag started: the line's
+      // height is the median row's, which has no fixed mapping to a lean value,
+      // so an absolute mapping would make it jump on grab.
+      this.distLean = this.clampLean(drag.lean + this.distDragDelta(dy) / drag.height);
+      this.queueRedistribute();
+    });
+
+    const endDrag = (e: PointerEvent) => {
+      if (!this.distDrag || e.pointerId !== this.distDrag.pointerId) return;
+      const moved = this.distDrag.moved;
+      this.distDrag = null;
+      handle.classList.remove('is-dragging');
+      // Whatever the live path skipped for speed is caught up here.
+      if (moved) this.flushRedistribute();
+    };
+    handle.addEventListener('pointerup', endDrag);
+    handle.addEventListener('pointercancel', endDrag);
+    handle.addEventListener('keydown', (e) => this.onDistKey(e));
+
+    document.getElementById('limit-dist-shapes')?.addEventListener('click', (e) => {
+      const chip = (e.target as HTMLElement).closest('[data-preset]') as HTMLElement | null;
+      const preset = LimitOrdersController.DIST_PRESETS[chip?.getAttribute('data-preset') || ''];
+      if (!preset) return;
+      this.distLean = preset.lean;
+      this.distShape = preset.shape;
+      this.redistribute(true);
+    });
+
+    const slider = document.getElementById('limit-dist-shape') as HTMLInputElement | null;
+    slider?.addEventListener('input', () => {
+      this.distShape = this.clampShape(parseFloat(slider.value) / 100);
+      // Same coalescing as the drag — `input` on a range fires just as fast.
+      this.queueRedistribute();
+    });
+    slider?.addEventListener('change', () => this.flushRedistribute());
+  }
+
+  /**
+   * Pointer travel to lean travel. Higher price is always up, so "further from
+   * the market" is up for a sell ladder and down for a buy one — the drag has to
+   * follow the picture, not a fixed direction.
+   */
+  private distDragDelta(dy: number): number {
+    return this.wizardSide === 'sell' ? -dy : dy;
+  }
+
+  private onDistKey(e: KeyboardEvent): void {
+    const step = 1 / Math.max(1, this.legs.length);
+    const away = this.wizardSide === 'sell' ? 'ArrowUp' : 'ArrowDown';
+    let handled = true;
+
+    switch (e.key) {
+      case 'ArrowUp':
+      case 'ArrowDown': {
+        // Same reasoning as the drag: an even split has no median to move.
+        if (this.distIsEven()) this.distShape = LimitOrdersController.DIST_SEED_SHAPE;
+        this.distLean = this.clampLean(
+          this.distLean + (e.key === away ? step : -step));
+        break;
+      }
+      case 'Home':
+      case 'End':
+        this.distLean = 0.5;
+        this.distShape = 0;
+        break;
+      default:
+        handled = false;
+    }
+    if (!handled) return;
+    e.preventDefault();
+    this.redistribute(true);
+  }
+
+  /**
+   * Coalesce a drag to one recompute per frame. Pointermove fires far faster
+   * than the ladder can be re-split and redrawn.
+   */
+  private queueRedistribute(): void {
+    if (this.distRaf) return;
+    this.distRaf = window.requestAnimationFrame(() => {
+      this.distRaf = 0;
+      this.redistribute(this.legs.length <= LimitOrdersController.DIST_LIVE_ROW_LIMIT);
+    });
+  }
+
+  private flushRedistribute(): void {
+    if (this.distRaf) {
+      window.cancelAnimationFrame(this.distRaf);
+      this.distRaf = 0;
+    }
+    this.redistribute(true);
+  }
+
+  /**
+   * Re-split the budget and show the result. `rows` off leaves the legs table
+   * alone for a frame — see DIST_LIVE_ROW_LIMIT.
+   */
+  private redistribute(rows: boolean): void {
+    this.splitAmounts();
+    if (rows) for (const leg of this.legs) this.updateLegRow(leg);
+    // Errors don't scroll the modal here: an invalid shape mid-drag would yank
+    // the plot out from under the pointer.
+    this.renderTotals(false);
   }
 
   /** Fresh random price inside each leg's own slice. Amount edits are kept. */
@@ -1726,14 +3188,19 @@ class LimitOrdersController {
     if (!(leg.price! > 0)) return 'Enter a limit price.';
     if (!(leg.amount! > 0)) return 'Enter an amount.';
     if (!this.isOnTick(leg.price!, market.priceTick)) {
-      return `${leg.pair} prices move in ${market.priceTick} increments.`;
+      return `${leg.pair} prices move in ${this.fmtTick(market.priceTick)} increments.`;
     }
     if (!this.isOnTick(leg.amount!, market.amountTick)) {
-      return `${leg.pair} amounts move in ${market.amountTick} increments.`;
+      return `${leg.pair} amounts move in ${this.fmtTick(market.amountTick)} increments.`;
     }
+    // "order size" / "order value" rather than a bare "minimum" on both: the two
+    // limits are separate, published separately, and can differ by an order of
+    // magnitude, so a message has to say which one it means.
     if (market.minAmount > 0 && leg.amount! < market.minAmount) {
       return `${this.fmtNum(leg.amount!, market.amountDecimals)} ${market.base} is below `
-           + `the ${this.fmtNum(market.minAmount, market.amountDecimals)} minimum for ${leg.pair}.`;
+           + `${leg.pair}'s minimum order size of `
+           + `${this.fmtNum(market.minAmount, market.amountDecimals)} ${market.base}`
+           + `${market.minAmountOverridden ? ' (set in Cyrus)' : ''}.`;
     }
     if (market.minCost > 0 && leg.price! * leg.amount! < market.minCost) {
       return `${this.fmtMoney(leg.price! * leg.amount!, market.quote)} is below the `
@@ -1769,9 +3236,13 @@ class LimitOrdersController {
   private validateLegs(): string | null {
     if (this.legs.length === 0) return 'Nothing to place — the ladder is empty.';
 
-    for (let i = 0; i < this.legs.length; i++) {
-      const problem = this.legProblem(this.legs[i]);
-      if (problem) return `Step ${i + 1}: ${problem}`;
+    // Deliberately a count rather than the first problem: renderLegProblems()
+    // spells out every reason next to the rows they belong to, and naming just
+    // one of several here made the other red rows look unexplained.
+    const bad = this.legs.filter(leg => this.legProblem(leg) !== null).length;
+    if (bad > 0) {
+      return `${bad} step${bad === 1 ? '' : 's'} cannot be placed as set — see the `
+           + 'reasons listed under the table.';
     }
 
     if (this.wizardSide === 'sell') {
@@ -1826,6 +3297,97 @@ class LimitOrdersController {
     if (!tbody) return;
     tbody.innerHTML = this.legs.map((leg, i) => this.legRow(leg, i)).join('');
     this.renderTotals();
+  }
+
+  /**
+   * Say why the outlined inputs are outlined.
+   *
+   * A red border on a row means legProblem() rejected it, and one shape change can
+   * redden a dozen rows for two or three different reasons at once. Problems are
+   * grouped by reason with their step numbers, so the fix is obvious without
+   * clicking through every red field to find out what each one wants.
+   */
+  private renderLegProblems(): void {
+    const host = document.getElementById('limit-legs-problems');
+    if (!host) return;
+
+    const groups = new Map<string, number[]>();
+    this.legs.forEach((leg, i) => {
+      const problem = this.legProblem(leg);
+      if (!problem) return;
+      const steps = groups.get(problem) || [];
+      steps.push(i + 1);
+      groups.set(problem, steps);
+    });
+
+    if (groups.size === 0) {
+      host.classList.add('d-none');
+      host.innerHTML = '';
+      return;
+    }
+
+    const total = Array.from(groups.values()).reduce((sum, steps) => sum + steps.length, 0);
+    const one = total === 1;
+    host.classList.remove('d-none');
+    host.innerHTML =
+      `<p class="limit-legs-problems-head">`
+      + `<i class="fa-solid fa-circle-exclamation"></i>`
+      + `<span><strong>${total} step${one ? '' : 's'} outlined in red</strong> — `
+      + `${one ? 'it' : 'they'} cannot be placed as set. Edit the price or amount, or `
+      + `remove the step${one ? '' : 's'} with the &times; button. Nothing is sent until `
+      + `every step is valid.</span></p>`
+      + `<ul class="limit-legs-problems-list">`
+      + Array.from(groups.entries()).map(([problem, steps]) =>
+          `<li><span class="limit-legs-problems-steps">Step${steps.length === 1 ? '' : 's'} `
+          + `${this.escapeHtml(this.formatStepList(steps))}</span>`
+          + `<span>${this.escapeHtml(problem)}</span></li>`).join('')
+      + `</ul>`
+      + this.legProblemsAdvice();
+  }
+
+  /**
+   * The one fix that actually helps when the reason is an exchange minimum.
+   *
+   * Editing a red row can't solve "the balance divided this many ways is too
+   * small" — the count, the budget or the shape has to change. Step 2 blocks the
+   * even-split case, but a lean applied afterwards starves its lightest steps, so
+   * the same advice has to exist here.
+   */
+  private legProblemsAdvice(): string {
+    const afford = this.affordableSteps();
+    if (!afford || afford.max >= this.legs.length) {
+      return this.distIsEven() ? '' :
+        `<p class="limit-legs-problems-tip">Leaning the ladder gives its lightest steps a `
+        + `smaller share, which can push them under the exchange's minimum. `
+        + `<strong>Even split</strong> in Advanced puts them back.</p>`;
+    }
+    return `<p class="limit-legs-problems-tip">`
+      + `${this.escapeHtml(this.stepFloorText(afford.floor))}, so this balance stretches to `
+      + `about <strong>${Math.max(0, afford.max)} step${afford.max === 1 ? '' : 's'}</strong>, `
+      + `not ${this.legs.length}. Go back and lower the step count, raise "Total to use", or `
+      + `remove the steps that fall short.</p>`;
+  }
+
+  /**
+   * "6–8, 12" rather than "6, 7, 8, 12".
+   *
+   * A hard lean on a long ladder can invalidate a run of forty consecutive steps,
+   * and forty comma-separated numbers is not a sentence anybody reads.
+   */
+  private formatStepList(steps: number[]): string {
+    const runs: string[] = [];
+    let start = steps[0];
+    let prev = steps[0];
+    for (const step of steps.slice(1)) {
+      if (step === prev + 1) { prev = step; continue; }
+      runs.push(start === prev ? String(start) : `${start}–${prev}`);
+      start = prev = step;
+    }
+    runs.push(start === prev ? String(start) : `${start}–${prev}`);
+    // Scattered single steps can still make a long list; cap the tail.
+    return runs.length > 6
+      ? `${runs.slice(0, 6).join(', ')} and ${runs.length - 6} more`
+      : runs.join(', ');
   }
 
   private legFor(el: HTMLElement): LimitLeg | undefined {
@@ -1926,7 +3488,12 @@ class LimitOrdersController {
     }
   }
 
-  private renderTotals(): void {
+  /**
+   * `scrollToError` off suppresses the scroll-into-view on the alert. A drag of
+   * the distribution line calls this on every frame, and scrolling the modal body
+   * each time would fight the pointer.
+   */
+  private renderTotals(scrollToError = true): void {
     const summary = document.getElementById('limit-legs-summary');
     if (summary) {
       const lines: string[] = [];
@@ -1958,9 +3525,11 @@ class LimitOrdersController {
     if (label) {
       label.textContent = `Place ${this.legs.length} order${this.legs.length === 1 ? '' : 's'}`;
     }
-    if (problem) this.showModalError(problem); else this.hideModalError();
+    if (problem) this.showModalError(problem, scrollToError); else this.hideModalError();
 
+    this.renderLegProblems();
     this.renderEstimate();
+    this.renderDist();
   }
 
   // ---------------------------------------------------------------------------
@@ -2324,6 +3893,11 @@ class LimitOrdersController {
   // Banners
   // ---------------------------------------------------------------------------
 
+  private setText(id: string, text: string): void {
+    const el = document.getElementById(id);
+    if (el) el.textContent = text;
+  }
+
   private setRefreshLabel(text: string): void {
     const el = document.getElementById('limit-refresh-label');
     if (el) el.textContent = text ? `— ${text}` : '';
@@ -2368,13 +3942,15 @@ class LimitOrdersController {
       this.wizardIsOpen() ? 'limit-modal-error' : 'cancel-order-error');
   }
 
-  private showModalError(message: string): void {
+  private showModalError(message: string, scroll = true): void {
     const el = this.modalErrorEl();
     if (!el) return;
     el.textContent = message;
     el.classList.remove('d-none');
     // The wizard body scrolls, so the alert can sit below the fold on step 3.
-    try { el.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch {}
+    if (scroll) {
+      try { el.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch {}
+    }
   }
 
   private hideModalError(): void {

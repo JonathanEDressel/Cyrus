@@ -107,6 +107,73 @@
       </table>
     </div>
   </div>
+
+  <!-- Where each coin's sell volume is going, one chart per coin.
+       Splitting by coin is what makes the bars comparable: every bar inside one
+       chart is the same asset, so their heights mean something. One chart mixing
+       SHIB and BTC would not. Sell side only — a buy spends its quote currency
+       rather than pouring the coin into it. -->
+  <div class="overview-section limit-flow-section d-none" id="limit-flow-section">
+    <div class="section-header">
+      <h2 class="section-title">What each coin is being sold into</h2>
+      <span class="limit-flow-meta" id="limit-flow-meta"></span>
+    </div>
+
+    <p class="limit-flow-intro" id="limit-flow-intro"></p>
+
+    <!-- Only rendered when more than one exchange is in play; with a single
+         connection the bar colour has nothing to distinguish. -->
+    <div class="limit-flow-legend d-none" id="limit-flow-legend"></div>
+
+    <div class="limit-flow-charts" id="limit-flow-charts"></div>
+
+    <p class="limit-dist-hint">
+      <i class="fa-solid fa-circle-info"></i>
+      <span>
+        One chart per coin, one bar per trading pair it is resting against. Bars count
+        the volume still waiting to fill, so a partly filled order contributes only its
+        remainder. Hover or tab to a bar for the proceeds, the order count and which
+        exchange it sits on.
+      </span>
+    </p>
+  </div>
+
+  <!-- The same picture for orders that are already resting — read only, because
+       these are live on the exchange. A real price histogram rather than one bar
+       per order: orders bunched at one price have to look bunched. One pair at a
+       time, since volumes are in the base coin. Follows the Buy/Sell tab and the
+       filters above. -->
+  <div class="overview-section limit-shape-section d-none" id="limit-shape-section">
+    <div class="section-header">
+      <h2 class="section-title" id="limit-shape-title">Where your resting orders sit</h2>
+      <select id="limit-shape-pair" class="limit-filter-select"
+              aria-label="Which pair to show the distribution for"></select>
+    </div>
+
+    <p class="limit-shape-intro" id="limit-shape-intro"></p>
+
+    <div class="limit-dist-frame">
+      <div class="limit-dist-yaxis" id="limit-shape-yaxis"></div>
+      <div class="limit-dist-plot is-static" id="limit-shape-plot">
+        <div class="limit-dist-bars" id="limit-shape-bars"></div>
+        <div class="limit-dist-market d-none" id="limit-shape-market">
+          <span class="limit-dist-market-label" id="limit-shape-market-label"></span>
+        </div>
+      </div>
+    </div>
+
+    <p class="limit-dist-readback" id="limit-shape-readback"></p>
+
+    <p class="limit-dist-hint">
+      <i class="fa-solid fa-circle-info"></i>
+      <span>
+        Price runs down the side and each row is one slice of it, so orders bunched at the
+        same price draw as one long bar rather than several evenly spaced ones. Bars count
+        the volume still waiting to fill. Hover a row for its price range and the orders
+        inside it.
+      </span>
+    </p>
+  </div>
 </div>
 
 <!-- Cancel confirmation modal -->
@@ -275,8 +342,8 @@
           <div id="limit-params-ladder">
             <div class="form-row">
               <div class="form-group">
-                <label for="limit-steps" data-help="How many resting orders to create. Each is a separate order on the exchange and must be cancelled individually.">Number of steps</label>
-                <input type="number" id="limit-steps" min="2" max="25" step="1" value="8">
+                <label for="limit-steps" data-help="How many resting orders to create. Each is a separate order on the exchange and must be cancelled individually. You get 50 steps per trading pair selected, so two pairs allow 100.">Number of steps</label>
+                <input type="number" id="limit-steps" min="2" max="50" step="1" value="8">
                 <span class="form-hint" id="limit-steps-hint"></span>
               </div>
               <div class="form-group">
@@ -353,6 +420,76 @@
         <div class="wizard-step d-none" id="limit-step-review">
           <p class="wizard-step-intro">Every price and amount below is editable. Nothing is sent until you confirm.</p>
 
+          <!-- How the total is shared out across the rungs, drawn the way an order
+               book is: price down the side, volume across. The only draggable thing
+               is the line across the median row — dragging it up or down moves the
+               price level that half your volume sits inside. Shape (how tightly the
+               volume clusters around it) is on the chips and the slider, so a drag
+               can only ever do one thing. -->
+          <details class="limit-dist d-none" id="limit-dist">
+            <summary class="limit-dist-summary">
+              <i class="fa-solid fa-sliders"></i>
+              <span>Advanced &mdash; shape how the volume is spread</span>
+              <span class="limit-dist-state" id="limit-dist-state"></span>
+            </summary>
+
+            <div class="limit-dist-body">
+            <p class="limit-dist-lede">
+              Each row is one step, at its own distance from the market. Bar length is what
+              that step commits &mdash; <span id="limit-dist-metric"></span>.
+            </p>
+
+            <div class="limit-dist-shapes" id="limit-dist-shapes">
+              <button type="button" class="limit-shape-chip" data-preset="even"
+                      title="The same amount on every step.">Even</button>
+              <button type="button" class="limit-shape-chip" data-preset="near"
+                      title="Most of the volume on the steps closest to the market — fills sooner, at worse prices.">Near market</button>
+              <button type="button" class="limit-shape-chip" data-preset="far"
+                      title="Most of the volume on the steps furthest from the market — better prices, less likely to fill.">Far out</button>
+              <button type="button" class="limit-shape-chip" data-preset="middle"
+                      title="Volume piled up in the middle of the band.">Middle</button>
+              <button type="button" class="limit-shape-chip" data-preset="ends"
+                      title="Volume at both extremes and little in between.">Both ends</button>
+            </div>
+
+            <div class="limit-dist-frame">
+              <div class="limit-dist-yaxis" id="limit-dist-yaxis"></div>
+              <div class="limit-dist-plot" id="limit-dist-plot">
+                <div class="limit-dist-bars" id="limit-dist-bars"></div>
+                <div class="limit-dist-market d-none" id="limit-dist-market">
+                  <span class="limit-dist-market-label" id="limit-dist-market-label"></span>
+                </div>
+                <div class="limit-dist-handle" id="limit-dist-handle" tabindex="0"
+                     role="slider" aria-valuemin="1" aria-valuemax="1" aria-valuenow="1"
+                     aria-label="Median price level — drag up or down to move where half the volume sits">
+                  <span class="limit-dist-grip" aria-hidden="true"></span>
+                  <span class="limit-dist-grip-tag" id="limit-dist-grip-tag"></span>
+                </div>
+              </div>
+            </div>
+
+            <p class="limit-dist-readback" id="limit-dist-readback"></p>
+
+            <div class="limit-dist-slider">
+              <span>Both ends</span>
+              <input type="range" id="limit-dist-shape" min="-100" max="100" step="1" value="0"
+                     aria-label="How tightly the volume clusters: negative pushes it to both ends of the band">
+              <span>Concentrated</span>
+            </div>
+
+            <p class="limit-dist-hint">
+              <i class="fa-solid fa-hand-pointer"></i>
+              <span>
+                Drag the bright line <strong>up or down</strong> to move the level half your volume
+                rests inside. Leaning a ladder moves volume between steps &mdash; it never adds any,
+                so the total still comes out of the same balance.
+              </span>
+            </p>
+
+            <p class="limit-dist-note d-none" id="limit-dist-note"></p>
+            </div>
+          </details>
+
           <div class="limit-legs-toolbar">
             <span class="limit-legs-estimate" id="limit-estimate"></span>
             <span class="limit-legs-spacer"></span>
@@ -361,7 +498,7 @@
               <i class="fa-solid fa-dice"></i> Regenerate prices
             </button>
             <button type="button" class="btn-secondary limit-btn-sm" id="limit-reset-legs"
-                    title="Rebuild the whole ladder from step 2, discarding every edit.">
+                    title="Rebuild the whole ladder from step 2, discarding every edit. Keeps the distribution shape — use Even split to flatten that.">
               <i class="fa-solid fa-rotate-left"></i> Reset
             </button>
           </div>
@@ -382,6 +519,12 @@
               <tbody id="limit-legs-tbody"></tbody>
             </table>
           </div>
+
+          <!-- Why some inputs above have a red outline. The alert at the bottom of
+               the modal only ever names one problem; a hard lean can invalidate a
+               dozen steps for two or three different reasons, so they're grouped
+               and spelled out here, next to the rows they belong to. -->
+          <div class="limit-legs-problems d-none" id="limit-legs-problems"></div>
 
           <div class="limit-legs-summary" id="limit-legs-summary"></div>
 

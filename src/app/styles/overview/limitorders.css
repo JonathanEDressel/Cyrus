@@ -1001,3 +1001,718 @@ body.theme-light .limit-wizard-blocker {
 .limit-progress-row.limit-progress-failed td {
   color: #ef4444;
 }
+
+/* ── Chart palette ───────────────────────────────────────────────────
+ * Chart data is deliberately NOT the red/green used by the side tabs and the
+ * .side-buy/.side-sell labels. Those colours mean "this is a sell"; on a bar
+ * they read as loss or danger, which is wrong for a mark that only says "this
+ * is where your volume sits". The side is already named by the tab, the section
+ * titles and every axis label, so the charts don't need to shout it again.
+ *
+ * Violet and indigo are close enough to feel like one family — the two never
+ * appear on screen together, since the tab switches between them — and neither
+ * collides with the amber used for warnings or the cyan used for controls. */
+#limit-orders-page,
+.create-limit-modal {
+  --chart-sell: 139, 92, 246;      /* violet  */
+  --chart-buy: 99, 102, 241;       /* indigo  */
+  --chart-sell-ink: 109, 40, 217;  /* darker, for light-theme text */
+}
+
+/* ── Volume distribution plots ───────────────────────────────────────
+ * One chart, used twice: the draggable one on the wizard's review step and the
+ * read-only histogram under the orders table.
+ *
+ * Laid out the way an order book is — price down the side, volume across — so a
+ * row is positioned by price and sized by volume. That's what lets the market
+ * price be a real line on the axis instead of something the reader has to infer,
+ * and what makes the drag handle a price level rather than an abstract offset.
+ *
+ * Rows carry no labels of their own: the axis names the levels and every row has
+ * a title, which is what keeps a 250-rung ladder legible. */
+.limit-dist {
+  border: 1px solid var(--border-primary);
+  border-radius: 10px;
+  margin-bottom: 1rem;
+  background: var(--bg-tertiary);
+}
+
+/* Shut by default: an even split is what most ladders want, and the shape
+ * controls are a detour for everyone else. Matches .limit-liquidity below. */
+.limit-dist-summary {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.7rem 0.9rem;
+  cursor: pointer;
+  font-size: 0.83rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  list-style: none;
+}
+
+.limit-dist-summary::-webkit-details-marker {
+  display: none;
+}
+
+.limit-dist-summary i {
+  color: var(--accent-cyan);
+}
+
+.limit-dist-summary::after {
+  content: '\f078';
+  font-family: 'Font Awesome 6 Free';
+  font-weight: 900;
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  transition: transform 0.2s;
+}
+
+.limit-dist[open] .limit-dist-summary::after {
+  transform: rotate(180deg);
+}
+
+/* Says what the shut panel is currently doing, so a leaned ladder can't hide. */
+.limit-dist-state {
+  margin-left: auto;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  background: var(--hover-overlay);
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.limit-dist-body {
+  padding: 0.75rem 0.9rem 0.85rem;
+  border-top: 1px solid var(--border-primary);
+}
+
+.limit-dist-lede {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--text-dim);
+}
+
+.limit-dist-lede span {
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+/* ── Named shapes ────────────────────────────────────────────────────
+ * These carry the shape so the drag can stay single-axis. Two axes on one
+ * handle meant every attempt to move the median also nudged the spread. */
+.limit-dist-shapes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.7rem;
+}
+
+.limit-shape-chip {
+  padding: 0.28rem 0.6rem;
+  border: 1px solid var(--border-primary);
+  border-radius: 999px;
+  background: var(--input-bg);
+  color: var(--text-muted);
+  font-size: 0.76rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
+}
+
+.limit-shape-chip:hover {
+  border-color: var(--border-secondary);
+  color: var(--text-secondary);
+}
+
+.limit-shape-chip.active {
+  border-color: var(--accent-cyan);
+  background: rgba(6, 182, 212, 0.12);
+  color: var(--accent-cyan);
+}
+
+/* ── The plot itself ─────────────────────────────────────────────────
+ * The frame owns the height so the axis gutter and the plot can't drift out of
+ * alignment — every tick is positioned as a percentage of the same box. */
+.limit-dist-frame {
+  display: flex;
+  gap: 0.45rem;
+  height: 210px;
+  margin-top: 0.8rem;
+}
+
+.limit-shape-section .limit-dist-frame {
+  height: 250px;
+  margin-top: 0.6rem;
+}
+
+.limit-dist-yaxis {
+  position: relative;
+  flex: 0 0 auto;
+  width: 78px;
+}
+
+.limit-dist-tick {
+  position: absolute;
+  right: 0;
+  transform: translateY(50%);
+  font-size: 0.68rem;
+  line-height: 1;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.limit-dist-plot {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  border-left: 1px solid var(--border-primary);
+  border-bottom: 1px solid var(--border-primary);
+}
+
+.limit-dist-bars {
+  position: absolute;
+  inset: 0;
+}
+
+.limit-dist-row {
+  position: absolute;
+  left: 0;
+  min-height: 2px;
+  max-height: 14px;
+  border-radius: 0 3px 3px 0;
+  background: var(--text-dim);
+  transform: translateY(50%);
+  transition: filter 0.12s;
+}
+
+.limit-dist-plot.is-buy .limit-dist-row {
+  background: linear-gradient(90deg, rgba(var(--chart-buy), 0.85), rgba(var(--chart-buy), 0.3));
+}
+
+.limit-dist-plot.is-sell .limit-dist-row {
+  background: linear-gradient(90deg, rgba(var(--chart-sell), 0.85), rgba(var(--chart-sell), 0.3));
+}
+
+.limit-dist-row:hover {
+  filter: brightness(1.35);
+}
+
+/* Histogram rows should read as slices of the axis, so they're allowed to fill
+ * more of their band than a ladder's rungs — which are single price levels and
+ * would overstate themselves if drawn thick. */
+.limit-dist-plot.is-static .limit-dist-row {
+  max-height: 28px;
+}
+
+/* A step that can't be placed as it stands — usually below the exchange
+ * minimum after a hard lean. The table row says which and why. */
+.limit-dist-plot .limit-dist-row.is-bad {
+  background: repeating-linear-gradient(
+    45deg,
+    rgba(245, 158, 11, 0.6) 0, rgba(245, 158, 11, 0.6) 3px,
+    rgba(245, 158, 11, 0.18) 3px, rgba(245, 158, 11, 0.18) 6px);
+}
+
+/* ── Market price marker ─────────────────────────────────────────────── */
+.limit-dist-market {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 0;
+  border-top: 1px dashed rgba(245, 158, 11, 0.85);
+  pointer-events: none;
+  z-index: 2;
+}
+
+.limit-dist-market-label {
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(245, 158, 11, 0.16);
+  color: #f59e0b;
+  font-size: 0.68rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* ── The one draggable thing: the median price line ──────────────────── */
+.limit-dist-handle {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 22px;
+  /* `bottom` is set per render from the median row's own position, so the line
+   * can never sit anywhere the bars don't put it. */
+  transform: translateY(50%);
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  cursor: ns-resize;
+  z-index: 3;
+  touch-action: none;
+}
+
+.limit-dist-grip {
+  flex: 1;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--accent-cyan);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35), 0 0 8px rgba(6, 182, 212, 0.5);
+  transition: height 0.12s, box-shadow 0.12s;
+}
+
+.limit-dist-grip-tag {
+  flex: 0 0 auto;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--accent-cyan);
+  color: #04222a;
+  font-size: 0.68rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.limit-dist-handle:hover .limit-dist-grip,
+.limit-dist-handle.is-dragging .limit-dist-grip {
+  height: 5px;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35), 0 0 12px rgba(6, 182, 212, 0.8);
+}
+
+.limit-dist-handle.is-dragging {
+  cursor: grabbing;
+}
+
+.limit-dist-handle:focus-visible {
+  outline: none;
+}
+
+.limit-dist-handle:focus-visible .limit-dist-grip {
+  height: 5px;
+  box-shadow: 0 0 0 2px var(--accent-cyan), 0 0 12px rgba(6, 182, 212, 0.8);
+}
+
+.limit-dist-readback {
+  margin: 0.5rem 0 0;
+  color: var(--text-muted);
+  font-size: 0.76rem;
+  font-weight: 600;
+}
+
+.limit-dist-slider {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 0.7rem;
+  font-size: 0.72rem;
+  color: var(--text-dim);
+}
+
+.limit-dist-slider input[type="range"] {
+  flex: 1;
+  min-width: 0;
+  accent-color: var(--accent-cyan);
+  cursor: pointer;
+}
+
+.limit-dist-hint {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin: 0.7rem 0 0;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: var(--text-dim);
+}
+
+.limit-dist-hint i {
+  margin-top: 0.2rem;
+  color: var(--accent-cyan);
+}
+
+.limit-dist-hint strong {
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+/* Only shown when the bars are measured in currencies that can't share a scale
+ * — a buy ladder rotating across, say, USDT and BTC. */
+.limit-dist-note {
+  margin: 0.5rem 0 0;
+  padding: 0.5rem 0.7rem;
+  border-radius: 8px;
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.25);
+  color: #f59e0b;
+  font-size: 0.76rem;
+  line-height: 1.45;
+}
+
+/* ── Read-only plot under the orders table ───────────────────────────── */
+.limit-shape-section .section-header {
+  gap: 1rem;
+}
+
+.limit-shape-intro {
+  margin: 0 0 0.2rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+/* ── Light theme ─────────────────────────────────────────────────────── */
+body.theme-light .limit-dist {
+  background: var(--bg-primary);
+}
+
+body.theme-light .limit-dist-note {
+  color: #b45309;
+}
+
+body.theme-light .limit-dist-market-label {
+  color: #b45309;
+}
+
+body.theme-light .limit-dist-grip {
+  box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.18), 0 0 8px rgba(6, 182, 212, 0.35);
+}
+
+body.theme-light .limit-dist-handle:hover .limit-dist-grip,
+body.theme-light .limit-dist-handle.is-dragging .limit-dist-grip {
+  box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.18), 0 0 12px rgba(6, 182, 212, 0.55);
+}
+/* ── Why some inputs are outlined red ────────────────────────────────
+ * .limit-leg-bad puts a red border on a step's price and amount inputs. That's
+ * a signal, not an explanation — this panel is the explanation, and it sits
+ * directly under the table so the reasons and the rows are read together. */
+.limit-legs-problems {
+  margin-top: 0.85rem;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 8px;
+  background: rgba(239, 68, 68, 0.07);
+}
+
+.limit-legs-problems-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.limit-legs-problems-head i {
+  margin-top: 0.15rem;
+  color: #ef4444;
+}
+
+.limit-legs-problems-head strong {
+  color: #ef4444;
+  font-weight: 700;
+}
+
+.limit-legs-problems-list {
+  margin: 0.55rem 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.limit-legs-problems-list li {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+/* Fixed width so the reasons line up in a column and read as a list. */
+.limit-legs-problems-steps {
+  flex: 0 0 auto;
+  min-width: 5.5rem;
+  padding: 0.05rem 0.4rem;
+  border-radius: 6px;
+  background: rgba(239, 68, 68, 0.14);
+  color: #ef4444;
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+body.theme-light .limit-legs-problems-head strong,
+body.theme-light .limit-legs-problems-steps,
+body.theme-light .limit-legs-problems-head i {
+  color: #b91c1c;
+}
+
+/* The actionable line under the reason list — what to change, not what's wrong. */
+.limit-legs-problems-tip {
+  margin: 0.6rem 0 0;
+  padding-top: 0.55rem;
+  border-top: 1px solid rgba(239, 68, 68, 0.2);
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.limit-legs-problems-tip strong {
+  color: var(--text-secondary);
+  font-weight: 700;
+}
+
+/* ── Pair loading ────────────────────────────────────────────────────
+ * Replaces the chips outright rather than sitting beside them: the previous
+ * coin's markets are not a preview of the next coin's. Its own keyframes rather
+ * than Font Awesome's fa-spin, matching how home.css does it. */
+.limit-quote-loading {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  /* Roughly a chip's height, so swapping in the real chips doesn't jump. */
+  min-height: 2.6rem;
+  font-size: 0.83rem;
+  color: var(--text-dim);
+}
+
+.limit-spinner {
+  color: var(--accent-cyan);
+  animation: limit-spin 0.9s linear infinite;
+}
+
+@keyframes limit-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Respect a reduced-motion preference: keep the icon, drop the rotation. */
+@media (prefers-reduced-motion: reduce) {
+  .limit-spinner { animation: none; }
+}
+
+/* ── Sell flow charts ────────────────────────────────────────────────
+ * One card per coin, one column per pair it is being sold into. Vertical
+ * columns rather than the horizontal rows used by the price plots above: this
+ * one compares named categories, not price levels, and a value label sitting on
+ * top of a column is the most direct way to read a total. */
+.limit-flow-meta {
+  font-size: 0.78rem;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.limit-flow-intro {
+  margin: 0 0 0.9rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.limit-flow-charts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 0.85rem;
+}
+
+.limit-flow-chart {
+  border: 1px solid var(--border-primary);
+  border-radius: 10px;
+  padding: 0.8rem 0.9rem 0.7rem;
+  background: var(--bg-tertiary);
+  transition: border-color 0.15s;
+}
+
+.limit-flow-chart:hover {
+  border-color: var(--border-secondary);
+}
+
+.limit-flow-chart-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.55rem;
+  margin-bottom: 0.35rem;
+}
+
+.limit-flow-coin {
+  padding: 0.12rem 0.5rem;
+  border-radius: 999px;
+  background: var(--hover-overlay);
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}
+
+.limit-flow-chart-total {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.limit-flow-chart-total em {
+  font-style: normal;
+  font-weight: 500;
+  color: var(--text-dim);
+}
+
+/* Scrolls rather than crushing when a coin rests against many pairs. */
+.limit-flow-plot {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.55rem;
+  padding-top: 1.4rem;
+  overflow-x: auto;
+  overflow-y: visible;
+}
+
+.limit-flow-col {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 54px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  cursor: default;
+}
+
+/* Fixed height so every column in a chart shares one scale. */
+.limit-flow-slot {
+  width: 100%;
+  height: 132px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.limit-flow-value {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  transition: color 0.15s;
+}
+
+.limit-flow-bar {
+  width: 100%;
+  max-width: 46px;
+  min-height: 3px;
+  border-radius: 4px 4px 0 0;
+  background: linear-gradient(180deg, rgba(var(--flow-hue), 0.92), rgba(var(--flow-hue), 0.34));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  transition: filter 0.15s, transform 0.15s;
+  transform-origin: bottom;
+}
+
+.limit-flow-label {
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  white-space: nowrap;
+  padding-top: 0.3rem;
+  border-top: 1px solid var(--border-primary);
+  width: 100%;
+  text-align: center;
+  transition: color 0.15s;
+}
+
+.limit-flow-col:hover .limit-flow-bar {
+  filter: brightness(1.25);
+  transform: scaleX(1.04);
+}
+
+.limit-flow-col:hover .limit-flow-value,
+.limit-flow-col:hover .limit-flow-label {
+  color: var(--text-primary);
+}
+
+body.theme-light .limit-flow-chart {
+  background: var(--bg-primary);
+}
+
+
+/* The combined payout, shown only when every bar is dollar-priced. */
+.limit-flow-chart-payout {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Replaces the combined total when the quotes aren't the same money. */
+.limit-flow-note {
+  margin: 0.6rem 0 0;
+  font-size: 0.72rem;
+  line-height: 1.45;
+  color: var(--text-dim);
+}
+
+/* ── Bar colour = exchange ───────────────────────────────────────────
+ * Reuses the hues behind .exchange-* in main.css, so a bar and the badge on the
+ * same order's table row read as the same venue. Attribute selectors rather
+ * than a class per exchange: unknown venues simply keep the default below. */
+.limit-flow-col {
+  --flow-hue: 139, 92, 246;
+}
+
+.limit-flow-col[data-exchange="kraken"]           { --flow-hue: 139, 92, 246; }
+.limit-flow-col[data-exchange="coinbase"]         { --flow-hue: 59, 130, 246; }
+.limit-flow-col[data-exchange="coinbaseadvanced"] { --flow-hue: 59, 130, 246; }
+.limit-flow-col[data-exchange="binance"]          { --flow-hue: 234, 179, 8; }
+.limit-flow-col[data-exchange="robinhood"]        { --flow-hue: 34, 197, 94; }
+
+/* Which venue a column belongs to, under its quote. Shown only when more than
+ * one exchange is present — otherwise every bar would repeat the same word. */
+.limit-flow-venue {
+  display: block;
+  margin-top: 0.1rem;
+  font-size: 0.66rem;
+  font-weight: 600;
+  color: rgb(var(--flow-hue));
+  opacity: 0.85;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.limit-flow-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.9rem;
+  margin: 0 0 0.85rem;
+}
+
+.limit-flow-key {
+  --flow-hue: 139, 92, 246;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.limit-flow-key[data-exchange="kraken"]           { --flow-hue: 139, 92, 246; }
+.limit-flow-key[data-exchange="coinbase"]         { --flow-hue: 59, 130, 246; }
+.limit-flow-key[data-exchange="coinbaseadvanced"] { --flow-hue: 59, 130, 246; }
+.limit-flow-key[data-exchange="binance"]          { --flow-hue: 234, 179, 8; }
+.limit-flow-key[data-exchange="robinhood"]        { --flow-hue: 34, 197, 94; }
+
+.limit-flow-key i {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  background: linear-gradient(180deg, rgba(var(--flow-hue), 0.92), rgba(var(--flow-hue), 0.34));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .limit-flow-bar { transition: none; }
+}
