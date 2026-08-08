@@ -267,6 +267,18 @@ class LimitOrdersController {
 
   private unsubscribe: (() => void) | null = null;
   private side: 'buy' | 'sell' = 'buy';
+
+  /**
+   * Ticked rows, keyed `connectionId:orderId` — an order id is only unique
+   * within its own exchange, so the bare id would collide across connections.
+   *
+   * Kept intersected with the visible rows on every render (see
+   * `pruneSelection`). Selection you cannot see is selection you cannot check,
+   * and this set feeds a bulk cancel.
+   */
+  private selected = new Set<string>();
+  private bulkPending: LimitOrder[] = [];
+  private bulkRunning = false;
   /** The order the confirm modal is currently asking about. */
   private pending: LimitOrder | null = null;
   private cancelling = false;
@@ -347,8 +359,11 @@ class LimitOrdersController {
     this.bindSideTabs();
     this.bindFilters();
     this.bindSorting();
+    this.bindSelection();
     this.bindShapePicker();
     this.bindModal();
+    this.bindDetailsModal();
+    this.bindBulkModal();
     this.bindWizard();
     this.bindDist();
     this.render();
@@ -425,6 +440,38 @@ class LimitOrdersController {
   /** The rows actually shown: current side, filtered, then sorted. */
   private visibleOrders(): LimitOrder[] {
     return this.sortOrders(this.filteredForSide(this.side));
+  }
+
+  // ---------------------------------------------------------------------------
+  // Selection
+  // ---------------------------------------------------------------------------
+
+  /** Order ids repeat across exchanges, so the connection has to be in the key. */
+  private selectionKey(order: LimitOrder): string {
+    return `${order.connectionId}:${order.id}`;
+  }
+
+  /**
+   * Drop anything ticked that the user can no longer see.
+   *
+   * Runs on every render, which covers all three ways a selection can go stale:
+   * a filter or side tab hiding a row, and the background poll finding an order
+   * already filled or cancelled elsewhere. The alternative — remembering hidden
+   * selections — means "Cancel selected" can act on orders that are not on
+   * screen, which for an irreversible action is not a trade worth making.
+   */
+  private pruneSelection(visible: LimitOrder[]): void {
+    if (this.selected.size === 0) return;
+    const live = new Set(visible.map(o => this.selectionKey(o)));
+    for (const key of Array.from(this.selected)) {
+      if (!live.has(key)) this.selected.delete(key);
+    }
+  }
+
+  private selectedOrders(): LimitOrder[] {
+    // Read back off the visible list rather than a stored copy, so the orders
+    // handed to a bulk cancel are the ones the store currently holds.
+    return this.visibleOrders().filter(o => this.selected.has(this.selectionKey(o)));
   }
 
   private sortValue(o: LimitOrder, key: SortKey): number | string {
@@ -529,6 +576,111 @@ class LimitOrdersController {
     });
   }
 
+  /**
+   * Selection, row-details and bulk-action wiring.
+   *
+   * All delegated and bound once. `#limit-tbody` and `#limit-thead` are in the
+   * view and only ever have their innerHTML replaced, so the elements
+   * themselves survive every render — per-render binding would be churn, and
+   * would accumulate handlers on the header.
+   */
+  private bindSelection(): void {
+    const tbody = document.getElementById('limit-tbody');
+
+    tbody?.addEventListener('change', (e) => {
+      const box = (e.target as HTMLElement).closest('[data-select-key]') as HTMLInputElement | null;
+      if (!box) return;
+      const key = box.getAttribute('data-select-key') || '';
+      if (box.checked) this.selected.add(key);
+      else this.selected.delete(key);
+      // Patch the affected UI rather than re-rendering: a full render rebuilds
+      // the tbody underneath the click that is still being processed.
+      this.syncSelectionUi();
+    });
+
+    tbody?.addEventListener('click', (e) => {
+      const target = e.target as HTMLElement;
+      // The checkbox and the Cancel button own their cells. A click there is
+      // not a request to read the order.
+      if (target.closest('.limit-select-col') || target.closest('.limit-actions-col')) return;
+      const row = target.closest('[data-order-key]') as HTMLElement | null;
+      if (!row) return;
+      this.openDetailsByKey(row.getAttribute('data-order-key') || '');
+    });
+
+    // Rows are focusable, so they answer to the keyboard too.
+    tbody?.addEventListener('keydown', (e) => {
+      const ke = e as KeyboardEvent;
+      if (ke.key !== 'Enter' && ke.key !== ' ') return;
+      const target = ke.target as HTMLElement;
+      // Space on a focused checkbox is the browser toggling it — leave it be.
+      if (target.closest('.limit-select-col') || target.closest('.limit-actions-col')) return;
+      const row = target.closest('[data-order-key]') as HTMLElement | null;
+      if (!row) return;
+      ke.preventDefault();
+      this.openDetailsByKey(row.getAttribute('data-order-key') || '');
+    });
+
+    document.getElementById('limit-thead')?.addEventListener('change', (e) => {
+      if ((e.target as HTMLElement).id !== 'limit-select-all') return;
+      const box = e.target as HTMLInputElement;
+      // Scoped to the filtered rows on purpose — see the note in renderHead.
+      const visible = this.visibleOrders();
+      for (const order of visible) {
+        if (box.checked) this.selected.add(this.selectionKey(order));
+        else this.selected.delete(this.selectionKey(order));
+      }
+      // Patch rather than render: rebuilding the header would replace the
+      // checkbox mid-click and drop keyboard focus.
+      this.syncSelectionUi();
+    });
+
+    document.getElementById('limit-bulk-clear')?.addEventListener('click', () => {
+      this.selected.clear();
+      this.syncSelectionUi();
+    });
+
+    document.getElementById('limit-bulk-cancel')?.addEventListener('click', () => {
+      this.openBulkModal();
+    });
+  }
+
+  /** Repaint the tri-state header box, row highlights and the bulk bar. */
+  private syncSelectionUi(): void {
+    const visible = this.visibleOrders();
+    const count = visible.filter(o => this.selected.has(this.selectionKey(o))).length;
+
+    const selectAll = document.getElementById('limit-select-all') as HTMLInputElement | null;
+    if (selectAll) {
+      selectAll.checked = visible.length > 0 && count === visible.length;
+      selectAll.indeterminate = count > 0 && count < visible.length;
+    }
+
+    document.querySelectorAll('#limit-tbody tr[data-order-key]').forEach((row) => {
+      const key = row.getAttribute('data-order-key') || '';
+      const on = this.selected.has(key);
+      row.classList.toggle('limit-row-selected', on);
+      // Drive the box from state too, so select-all can run through here
+      // instead of re-rendering the table out from under the click.
+      const box = row.querySelector('[data-select-key]') as HTMLInputElement | null;
+      if (box && box.checked !== on) box.checked = on;
+    });
+
+    this.renderBulkBar(count);
+  }
+
+  private renderBulkBar(count: number): void {
+    const bar = document.getElementById('limit-bulk-bar');
+    if (!bar) return;
+    bar.classList.toggle('d-none', count === 0);
+    if (count === 0) return;
+
+    const label = document.getElementById('limit-bulk-count');
+    if (label) label.textContent = `${count} order${count === 1 ? '' : 's'} selected`;
+    const button = document.getElementById('limit-bulk-cancel-label');
+    if (button) button.textContent = count === 1 ? 'Cancel 1 order' : `Cancel ${count} orders`;
+  }
+
   private render(): void {
     const isAll = ExchangeStore.isAllMode();
     const error = ExchangeStore.error;
@@ -548,6 +700,9 @@ class LimitOrdersController {
 
     // Runs before the rows are computed: it can clear a stale exchange filter.
     this.renderToolbar(isAll);
+    // Then prune, because that filter change moves what counts as visible — and
+    // the header checkbox rendered next reads the pruned selection.
+    this.pruneSelection(this.visibleOrders());
     this.renderHead(isAll);
     this.updateTabCounts();
 
@@ -561,6 +716,7 @@ class LimitOrdersController {
 
     const orders = this.visibleOrders();
     this.renderRows(orders, isAll);
+    this.renderBulkBar(orders.filter(o => this.selected.has(this.selectionKey(o))).length);
     this.updateCountTitle(orders.length);
     this.renderFilterMeta(orders.length);
     this.renderFlow();
@@ -625,7 +781,24 @@ class LimitOrdersController {
   private renderHead(isAll: boolean): void {
     const thead = document.getElementById('limit-thead');
     if (!thead) return;
+    // The select-all box covers the FILTERED rows, not every order — it sits
+    // below the filter controls and ticking it must never reach past what the
+    // filter is showing. The label says so explicitly.
+    const visible = this.visibleOrders();
+    const selectedCount = visible.filter(o => this.selected.has(this.selectionKey(o))).length;
+    const allChecked = visible.length > 0 && selectedCount === visible.length;
+    const someChecked = selectedCount > 0 && !allChecked;
+    const selectAllTitle = visible.length === 0
+      ? 'No orders to select'
+      : this.isFiltering()
+        ? `Select all ${visible.length} filtered order${visible.length === 1 ? '' : 's'}`
+        : `Select all ${visible.length} ${this.side} order${visible.length === 1 ? '' : 's'}`;
+
     const cols = [
+      `<th class="limit-select-col">`
+        + `<input type="checkbox" id="limit-select-all" class="limit-row-check"`
+        + ` aria-label="${this.escapeAttr(selectAllTitle)}" title="${this.escapeAttr(selectAllTitle)}"`
+        + `${allChecked ? ' checked' : ''}${visible.length === 0 ? ' disabled' : ''}></th>`,
       ...(isAll ? [this.sortableTh('exchange', 'Exchange')] : []),
       this.sortableTh('pair', 'Pair'),
       this.sortableTh('price', 'Limit Price'),
@@ -637,6 +810,11 @@ class LimitOrdersController {
       '<th class="limit-actions-col">Action</th>',
     ];
     thead.innerHTML = `<tr>${cols.join('')}</tr>`;
+
+    // `indeterminate` is a property, not an attribute — it cannot be set in the
+    // markup above and has to be applied after the node exists.
+    const selectAll = document.getElementById('limit-select-all') as HTMLInputElement | null;
+    if (selectAll) selectAll.indeterminate = someChecked;
   }
 
   private sortableTh(key: SortKey, label: string): string {
@@ -1081,7 +1259,8 @@ class LimitOrdersController {
     const tbody = document.getElementById('limit-tbody');
     if (!tbody) return;
 
-    const colspan = isAll ? 9 : 8;
+    // +1 for the select column added ahead of everything else.
+    const colspan = isAll ? 10 : 9;
     if (orders.length === 0) {
       const state = this.loadState();
       const message = state === 'no-connection'
@@ -1109,7 +1288,16 @@ class LimitOrdersController {
         ? `<td><span class="exchange-badge exchange-${this.escapeAttr(o.exchangeName).toLowerCase()}">${this.escapeHtml(o.exchangeName)}</span></td>`
         : '';
       const partial = this.filledFraction(o) > 0;
-      return `<tr>
+      const key = this.selectionKey(o);
+      const checked = this.selected.has(key);
+      return `<tr class="limit-row${checked ? ' limit-row-selected' : ''}"
+        data-order-key="${this.escapeAttr(key)}" tabindex="0"
+        title="Click for full order details">
+        <td class="limit-select-col">
+          <input type="checkbox" class="limit-row-check" data-select-key="${this.escapeAttr(key)}"
+                 aria-label="Select ${this.escapeAttr(o.pair)} order ${this.escapeAttr(o.id)}"
+                 ${checked ? 'checked' : ''}>
+        </td>
         ${exchangeCol}
         <td class="limit-pair-cell">${this.escapeHtml(o.pair)}${o.synthetic
           ? ' <span class="limit-synthetic-tag" title="Kraken routes this pair rather than listing it. Kraken&#39;s API cannot cancel these orders — use Kraken&#39;s own site or app.">synthetic</span>'
@@ -1198,18 +1386,22 @@ class LimitOrdersController {
 
     this.bindBackdropClose('cancel-order-overlay', () => this.closeModal());
 
-    // One document-level handler for BOTH overlays, topmost first. A second
+    // One document-level handler for EVERY overlay, topmost first. A second
     // listener would leak one handler per navigation, since teardown() only
     // removes the one it knows about.
     this.escHandler = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
-      const create = document.getElementById('create-limit-overlay');
-      if (create && !create.classList.contains('d-none')) {
-        this.closeCreateModal();
-        return;
-      }
-      const overlay = document.getElementById('cancel-order-overlay');
-      if (overlay && !overlay.classList.contains('d-none')) this.closeModal();
+      const isOpen = (id: string) => {
+        const el = document.getElementById(id);
+        return !!el && !el.classList.contains('d-none');
+      };
+      // Ordered by how disruptive losing the dialog would be: the wizard holds
+      // unsaved work, the two cancel dialogs hold a pending decision, and the
+      // read-only details view holds nothing at all.
+      if (isOpen('create-limit-overlay')) { this.closeCreateModal(); return; }
+      if (isOpen('bulk-cancel-overlay')) { this.closeBulkModal(); return; }
+      if (isOpen('cancel-order-overlay')) { this.closeModal(); return; }
+      if (isOpen('order-details-overlay')) { this.closeDetails(); }
     };
     document.addEventListener('keydown', this.escHandler);
   }
@@ -1312,6 +1504,367 @@ class LimitOrdersController {
       if (dismissBtn) dismissBtn.disabled = false;
       this.showModalError(err?.message || 'Failed to cancel the order. Please try again.');
     }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Read-only details modal
+  // ---------------------------------------------------------------------------
+
+  private bindDetailsModal(): void {
+    document.getElementById('order-details-close')
+      ?.addEventListener('click', () => this.closeDetails());
+    document.getElementById('order-details-dismiss')
+      ?.addEventListener('click', () => this.closeDetails());
+    this.bindBackdropClose('order-details-overlay', () => this.closeDetails());
+  }
+
+  private openDetailsByKey(key: string): void {
+    // Resolve against the store rather than the row's markup, so the dialog
+    // always describes the order as it currently stands.
+    const order = this.allLimitOrders().find(o => this.selectionKey(o) === key);
+    if (order) this.openDetails(order);
+  }
+
+  private openDetails(order: LimitOrder): void {
+    const set = (id: string, value: string) => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = value;
+    };
+
+    const sideEl = document.getElementById('order-details-side');
+    if (sideEl) {
+      const side = (order.side || '').toLowerCase();
+      sideEl.textContent = side.toUpperCase();
+      sideEl.className = `cancel-order-side ${side === 'buy' ? 'side-buy' : 'side-sell'}`;
+    }
+
+    const base = this.baseAsset(order);
+    const remaining = this.toNumber(order.volume) - this.toNumber(order.filled);
+
+    set('order-details-pair', order.pair || '--');
+    set('order-details-type', this.formatType(order));
+    set('order-details-status', this.formatStatus(order));
+    set('order-details-price', this.formatPrice(order));
+    set('order-details-volume', `${order.volume} ${base}`.trim());
+    set('order-details-filled', `${order.filled} ${base}`.trim());
+    set('order-details-remaining',
+        `${this.fmtGrouped(Math.max(0, remaining))} ${base}`.trim());
+    set('order-details-total', this.formatTotal(order));
+    set('order-details-opened', this.formatOpened(order));
+    set('order-details-id', order.id || '--');
+    set('order-details-exchange', order.exchangeName || '--');
+
+    document.getElementById('order-details-exchange-row')
+      ?.classList.toggle('d-none', !ExchangeStore.isAllMode());
+    document.getElementById('order-details-partial')
+      ?.classList.toggle('d-none', this.filledFraction(order) <= 0);
+    document.getElementById('order-details-synthetic')
+      ?.classList.toggle('d-none', !order.synthetic);
+
+    document.getElementById('order-details-overlay')?.classList.remove('d-none');
+    (document.getElementById('order-details-dismiss') as HTMLButtonElement | null)?.focus();
+  }
+
+  private closeDetails(): void {
+    document.getElementById('order-details-overlay')?.classList.add('d-none');
+  }
+
+  /** Status as the exchange reports it, title-cased; 'Open' when unreported. */
+  private formatStatus(order: LimitOrder): string {
+    const raw = String(order.status || '').trim();
+    if (!raw) return 'Open';
+    return raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Bulk cancel
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Delay between cancels in a bulk run.
+   *
+   * Fixed at the slowest pacing any supported exchange asks for (Kraken's
+   * 1000ms, per the backend registry) rather than read per-exchange: one bulk
+   * run can span several connections, and a single loop cannot honour several
+   * different budgets at once. Erring slow costs seconds; erring fast trips a
+   * rate limit part-way through and leaves the user guessing which orders
+   * actually went.
+   */
+  private static readonly BULK_CANCEL_PACE_MS = 1000;
+
+  private bindBulkModal(): void {
+    document.getElementById('bulk-cancel-close')
+      ?.addEventListener('click', () => this.closeBulkModal());
+    document.getElementById('bulk-cancel-dismiss')
+      ?.addEventListener('click', () => this.closeBulkModal());
+    document.getElementById('bulk-cancel-confirm')
+      ?.addEventListener('click', () => void this.confirmBulkCancel());
+    this.bindBackdropClose('bulk-cancel-overlay', () => this.closeBulkModal());
+  }
+
+  private openBulkModal(): void {
+    const orders = this.selectedOrders();
+    if (orders.length === 0) return;
+
+    this.bulkPending = orders;
+    this.hideBulkError();
+
+    const isAll = ExchangeStore.isAllMode();
+    document.getElementById('bulk-cancel-exchange-th')?.classList.toggle('d-none', !isAll);
+
+    const title = document.getElementById('bulk-cancel-title');
+    if (title) {
+      title.textContent = orders.length === 1
+        ? 'Cancel this order?'
+        : `Cancel these ${orders.length} orders?`;
+    }
+
+    const confirmLabel = document.getElementById('bulk-cancel-confirm-label');
+    if (confirmLabel) {
+      confirmLabel.textContent = orders.length === 1
+        ? 'Cancel Order' : `Cancel ${orders.length} Orders`;
+    }
+
+    const subtitle = document.getElementById('bulk-cancel-subtitle');
+    if (subtitle) {
+      const exchanges = new Set(orders.map(o => o.exchangeName).filter(Boolean));
+      const where = exchanges.size > 1 ? ` across ${exchanges.size} exchanges` : '';
+      subtitle.textContent = `Review the list below${where} — cancelling cannot be undone.`;
+    }
+
+    const note = document.getElementById('bulk-cancel-note-text');
+    if (note) {
+      note.textContent = orders.length === 1
+        ? 'This order is cancelled from this page. Leaving before it finishes leaves it resting on the exchange.'
+        : `These are cancelled one at a time, taking ${this.bulkEstimateText(orders.length)}. `
+          + 'Leaving this page part-way through stops the rest — anything not yet '
+          + 'cancelled stays resting on the exchange.';
+    }
+
+    const partial = orders.filter(o => this.filledFraction(o) > 0);
+    const partialBox = document.getElementById('bulk-cancel-partial');
+    const partialText = document.getElementById('bulk-cancel-partial-text');
+    partialBox?.classList.toggle('d-none', partial.length === 0);
+    if (partialText && partial.length) {
+      partialText.textContent = partial.length === 1
+        ? 'One of these orders is partially filled. Cancelling stops the remainder — the portion already filled stays executed.'
+        : `${partial.length} of these orders are partially filled. Cancelling stops the remainder — the portions already filled stay executed.`;
+    }
+
+    // Kraken cannot cancel synthetic-pair orders through its API, so say so
+    // before the run rather than presenting it as a mystery failure after.
+    const synthetic = orders.filter(o => o.synthetic);
+    const synthBox = document.getElementById('bulk-cancel-synthetic');
+    const synthText = document.getElementById('bulk-cancel-synthetic-text');
+    synthBox?.classList.toggle('d-none', synthetic.length === 0);
+    if (synthText && synthetic.length) {
+      synthText.textContent =
+        `${synthetic.length} of these ${synthetic.length === 1 ? 'is a' : 'are'} Kraken `
+        + `synthetic-pair order${synthetic.length === 1 ? '' : 's'}. Kraken's API cannot cancel `
+        + `${synthetic.length === 1 ? 'it' : 'them'} — expect ${synthetic.length === 1 ? 'it' : 'those'} `
+        + `to fail here and cancel ${synthetic.length === 1 ? 'it' : 'them'} from Kraken's own site or app.`;
+    }
+
+    this.renderBulkRows(isAll);
+    this.setBulkProgress(0, orders.length, false);
+    this.setBulkBusy(false);
+
+    document.getElementById('bulk-cancel-overlay')?.classList.remove('d-none');
+    (document.getElementById('bulk-cancel-dismiss') as HTMLButtonElement | null)?.focus();
+  }
+
+  private bulkEstimateText(count: number): string {
+    if (count <= 1) return 'a moment';
+    const ms = (count - 1) * LimitOrdersController.BULK_CANCEL_PACE_MS
+             + count * LimitOrdersController.PLACE_OVERHEAD_MS;
+    const seconds = Math.round(ms / 1000);
+    if (seconds < 60) return `about ${seconds} second${seconds === 1 ? '' : 's'}`;
+    const minutes = Math.round(seconds / 60);
+    return `about ${minutes} minute${minutes === 1 ? '' : 's'}`;
+  }
+
+  private renderBulkRows(isAll: boolean): void {
+    const tbody = document.getElementById('bulk-cancel-tbody');
+    if (!tbody) return;
+
+    tbody.innerHTML = this.bulkPending.map((o, i) => {
+      const exchangeCol = isAll
+        ? `<td><span class="exchange-badge exchange-${this.escapeAttr(o.exchangeName).toLowerCase()}">${this.escapeHtml(o.exchangeName)}</span></td>`
+        : '';
+      const side = (o.side || '').toLowerCase();
+      const synthetic = o.synthetic
+        ? ' <span class="limit-synthetic-tag">synthetic</span>' : '';
+      const partial = this.filledFraction(o) > 0
+        ? ' <span class="limit-partial-tag">partial</span>' : '';
+      return `<tr data-bulk-key="${this.escapeAttr(this.selectionKey(o))}">
+        <td class="limit-leg-num-col">${i + 1}</td>
+        ${exchangeCol}
+        <td class="limit-pair-cell">
+          <span class="cancel-order-side ${side === 'buy' ? 'side-buy' : 'side-sell'}">${this.escapeHtml(side.toUpperCase())}</span>
+          ${this.escapeHtml(o.pair)}${synthetic}
+        </td>
+        <td>${this.escapeHtml(this.formatPrice(o))}</td>
+        <td>${this.escapeHtml(o.volume)}${partial}</td>
+        <td>${this.escapeHtml(this.formatTotal(o))}</td>
+        <td class="bulk-cancel-status-col" data-bulk-status>
+          <span class="bulk-status bulk-status-waiting">Waiting</span>
+        </td>
+      </tr>`;
+    }).join('');
+  }
+
+  private setBulkRowStatus(order: LimitOrder, state: 'working' | 'done' | 'failed',
+                           detail?: string): void {
+    const key = this.selectionKey(order);
+    const row = document.querySelector(`#bulk-cancel-tbody tr[data-bulk-key="${CSS.escape(key)}"]`);
+    const cell = row?.querySelector('[data-bulk-status]');
+    if (!cell) return;
+
+    if (state === 'working') {
+      cell.innerHTML = '<span class="bulk-status bulk-status-working">'
+        + '<i class="fa-solid fa-spinner fa-spin"></i> Cancelling</span>';
+    } else if (state === 'done') {
+      cell.innerHTML = `<span class="bulk-status bulk-status-done">`
+        + `<i class="fa-solid fa-check"></i> ${this.escapeHtml(detail || 'Cancelled')}</span>`;
+    } else {
+      cell.innerHTML = `<span class="bulk-status bulk-status-failed" title="${this.escapeAttr(detail || '')}">`
+        + `<i class="fa-solid fa-triangle-exclamation"></i> ${this.escapeHtml(detail || 'Failed')}</span>`;
+    }
+  }
+
+  private setBulkProgress(done: number, total: number, visible: boolean): void {
+    document.getElementById('bulk-cancel-progress')?.classList.toggle('d-none', !visible);
+    const fill = document.getElementById('bulk-cancel-fill') as HTMLElement | null;
+    if (fill) fill.style.width = `${total ? Math.round((done / total) * 100) : 0}%`;
+    const count = document.getElementById('bulk-cancel-count');
+    if (count) count.textContent = `${done} of ${total}`;
+  }
+
+  private setBulkBusy(busy: boolean): void {
+    const confirm = document.getElementById('bulk-cancel-confirm') as HTMLButtonElement | null;
+    const dismiss = document.getElementById('bulk-cancel-dismiss') as HTMLButtonElement | null;
+    const close = document.getElementById('bulk-cancel-close') as HTMLButtonElement | null;
+    if (confirm) confirm.disabled = busy;
+    if (dismiss) dismiss.disabled = busy;
+    if (close) close.disabled = busy;
+  }
+
+  private closeBulkModal(): void {
+    // A run in flight owns the dialog — its results have to land somewhere.
+    if (this.bulkRunning) return;
+    this.bulkPending = [];
+    this.hideBulkError();
+    document.getElementById('bulk-cancel-overlay')?.classList.add('d-none');
+  }
+
+  private showBulkError(message: string): void {
+    const el = document.getElementById('bulk-cancel-error');
+    if (!el) return;
+    el.textContent = message;
+    el.classList.remove('d-none');
+  }
+
+  private hideBulkError(): void {
+    document.getElementById('bulk-cancel-error')?.classList.add('d-none');
+  }
+
+  /**
+   * Cancel the listed orders one at a time.
+   *
+   * Sequential and paced rather than fired in parallel: these are private,
+   * rate-limited calls against the same keys the automation worker uses, and a
+   * burst that trips a throttle would leave an unknown subset cancelled.
+   *
+   * Each row reports its own outcome as it lands, and a failure never stops the
+   * run — one synthetic-pair order that Kraken refuses must not strand the
+   * other nineteen. The dialog stays open when anything failed, so the list of
+   * what did and didn't go is still on screen.
+   */
+  private async confirmBulkCancel(): Promise<void> {
+    if (this.bulkRunning || this.bulkPending.length === 0) return;
+
+    const orders = this.bulkPending.slice();
+    this.bulkRunning = true;
+    this.hideBulkError();
+    this.setBulkBusy(true);
+    this.setBulkProgress(0, orders.length, true);
+
+    const touched = new Set<number>();
+    const failures: Array<{ order: LimitOrder; message: string }> = [];
+    let done = 0;
+
+    for (let i = 0; i < orders.length; i++) {
+      // Navigating away mid-run: stop issuing, keep whatever already happened.
+      if (this.torndown) break;
+
+      const order = orders[i];
+      this.setBulkRowStatus(order, 'working');
+      try {
+        const result = await ExchangeController.cancelOrder(
+          order.connectionId, order.id, order.pair);
+        touched.add(order.connectionId);
+        // Robinhood only acknowledges the request and cancels asynchronously,
+        // so don't claim it's gone.
+        const pending = String(result?.status || '').toLowerCase() === 'canceling';
+        this.setBulkRowStatus(order, 'done', pending ? 'Submitted' : 'Cancelled');
+      } catch (err: any) {
+        const message = err?.message || 'Failed';
+        failures.push({ order, message });
+        this.setBulkRowStatus(order, 'failed', message);
+      }
+
+      done++;
+      this.setBulkProgress(done, orders.length, true);
+      if (i < orders.length - 1 && !this.torndown) {
+        await this.sleep(LimitOrdersController.BULK_CANCEL_PACE_MS);
+      }
+    }
+
+    this.bulkRunning = false;
+    this.setBulkBusy(false);
+
+    // Other pages share the store's order cache — drop every connection we
+    // touched before refetching, or they keep showing cancelled orders.
+    for (const connId of touched) ExchangeStore.invalidateConnectionData(connId);
+
+    if (this.torndown) return;
+
+    const succeeded = done - failures.length;
+    // Only clear what actually went. A failed order stays ticked so the user
+    // can retry it without hunting through the table again.
+    for (const order of orders) {
+      if (!failures.some(f => this.selectionKey(f.order) === this.selectionKey(order))) {
+        this.selected.delete(this.selectionKey(order));
+      }
+    }
+
+    if (failures.length === 0) {
+      this.closeBulkModalForce();
+      this.showSuccess(succeeded === 1
+        ? 'Cancelled 1 limit order.'
+        : `Cancelled ${succeeded} limit orders.`);
+    } else {
+      // Dialog stays open: the per-row outcomes are the only record of which
+      // orders went and which are still resting.
+      this.showBulkError(
+        `${succeeded} cancelled, ${failures.length} failed. The failures are listed above and `
+        + 'stay selected so you can retry them.');
+    }
+
+    // Best-effort: the cancels have already happened and been reported, so a
+    // failed refresh must not surface as though the run itself failed.
+    try {
+      await ExchangeStore.refreshOrders();
+    } catch {
+      /* the next poll picks it up */
+    }
+  }
+
+  /** Close past the in-flight guard, for the success path that owns the run. */
+  private closeBulkModalForce(): void {
+    this.bulkPending = [];
+    this.hideBulkError();
+    document.getElementById('bulk-cancel-overlay')?.classList.add('d-none');
   }
 
   // ---------------------------------------------------------------------------

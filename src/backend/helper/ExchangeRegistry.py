@@ -26,6 +26,18 @@ SUPPORTED_EXCHANGES: dict[str, dict] = {
         # Kraken's private call-rate counter is the real constraint here, and
         # 1s between orders is what it sustains. See ORDER_PACING notes below.
         'order_pacing_ms': 1000,
+        'supports_transfer_history': True,
+        'transfer_history': {
+            'source': 'transactions',
+            'window_seconds': 365 * 86400,
+            # DepositStatus/WithdrawStatus return ~500 rows without a cursor;
+            # treat anything at or above this as an overflowed window.
+            'page_cap': 450,
+            'history_epoch': 1420070400,   # 2015-01-01
+            # Funding endpoints cost 2-3 units of Kraken's call-rate counter,
+            # so they need more room than the 1000ms used for order entry.
+            'page_pacing_ms': 1200,
+        },
         'has_sandbox': False,
         'website': 'https://www.kraken.com',
         'api_key_url': 'https://www.kraken.com/u/security/api',
@@ -42,6 +54,22 @@ SUPPORTED_EXCHANGES: dict[str, dict] = {
         'supports_withdraw': False,
         'supports_rebalance': True,
         'order_pacing_ms': 250,
+        'supports_transfer_history': True,
+        # Coinbase is the odd one out. ``fetch_deposits``/``fetch_withdrawals``
+        # hit the v2 fiat rails and explicitly do NOT return crypto ("Won't
+        # return crypto deposits ... Use fetchLedger for those" — ccxt's own
+        # docstring), so the ledger is the only route to a crypto transfer.
+        # Every Coinbase entry point also runs through
+        # ``prepare_account_request_with_currency_code``, which demands either a
+        # currency code or an account_id, so there is no "all transfers" call:
+        # the sync resolves account ids once and walks them.
+        'transfer_history': {
+            'source': 'ledger',
+            'window_seconds': None,        # cursor-paged, no server-side time filter
+            'page_cap': 100,               # v2 transactions hard max
+            'history_epoch': 1370044800,   # 2013-06-01
+            'page_pacing_ms': 350,
+        },
         'has_sandbox': False,
         'website': 'https://www.coinbase.com',
         'api_key_url': 'https://www.coinbase.com/settings/api',
@@ -55,6 +83,18 @@ SUPPORTED_EXCHANGES: dict[str, dict] = {
         'supports_withdraw': False,
         'supports_rebalance': True,
         'order_pacing_ms': 250,
+        'supports_transfer_history': True,
+        # No ledger fallback here: binance.fetch_ledger raises NotSupported for
+        # spot wallets even though has['fetchLedger'] is True, so the deposit /
+        # withdrawal endpoints are the only option. ccxt itself clamps
+        # ``endTime = since + 90d``, hence the 89-day window.
+        'transfer_history': {
+            'source': 'transactions',
+            'window_seconds': 89 * 86400,
+            'page_cap': 1000,
+            'history_epoch': 1498867200,   # 2017-07-01, Binance launch
+            'page_pacing_ms': 500,
+        },
         'has_sandbox': False,
         'website': 'https://www.binance.com',
         'api_key_url': 'https://www.binance.com/en/my/settings/api-management',
@@ -73,6 +113,11 @@ SUPPORTED_EXCHANGES: dict[str, dict] = {
         # placement costs a signed request or two, so 600ms is the sustainable
         # floor rather than a guess.
         'order_pacing_ms': 600,
+        # No funding-history API at all, and the adapter doesn't duck-type
+        # fetch_deposits/fetch_withdrawals/fetch_ledger — calling one raises a
+        # bare AttributeError rather than anything ccxt-shaped.
+        'supports_transfer_history': False,
+        'transfer_history': None,
         # Robinhood issues no secret: the user generates an Ed25519 keypair,
         # registers the public half, and pastes the private half here. The
         # Profile page offers a key generator when this is set.
@@ -155,6 +200,7 @@ def get_supported_exchanges() -> list[dict]:
             'has_withdrawal_addresses': meta['has_withdrawal_addresses'],
             'supports_withdraw': meta.get('supports_withdraw', False),
             'supports_rebalance': meta.get('supports_rebalance', False),
+            'supports_transfer_history': meta.get('supports_transfer_history', False),
             'order_pacing_ms': meta.get('order_pacing_ms', DEFAULT_ORDER_PACING_MS),
             'needs_generated_keypair': meta.get('needs_generated_keypair', False),
             'has_sandbox': meta.get('has_sandbox', False),
@@ -176,6 +222,28 @@ def get_minimum_withdrawal(exchange_name: str, asset: str) -> float:
 def supports_rebalance(exchange_name: str) -> bool:
     """True when the balancer can operate on *exchange_name*."""
     return SUPPORTED_EXCHANGES.get(exchange_name, {}).get('supports_rebalance', False)
+
+
+def supports_transfer_history(exchange_name: str) -> bool:
+    """True when deposit/withdrawal history can be read for *exchange_name*.
+
+    Advisory only — it says the exchange has an endpoint worth calling, not
+    that this user's API key carries the permission to call it. Kraken needs
+    "Query Funds", Binance needs "Enable Reading", and existing Cyrus keys were
+    only ever validated against ``fetch_balance``, so a key that trades fine can
+    still be rejected here. The sync catches that and records it per connection.
+    """
+    return SUPPORTED_EXCHANGES.get(exchange_name, {}).get('supports_transfer_history', False)
+
+
+def get_transfer_history_config(exchange_name: str) -> dict | None:
+    """Windowing/pacing metadata for *exchange_name*'s transfer history.
+
+    ``source`` selects the fetch strategy — ``'transactions'`` for the
+    deposit/withdrawal endpoints, ``'ledger'`` for Coinbase's per-account walk.
+    Returns None when the exchange has no transfer history at all.
+    """
+    return SUPPORTED_EXCHANGES.get(exchange_name, {}).get('transfer_history')
 
 
 def get_order_pacing_ms(exchange_name: str) -> int:

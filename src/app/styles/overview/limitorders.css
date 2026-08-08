@@ -252,6 +252,124 @@ body.theme-light .create-limit-modal .alert-warning {
   text-align: right;
 }
 
+/* ── Row selection ─────────────────────────────────────────────────────── */
+
+.limit-select-col {
+  width: 2.25rem;
+  text-align: center;
+  /* The cell is the click target the row handler ignores, so it needs to cover
+     the whole column rather than just the box itself. */
+  padding-left: 0.5rem;
+  padding-right: 0.25rem;
+}
+
+.limit-row-check {
+  width: 0.95rem;
+  height: 0.95rem;
+  cursor: pointer;
+  accent-color: var(--accent, #6366f1);
+  vertical-align: middle;
+}
+
+.limit-row-check:disabled {
+  cursor: default;
+  opacity: 0.4;
+}
+
+/* Rows open the read-only details dialog, so they have to look clickable. */
+.limit-row {
+  cursor: pointer;
+}
+
+.limit-row:hover {
+  background: var(--bg-hover, rgba(127, 127, 127, 0.06));
+}
+
+.limit-row:focus-visible {
+  outline: 2px solid var(--accent, #6366f1);
+  outline-offset: -2px;
+}
+
+.limit-row-selected,
+.limit-row-selected:hover {
+  background: rgba(99, 102, 241, 0.10);
+}
+
+/* ── Bulk action bar ───────────────────────────────────────────────────── */
+
+.limit-bulk-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  margin-bottom: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  border-radius: 8px;
+  background: rgba(99, 102, 241, 0.07);
+}
+
+.limit-bulk-count {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+/* ── Bulk cancel dialog ────────────────────────────────────────────────── */
+
+.bulk-cancel-modal {
+  max-width: 60rem;
+  width: 100%;
+}
+
+.bulk-cancel-wrap {
+  /* The list is the point of the dialog — it scrolls rather than being
+     truncated, because a confirmation that hides some of what it is
+     confirming is worse than no confirmation. */
+  max-height: 22rem;
+  overflow-y: auto;
+}
+
+.bulk-cancel-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--bg-secondary, #1a1a1a);
+}
+
+.bulk-cancel-status-col {
+  width: 9rem;
+  white-space: nowrap;
+}
+
+.bulk-cancel-progress {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.75rem;
+}
+
+.bulk-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.bulk-status-waiting { color: var(--text-dim); }
+.bulk-status-working { color: var(--accent, #6366f1); }
+.bulk-status-done    { color: #22c55e; }
+
+.bulk-status-failed {
+  color: #ef4444;
+  cursor: help;
+  /* Exchange errors can be a paragraph long; the full text is on the title. */
+  max-width: 8.5rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* Kraken synthetic-pair marker. Red rather than amber: unlike "partial", this
    means the Cancel button in the same row is expected to fail. */
 .limit-synthetic-tag {

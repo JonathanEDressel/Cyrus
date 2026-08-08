@@ -51,6 +51,8 @@ Capability flags live in `src/backend/helper/ExchangeRegistry.py` and are enforc
 **Monitoring**
 - Portfolio overview with value history charts
 - Open orders across every connected exchange
+- Resting limit orders in one table — click a row for full detail, or select several and cancel them together
+- Transfer history (deposits and withdrawals) backfilled from each exchange and cached locally
 - Watchlist with price data
 - Optional monthly email report
 - Desktop notifications and optional email alerts when a rule executes
@@ -209,13 +211,15 @@ CYRUS_POLL_INTERVAL=60
 
 1. **Create an account** — click *Create Account*, pick a username (3+ chars) and password (6+ chars)
 2. **Connect an exchange** — *Profile → Exchange Connections*, add your API key and secret, then *Test* to validate
-3. **Look around** — *Overview* for portfolio, *Open Orders* for live orders
+3. **Look around** — *Overview* for portfolio, *Open Orders* for live orders, *Transfers* for deposit and withdrawal history
 4. **Create an automation** — *Automations → New Automation*, pick a trigger and action, review, save
 5. **Check the heartbeat** — the pill at the top of the Automations page should read *Automations running*
 
 ### API key permissions
 
 Grant the minimum your rules need. Convert actions need trade permission; withdraw actions additionally need withdraw permission **and** the destination address must already be whitelisted on the exchange. Cyrus cannot add addresses to a whitelist — it can only send to entries that already exist.
+
+**Transfer history needs a permission trading does not.** A key created for trading can read balances and place orders but still be refused funding history, because that sits behind a separate scope — *Query Funds* on Kraken, *Enable Reading* on Binance, transaction access on a Coinbase CDP key. Cyrus validates keys against a balance call, so this only surfaces the first time you open the Transfers page; when it does, the page names the missing permission and stops retrying until you re-validate. Robinhood exposes no transfer-history API at all.
 
 ---
 
@@ -245,6 +249,7 @@ Cyrus/
 │   │   ├── helper/
 │   │   │   ├── ExchangeClient.py      # CCXT operations
 │   │   │   ├── ExchangeRegistry.py    # Capability flags, withdrawal minimums
+│   │   │   ├── TransferSync.py        # Chunked, resumable transfer backfill
 │   │   │   ├── Security.py            # Fernet, bcrypt, JWT
 │   │   │   ├── SetupDatabase.py       # Initial schema
 │   │   │   ├── MigrateDatabase.py     # Idempotent migrations (run on boot)
@@ -374,7 +379,15 @@ All routes require `Authorization: Bearer <token>` except `/api/health` and the 
 
 ### Exchange data
 - `GET /api/exchange/<id>/open-orders` · `/balance` · `/withdrawal-addresses` · `/portfolio`
+- `GET /api/exchange/<id>/assets` · `/pairs` — tradable assets and per-market tick sizes, minimums and free balances
+- `POST /api/exchange/<id>/create-order` · `/cancel-order`
 - `GET /api/exchange/portfolio/history`
+
+### Transfers
+- `GET /api/transfers/` — cached deposit/withdrawal history; filter by `conn_id`, `kind`, `asset`, `status`, `from`, `to`
+- `GET /api/transfers/status` — per-connection backfill progress and any blocking error
+- `POST /api/transfers/sync` — run one bounded slice of sync; repeat until `complete` is true
+- `GET /api/transfers/assets` — distinct assets seen in transfer history
 
 ### Automation
 - `GET|POST /api/automation/rules`

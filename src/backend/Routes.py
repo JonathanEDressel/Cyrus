@@ -6,6 +6,7 @@ from controllers.AutomationController import automation_bp
 from controllers.WatchlistController import watchlist_bp
 from controllers.MarketDataController import market_data_bp
 from controllers.ReportController import report_bp
+from controllers.TransferController import transfer_bp
 
 
 def register_health_route(app):
@@ -46,3 +47,4 @@ def register_routes(app):
     app.register_blueprint(watchlist_bp, url_prefix='/api/watchlist')
     app.register_blueprint(market_data_bp, url_prefix='/api/market')
     app.register_blueprint(report_bp, url_prefix='/api/report')
+    app.register_blueprint(transfer_bp, url_prefix='/api/transfers')

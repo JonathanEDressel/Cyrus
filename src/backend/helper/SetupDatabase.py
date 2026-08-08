@@ -174,6 +174,75 @@ def setup_database():
             )
         ''')
 
+        # Deposit/withdrawal history pulled from the exchanges. Cached rather
+        # than fetched live because the endpoints are slow, heavily rate-limited
+        # and windowed (Binance serves 90 days per request), and because a later
+        # cost-basis phase needs a durable, deduplicated record rather than
+        # whatever the exchange happened to return this minute.
+        #
+        # occurred_at is UNIX epoch SECONDS to match every other timestamp here;
+        # ccxt speaks milliseconds and the conversion happens in ExchangeClient.
+        #
+        # dedupe_key is NOT NULL on purpose: SQLite treats NULLs as DISTINCT
+        # inside a UNIQUE index, so a nullable key would let every re-sync
+        # insert a fresh duplicate, silently and forever. ExchangeClient's
+        # transfer_dedupe_key() always produces one.
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS transfer_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                exchange_connection_id INTEGER NOT NULL,
+                exchange_name TEXT NOT NULL,
+                kind TEXT NOT NULL,
+                external_id TEXT,
+                dedupe_key TEXT NOT NULL,
+                txid TEXT,
+                network TEXT,
+                asset TEXT NOT NULL,
+                amount TEXT NOT NULL,
+                amount_num REAL NOT NULL DEFAULT 0,
+                fee_amount TEXT,
+                fee_currency TEXT,
+                status TEXT,
+                address TEXT,
+                tag TEXT,
+                occurred_at INTEGER NOT NULL DEFAULT 0,
+                usd_value REAL,
+                usd_price_source TEXT,
+                is_internal INTEGER,
+                internal_match_id INTEGER,
+                match_source TEXT,
+                raw_payload TEXT,
+                first_seen_at INTEGER NOT NULL,
+                updated_at INTEGER NOT NULL,
+                UNIQUE(user_id, exchange_connection_id, kind, dedupe_key),
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                FOREIGN KEY (exchange_connection_id) REFERENCES exchange_connections(id) ON DELETE CASCADE
+            )
+        ''')
+
+        # Resume state for the chunked backfill, one row per (connection, kind).
+        # synced_through is advanced only inside the same transaction that wrote
+        # the rows it covers, so an interrupted sync re-reads a window rather
+        # than skipping it.
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS transfer_sync_state (
+                exchange_connection_id INTEGER NOT NULL,
+                kind TEXT NOT NULL,
+                synced_through INTEGER NOT NULL DEFAULT 0,
+                history_epoch INTEGER NOT NULL DEFAULT 0,
+                backfill_complete INTEGER NOT NULL DEFAULT 0,
+                pass_started_at INTEGER,
+                account_queue TEXT,
+                last_sync_ok_at INTEGER,
+                last_error TEXT,
+                disabled INTEGER NOT NULL DEFAULT 0,
+                disabled_reason TEXT,
+                PRIMARY KEY (exchange_connection_id, kind),
+                FOREIGN KEY (exchange_connection_id) REFERENCES exchange_connections(id) ON DELETE CASCADE
+            )
+        ''')
+
         conn.execute('CREATE INDEX IF NOT EXISTS idx_username ON users(username)')
         conn.execute('CREATE INDEX IF NOT EXISTS idx_user_active ON automation_rules(user_id, is_active)')
         conn.execute('CREATE INDEX IF NOT EXISTS idx_user_log ON automation_log(user_id, created_at)')
@@ -181,6 +250,10 @@ def setup_database():
         conn.execute('CREATE INDEX IF NOT EXISTS idx_watched_cryptos_user ON watched_cryptos(user_id)')
         conn.execute('CREATE INDEX IF NOT EXISTS idx_pf_snap_user_time ON portfolio_snapshots(user_id, captured_at)')
         conn.execute('CREATE INDEX IF NOT EXISTS idx_pf_snap_assets_snap ON portfolio_snapshot_assets(snapshot_id)')
+        conn.execute('CREATE INDEX IF NOT EXISTS idx_transfer_user_time ON transfer_history(user_id, occurred_at DESC)')
+        conn.execute('CREATE INDEX IF NOT EXISTS idx_transfer_conn_kind_time ON transfer_history(exchange_connection_id, kind, occurred_at)')
+        conn.execute('CREATE INDEX IF NOT EXISTS idx_transfer_user_asset ON transfer_history(user_id, asset)')
+        conn.execute('CREATE INDEX IF NOT EXISTS idx_transfer_unsettled ON transfer_history(exchange_connection_id, kind, status, occurred_at)')
 
         for migration in [
             'ALTER TABLE automation_rules ADD COLUMN trigger_exchange_id INTEGER REFERENCES exchange_connections(id) ON DELETE SET NULL',

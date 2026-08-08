@@ -522,6 +522,132 @@ const DemoData = (() => {
     return (ORDERS[connId] || []).map((o) => ({ ...o }));
   }
 
+  // ── Transfer history ──────────────────────────────────────────────────────
+
+  /** One transfer row, shaped exactly like the backend's serialised column set. */
+  function xfer(connId: number, exchange: string, label: string, kind: 'deposit' | 'withdrawal',
+                asset: string, amount: string, daysAgo: number, opts: {
+                  fee?: string; status?: string; txid?: string | null;
+                  network?: string; internal?: number | null;
+                } = {}): any {
+    const id = `${connId}-${kind}-${asset}-${daysAgo}`;
+    return {
+      id: Math.abs(hashId(id)),
+      exchange_connection_id: connId,
+      exchange_name: exchange,
+      exchange_label: label,
+      kind,
+      external_id: id,
+      txid: opts.txid === undefined ? `0x${hashHex(id)}` : opts.txid,
+      network: opts.network || null,
+      asset,
+      amount,
+      amount_num: Number(amount),
+      fee_amount: opts.fee || null,
+      fee_currency: opts.fee ? asset : null,
+      status: opts.status || 'ok',
+      address: null,
+      tag: null,
+      occurred_at: Math.floor((Date.now() - daysAgo * DAY) / 1000),
+      usd_value: null,
+      is_internal: opts.internal === undefined ? null : opts.internal,
+    };
+  }
+
+  function hashId(s: string): number {
+    let h = 0;
+    for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+    return h;
+  }
+
+  function hashHex(s: string): string {
+    return Math.abs(hashId(s)).toString(16).padStart(8, '0').repeat(5).slice(0, 40);
+  }
+
+  /** Assets and sizes deliberately track HOLDINGS/PRICE so the demo reads as one
+   *  coherent account rather than four unrelated datasets. */
+  const TRANSFERS: Record<number, any[]> = {
+    [KRAKEN]: [
+      xfer(KRAKEN, 'kraken', 'Main', 'deposit', 'BTC', '0.15', 210, { network: 'Bitcoin' }),
+      xfer(KRAKEN, 'kraken', 'Main', 'deposit', 'USDT', '12000', 180, { network: 'Ethereum' }),
+      xfer(KRAKEN, 'kraken', 'Main', 'withdrawal', 'BTC', '0.042', 96, { fee: '0.00015', network: 'Bitcoin' }),
+      xfer(KRAKEN, 'kraken', 'Main', 'deposit', 'ETH', '3.5', 74, { network: 'Ethereum' }),
+      xfer(KRAKEN, 'kraken', 'Main', 'withdrawal', 'XLM', '4200', 41, { fee: '0.00002', network: 'Stellar' }),
+      xfer(KRAKEN, 'kraken', 'Main', 'deposit', 'SOL', '48.2', 27, { network: 'Solana' }),
+      xfer(KRAKEN, 'kraken', 'Main', 'withdrawal', 'USDT', '3500', 12, { fee: '2.5', network: 'Tron' }),
+      // Still settling — exercises the pending badge and the unsettled rewind.
+      xfer(KRAKEN, 'kraken', 'Main', 'withdrawal', 'ETH', '1.2', 0.3, { fee: '0.0011', status: 'pending', network: 'Ethereum' }),
+    ],
+    [COINBASE]: [
+      xfer(COINBASE, 'coinbase', 'Coinbase', 'deposit', 'USD', '5000', 150, { txid: null }),
+      xfer(COINBASE, 'coinbase', 'Coinbase', 'deposit', 'ETH', '2.1', 118, { network: 'ethereum' }),
+      // Coinbase <-> Advanced moves come back tagged internal for free.
+      xfer(COINBASE, 'coinbase', 'Coinbase', 'withdrawal', 'USDC', '2500', 63, { txid: null, internal: 1 }),
+      xfer(COINBASE, 'coinbase', 'Coinbase', 'deposit', 'USDC', '2500', 63, { txid: null, internal: 1 }),
+      xfer(COINBASE, 'coinbase', 'Coinbase', 'withdrawal', 'BTC', '0.028', 22, { fee: '0.0001', network: 'bitcoin' }),
+      xfer(COINBASE, 'coinbase', 'Coinbase', 'deposit', 'LINK', '310', 9, { network: 'ethereum' }),
+    ],
+    [BINANCE]: [
+      xfer(BINANCE, 'binance', 'Binance', 'deposit', 'USDT', '8000', 165, { network: 'BSC' }),
+      xfer(BINANCE, 'binance', 'Binance', 'deposit', 'DOGE', '91300', 88, { network: 'Dogecoin' }),
+      xfer(BINANCE, 'binance', 'Binance', 'withdrawal', 'ADA', '15400', 52, { fee: '1.0', network: 'Cardano' }),
+      xfer(BINANCE, 'binance', 'Binance', 'withdrawal', 'AVAX', '86.9', 31, { fee: '0.01', network: 'AVAX C-Chain' }),
+      xfer(BINANCE, 'binance', 'Binance', 'deposit', 'ATOM', '540', 14, { network: 'Cosmos' }),
+      xfer(BINANCE, 'binance', 'Binance', 'withdrawal', 'DOT', '1200', 5, { fee: '0.1', status: 'failed', network: 'Polkadot' }),
+    ],
+    // Robinhood has no transfer API — its rows stay empty on purpose so the
+    // "not supported" notice has something to be true about.
+    [ROBINHOOD]: [],
+  };
+
+  function transfers(connId: number | 'all' | null | undefined,
+                     filters: any = {}): any {
+    let rows = connId === undefined || connId === null || connId === 'all'
+      ? Object.keys(TRANSFERS).flatMap((k) => TRANSFERS[Number(k)])
+      : (TRANSFERS[Number(connId)] || []).slice();
+
+    if (filters.kind) rows = rows.filter((r) => r.kind === filters.kind);
+    if (filters.asset) rows = rows.filter((r) => r.asset === filters.asset);
+    rows = rows.slice().sort((a, b) => b.occurred_at - a.occurred_at);
+
+    const total = rows.length;
+    const offset = Number(filters.offset || 0);
+    const limit = Number(filters.limit || 100);
+    return {
+      items: rows.slice(offset, offset + limit).map((r) => ({ ...r })),
+      total,
+      limit,
+      offset,
+      sync: transferStatus(),
+    };
+  }
+
+  function transferStatus(): any {
+    const done = { state: 'idle', progress_pct: 100, backfill_complete: true,
+                   last_sync_ok_at: Math.floor((Date.now() - 4 * MIN) / 1000),
+                   age_seconds: 240, last_error: null };
+    const none = { state: 'unsupported', progress_pct: 0 };
+    return {
+      any_pending: false,
+      connections: [
+        { connection_id: KRAKEN, exchange: 'kraken', label: 'Main', supported: true,
+          kinds: { deposit: { ...done }, withdrawal: { ...done } } },
+        { connection_id: COINBASE, exchange: 'coinbase', label: 'Coinbase', supported: true,
+          kinds: { deposit: { ...done }, withdrawal: { ...done } } },
+        { connection_id: BINANCE, exchange: 'binance', label: 'Binance', supported: true,
+          kinds: { deposit: { ...done }, withdrawal: { ...done } } },
+        { connection_id: ROBINHOOD, exchange: 'robinhood', label: 'Robinhood', supported: false,
+          kinds: { deposit: { ...none }, withdrawal: { ...none } } },
+      ],
+    };
+  }
+
+  function transferAssets(): string[] {
+    const seen = new Set<string>();
+    Object.keys(TRANSFERS).forEach((k) => TRANSFERS[Number(k)].forEach((r) => seen.add(r.asset)));
+    return Array.from(seen).sort();
+  }
+
   /** Drop an order from the demo book so cancelling it looks like it worked. */
   function cancelOrder(connId: number, orderId: string): void {
     const book = ORDERS[connId];
@@ -945,6 +1071,9 @@ const DemoData = (() => {
     assetDetail,
     allocations,
     openOrders,
+    transfers,
+    transferStatus,
+    transferAssets,
     cancelOrder,
     limitPairs,
     createOrder,
@@ -992,6 +1121,15 @@ class DemoMode {
         return { id: orderId, status: 'canceled' };
       }],
       [ExchangeController, 'getPairs', async (id: number, asset: string) => DemoData.limitPairs(id, asset)],
+      [TransferController, 'getTransfers', async (filters: any = {}) =>
+        DemoData.transfers(filters.connId, filters)],
+      [TransferController, 'getStatus', async () => DemoData.transferStatus()],
+      [TransferController, 'getAssets', async () => DemoData.transferAssets()],
+      // Nothing to sync against — report an instantly-complete pass so the
+      // page's backfill loop terminates on its first round.
+      [TransferController, 'sync', async () => ({
+        complete: true, new_rows: 0, already_running: false, sync: DemoData.transferStatus(),
+      })],
       // Placement is honoured for the same reason as cancelling: it only writes
       // to the fake order book, and a no-op would make the ladder look broken.
       [ExchangeController, 'createOrder', async (id: number, order: any) => DemoData.createOrder(id, order)],

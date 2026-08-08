@@ -1,0 +1,92 @@
+<div class="page-container transfers-page">
+  <div class="overview-header">
+    <h1 class="page-title">Transfers</h1>
+    <p class="page-subtitle">
+      Deposits and withdrawals across your connected exchanges
+      <span class="auto-refresh-label" id="transfers-refresh-label"></span>
+    </p>
+  </div>
+
+  <div class="alert alert-warning d-none" id="transfers-error">
+    <span id="transfers-error-message"></span>
+  </div>
+
+  <div class="transfers-notice d-none" id="transfers-permission">
+    <i class="fa-solid fa-key"></i>
+    <span id="transfers-permission-message"></span>
+  </div>
+
+  <div class="transfers-notice d-none" id="transfers-unsupported">
+    <i class="fa-solid fa-circle-info"></i>
+    <span id="transfers-unsupported-message"></span>
+  </div>
+
+  <div class="transfers-progress d-none" id="transfers-progress">
+    <div class="transfers-progress-head">
+      <span id="transfers-progress-label">Fetching history…</span>
+      <span id="transfers-progress-pct">0%</span>
+    </div>
+    <div class="transfers-progress-track">
+      <div class="transfers-progress-fill" id="transfers-progress-fill"></div>
+    </div>
+  </div>
+
+  <div class="overview-section">
+    <div class="section-header">
+      <h2 class="section-title" id="transfers-count-title">History</h2>
+      <div class="holdings-toolbar">
+        <select id="transfers-connection" class="holdings-conn-select" aria-label="Exchange connection">
+          <option value="all">All exchanges</option>
+        </select>
+        <select id="transfers-kind" class="holdings-conn-select" aria-label="Transfer type">
+          <option value="">All types</option>
+          <option value="deposit">Deposits</option>
+          <option value="withdrawal">Withdrawals</option>
+        </select>
+        <select id="transfers-asset" class="holdings-conn-select" aria-label="Asset">
+          <option value="">All assets</option>
+        </select>
+        <button type="button" class="btn-icon" id="transfers-refresh" title="Sync from exchanges">
+          <i class="fa-solid fa-rotate"></i>
+        </button>
+      </div>
+    </div>
+
+    <div class="data-table-wrapper">
+      <table class="data-table" id="transfers-table">
+        <thead>
+          <tr>
+            <th>Exchange</th>
+            <th>Type</th>
+            <th>Asset</th>
+            <th class="holdings-th-num">Amount</th>
+            <th class="holdings-th-num">Fee</th>
+            <th>Status</th>
+            <th>When</th>
+            <th>Transaction</th>
+          </tr>
+        </thead>
+        <tbody id="transfers-tbody">
+          <tr class="empty-row"><td colspan="8">Loading transfers…</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="transfers-pager d-none" id="transfers-pager">
+      <button type="button" class="btn-icon" id="transfers-prev" title="Previous page">
+        <i class="fa-solid fa-chevron-left"></i>
+      </button>
+      <span id="transfers-pager-label"></span>
+      <button type="button" class="btn-icon" id="transfers-next" title="Next page">
+        <i class="fa-solid fa-chevron-right"></i>
+      </button>
+    </div>
+  </div>
+
+  <p class="transfers-footnote">
+    Transfer history is fetched from each exchange and stored locally so this page
+    loads instantly. Exchanges only report their own side of a transfer — a
+    withdrawal to your own wallet looks the same to them as one sent to anyone
+    else, so nothing here should be read as a record of who owns the far end.
+  </p>
+</div>

@@ -96,6 +96,17 @@
       <span class="limit-filter-meta" id="limit-filter-meta"></span>
     </div>
 
+    <!-- Bulk actions. Hidden until something is ticked, so the default view
+         stays as uncluttered as it was before selection existed. -->
+    <div class="limit-bulk-bar d-none" id="limit-bulk-bar">
+      <span class="limit-bulk-count" id="limit-bulk-count"></span>
+      <button class="btn-link-sm" id="limit-bulk-clear">Clear selection</button>
+      <span class="limit-legs-spacer"></span>
+      <button class="btn-danger limit-btn-sm" id="limit-bulk-cancel">
+        <i class="fa-solid fa-ban"></i> <span id="limit-bulk-cancel-label">Cancel selected</span>
+      </button>
+    </div>
+
     <div class="data-table-wrapper">
       <table class="data-table" id="limit-orders-table">
         <thead id="limit-thead"></thead>
@@ -256,6 +267,165 @@
       <button class="btn-secondary" id="cancel-order-dismiss">Keep Order</button>
       <button class="btn-danger" id="cancel-order-confirm">
         <i class="fa-solid fa-ban"></i> Cancel Order
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Read-only order details, opened by clicking a row.
+     Deliberately has no Cancel button: this is the "let me look at it" path, and
+     an irreversible action one stray click from simply inspecting a row is how
+     people cancel orders they meant to read. Cancelling stays behind the row's
+     own Cancel button. -->
+<div class="edit-rule-overlay d-none" id="order-details-overlay">
+  <div class="edit-rule-modal cancel-order-modal">
+    <div class="edit-rule-modal-header">
+      <div>
+        <h3>Order details</h3>
+        <span class="edit-rule-modal-subtitle">This order is still resting on the exchange.</span>
+      </div>
+      <button class="edit-rule-modal-close" id="order-details-close" title="Close">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+    </div>
+
+    <div class="edit-rule-modal-body">
+      <div class="cancel-order-summary">
+        <span class="cancel-order-side" id="order-details-side">BUY</span>
+        <span class="cancel-order-pair" id="order-details-pair"></span>
+      </div>
+
+      <dl class="cancel-order-details">
+        <div class="cancel-order-detail" id="order-details-exchange-row">
+          <dt>Exchange</dt>
+          <dd id="order-details-exchange"></dd>
+        </div>
+        <div class="cancel-order-detail">
+          <dt>Order type</dt>
+          <dd id="order-details-type"></dd>
+        </div>
+        <div class="cancel-order-detail">
+          <dt>Status</dt>
+          <dd id="order-details-status"></dd>
+        </div>
+        <div class="cancel-order-detail">
+          <dt>Limit price</dt>
+          <dd id="order-details-price"></dd>
+        </div>
+        <div class="cancel-order-detail">
+          <dt>Volume</dt>
+          <dd id="order-details-volume"></dd>
+        </div>
+        <div class="cancel-order-detail">
+          <dt>Filled so far</dt>
+          <dd id="order-details-filled"></dd>
+        </div>
+        <div class="cancel-order-detail">
+          <dt>Remaining</dt>
+          <dd id="order-details-remaining"></dd>
+        </div>
+        <div class="cancel-order-detail">
+          <dt>Estimated total</dt>
+          <dd id="order-details-total"></dd>
+        </div>
+        <div class="cancel-order-detail">
+          <dt>Opened</dt>
+          <dd id="order-details-opened"></dd>
+        </div>
+        <div class="cancel-order-detail">
+          <dt>Order ID</dt>
+          <dd class="cancel-order-id" id="order-details-id"></dd>
+        </div>
+      </dl>
+
+      <p class="cancel-order-partial d-none" id="order-details-partial">
+        <i class="fa-solid fa-circle-info"></i>
+        <span>
+          This order is partially filled. The filled portion has already executed;
+          only the remainder is still resting.
+        </span>
+      </p>
+
+      <p class="cancel-order-synthetic d-none" id="order-details-synthetic">
+        <i class="fa-solid fa-triangle-exclamation"></i>
+        <span>
+          This is a Kraken <strong>synthetic-pair</strong> order — a pair Kraken routes
+          rather than lists directly. Kraken's API cannot cancel these, so it has to be
+          cancelled from <strong>Kraken's own website or app</strong>.
+        </span>
+      </p>
+    </div>
+
+    <div class="edit-rule-modal-footer">
+      <button class="btn-secondary" id="order-details-dismiss">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Bulk cancel confirmation. Every order is listed in full rather than
+     summarised as a count: "Cancel 14 orders?" is not something anyone can
+     meaningfully agree to. -->
+<div class="edit-rule-overlay d-none" id="bulk-cancel-overlay">
+  <div class="edit-rule-modal bulk-cancel-modal">
+    <div class="edit-rule-modal-header">
+      <div>
+        <h3 id="bulk-cancel-title">Cancel these orders?</h3>
+        <span class="edit-rule-modal-subtitle" id="bulk-cancel-subtitle">
+          Review the list below — cancelling cannot be undone.
+        </span>
+      </div>
+      <button class="edit-rule-modal-close" id="bulk-cancel-close" title="Close">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+    </div>
+
+    <div class="edit-rule-modal-body">
+      <div class="bulk-cancel-progress d-none" id="bulk-cancel-progress">
+        <span class="limit-progress-track">
+          <span class="limit-progress-fill" id="bulk-cancel-fill" style="width:0%"></span>
+        </span>
+        <span class="limit-progress-count" id="bulk-cancel-count">0 of 0</span>
+      </div>
+
+      <div class="data-table-wrapper bulk-cancel-wrap">
+        <table class="data-table bulk-cancel-table">
+          <thead>
+            <tr>
+              <th class="limit-leg-num-col">#</th>
+              <th id="bulk-cancel-exchange-th" class="d-none">Exchange</th>
+              <th>Pair</th>
+              <th>Limit price</th>
+              <th>Volume</th>
+              <th>Est. total</th>
+              <th class="bulk-cancel-status-col">Status</th>
+            </tr>
+          </thead>
+          <tbody id="bulk-cancel-tbody"></tbody>
+        </table>
+      </div>
+
+      <p class="cancel-order-partial d-none" id="bulk-cancel-partial">
+        <i class="fa-solid fa-circle-info"></i>
+        <span id="bulk-cancel-partial-text"></span>
+      </p>
+
+      <p class="cancel-order-synthetic d-none" id="bulk-cancel-synthetic">
+        <i class="fa-solid fa-triangle-exclamation"></i>
+        <span id="bulk-cancel-synthetic-text"></span>
+      </p>
+
+      <p class="limit-batch-warning" id="bulk-cancel-note">
+        <i class="fa-solid fa-triangle-exclamation"></i>
+        <span id="bulk-cancel-note-text"></span>
+      </p>
+
+      <div class="alert alert-warning d-none" id="bulk-cancel-error"></div>
+    </div>
+
+    <div class="edit-rule-modal-footer">
+      <button class="btn-secondary" id="bulk-cancel-dismiss">Keep Orders</button>
+      <button class="btn-danger" id="bulk-cancel-confirm">
+        <i class="fa-solid fa-ban"></i> <span id="bulk-cancel-confirm-label">Cancel Orders</span>
       </button>
     </div>
   </div>

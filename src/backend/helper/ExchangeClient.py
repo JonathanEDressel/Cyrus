@@ -7,6 +7,8 @@ caller owns the lifecycle and the functions stay stateless / exchange-agnostic.
 it implements the same method names, so nothing here needs a Robinhood branch.
 """
 
+import hashlib
+import json
 from decimal import Decimal, ROUND_DOWN, ROUND_HALF_EVEN
 
 import ccxt
@@ -913,6 +915,303 @@ def get_price_extremes(exchange: ccxt.Exchange, base_asset: str, quote_asset: st
         'candles': len(in_window),
         'source': 'candles',
     }
+
+
+# ---------------------------------------------------------------------------
+# Transfer history (deposits / withdrawals)
+#
+# Two fetch strategies, chosen per exchange by the registry's
+# ``transfer_history['source']``:
+#
+#   'transactions' — Kraken and Binance. ``fetch_deposits`` / ``fetch_withdrawals``
+#                    over explicit time windows. Both accept ``params['until']``.
+#   'ledger'       — Coinbase only, and not by preference. Its deposit/withdrawal
+#                    endpoints are FIAT-ONLY ("Won't return crypto deposits ...
+#                    Use fetchLedger for those" is ccxt's own docstring), and
+#                    every Coinbase entry point routes through
+#                    ``prepare_account_request_with_currency_code``, which
+#                    requires a currency code or an account_id. So there is no
+#                    "give me this account's transfers" call: we resolve the
+#                    account ids once and walk them.
+#
+# Everything here returns rows already normalised by :func:`normalize_transfer`,
+# so the two strategies converge before any caller sees them.
+# ---------------------------------------------------------------------------
+
+_TRANSFER_METHODS = {'deposit': 'fetch_deposits', 'withdrawal': 'fetch_withdrawals'}
+_TRANSFER_HAS_KEYS = {'deposit': 'fetchDeposits', 'withdrawal': 'fetchWithdrawals'}
+
+#: Terminal ccxt transfer statuses — anything else is still in flight and gets
+#: re-read on the next sync so a pending->ok transition is picked up.
+TERMINAL_TRANSFER_STATUSES = ('ok', 'failed', 'canceled')
+
+#: Coinbase v2 transaction types that represent value entering or leaving the
+#: account. Everything else (buy, sell, trade, interest, ...) is not a transfer.
+_COINBASE_TRANSFER_TYPES = {
+    'send',                 # crypto, EITHER direction — the sign decides
+    'fiat_deposit', 'fiat_withdrawal',
+    'pro_deposit', 'pro_withdrawal',
+    'exchange_deposit', 'exchange_withdrawal',
+}
+
+#: Coinbase <-> Coinbase Pro/Advanced moves. Both sides are the same person's
+#: accounts, so these are self-transfers for free — no matching required.
+_COINBASE_INTERNAL_TYPES = {
+    'pro_deposit', 'pro_withdrawal', 'exchange_deposit', 'exchange_withdrawal',
+}
+
+#: Coinbase transaction blobs run to a couple of KB; a pathological one should
+#: not be able to bloat the database or end up quoted in an error message.
+MAX_RAW_PAYLOAD_BYTES = 8192
+
+
+def can_fetch_transfers(exchange, kind: str, source: str = 'transactions') -> bool:
+    """True when *exchange* exposes the call this *kind* / *source* needs.
+
+    The attribute probe has to come first. ``RobinhoodAdapter`` genuinely does
+    not define ``fetch_deposits``, so touching it raises ``AttributeError`` —
+    which is not in ccxt's exception hierarchy and would sail straight past
+    every ``except ccxt.NotSupported`` a caller might reasonably write.
+
+    ``has`` is then a necessary but not sufficient check: Binance advertises
+    ``has['fetchLedger'] = True`` and raises ``NotSupported`` for spot wallets
+    anyway. The registry's ``source`` is what actually decides which call to
+    make; this is the last-line sanity check before making it.
+    """
+    if source == 'ledger':
+        name, has_key = 'fetch_ledger', 'fetchLedger'
+    else:
+        name, has_key = _TRANSFER_METHODS.get(kind), _TRANSFER_HAS_KEYS.get(kind)
+    if not name:
+        return False
+    if not callable(getattr(exchange, name, None)):
+        return False
+    return bool((getattr(exchange, 'has', None) or {}).get(has_key))
+
+
+def _canonical_amount(value) -> str:
+    """A stable decimal string for *value* — the form hashed into a dedupe key.
+
+    Canonical because the key must survive a ccxt upgrade: if the library
+    starts rendering ``0.50`` where it used to render ``0.5``, an un-normalised
+    string would fork every synthetic key and silently duplicate the user's
+    entire transfer history. ``format(..., 'f')`` also keeps small amounts out
+    of exponent notation, which ``normalize()`` alone would produce.
+    """
+    try:
+        number = Decimal(str(value if value is not None else 0))
+    except Exception:
+        return '0'
+    if number == 0:
+        return '0'
+    return format(number.normalize(), 'f')
+
+
+def _amount_float(value) -> float:
+    """Best-effort float for sorting. Never raises — 0.0 sorts last, harmlessly."""
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _payload_json(info) -> str | None:
+    """Compact JSON for the raw exchange payload, or a marker when oversized."""
+    if not info:
+        return None
+    try:
+        text = json.dumps(info, default=str, separators=(',', ':'))
+    except Exception:
+        return None
+    return '{"_truncated":true}' if len(text) > MAX_RAW_PAYLOAD_BYTES else text
+
+
+def transfer_dedupe_key(kind: str, external_id, txid, asset: str,
+                        amount_str: str, occurred_at: int, address) -> str:
+    """A never-null identity for one transfer.
+
+    Null-safety is the whole point. SQLite treats NULLs as DISTINCT inside a
+    UNIQUE index, so a nullable key would make every re-sync insert a fresh
+    duplicate — silently, forever, surfacing years later as a wrong cost basis.
+
+    The fallback chain is exchange id, then on-chain hash, then a hash of the
+    transfer's own content. The content hash is last because it is the only one
+    that can collide legitimately (two identical-looking deposits in the same
+    second), and the exchange id is first because it is the only one guaranteed
+    stable across a status change.
+    """
+    if external_id:
+        return str(external_id)
+    if txid:
+        return f"tx:{txid}:{asset}:{amount_str}"
+    raw = f"{kind}|{asset}|{amount_str}|{occurred_at}|{txid or ''}|{address or ''}"
+    return "syn:" + hashlib.sha1(raw.encode('utf-8')).hexdigest()
+
+
+def _finalize_row(kind: str, asset: str, amount, occurred_ms, status,
+                  external_id=None, txid=None, network=None, address=None,
+                  tag=None, fee=None, is_internal=None, info=None) -> dict:
+    """Assemble the DB-shaped row both fetch strategies converge on.
+
+    ``occurred_at`` is epoch SECONDS — ccxt speaks milliseconds and this
+    database stores seconds everywhere, so the conversion happens here, once.
+    A missing timestamp becomes 0 rather than None so the column can stay NOT
+    NULL; such rows sort last and re-upsert harmlessly.
+    """
+    asset = str(asset or '').upper()
+    amount_str = _canonical_amount(amount)
+    occurred_at = int(occurred_ms // 1000) if occurred_ms else 0
+    fee = fee or {}
+    return {
+        'kind': kind,
+        'external_id': str(external_id) if external_id else None,
+        'dedupe_key': transfer_dedupe_key(kind, external_id, txid, asset,
+                                          amount_str, occurred_at, address),
+        'txid': str(txid) if txid else None,
+        'network': str(network) if network else None,
+        'asset': asset,
+        'amount': amount_str,
+        'amount_num': _amount_float(amount),
+        'fee_amount': _canonical_amount(fee.get('cost')) if fee.get('cost') is not None else None,
+        'fee_currency': str(fee.get('currency')).upper() if fee.get('currency') else None,
+        'status': str(status) if status else None,
+        'address': str(address) if address else None,
+        'tag': str(tag) if tag else None,
+        'occurred_at': occurred_at,
+        'is_internal': None if is_internal is None else (1 if is_internal else 0),
+        'raw_payload': _payload_json(info),
+    }
+
+
+def normalize_transfer(raw: dict, kind: str) -> dict:
+    """One ccxt transaction structure -> one ``transfer_history`` row.
+
+    The address fields collapse to a single column deliberately: for a deposit
+    the interesting counterparty is ``addressFrom``, for a withdrawal it is
+    ``addressTo``, and the generic ``address`` is whichever the exchange chose
+    to report. One column holding "the other end" is what the later
+    self-transfer matcher wants; the untouched payload keeps the rest.
+    """
+    raw = raw or {}
+    if kind == 'deposit':
+        address = raw.get('addressFrom') or raw.get('address') or raw.get('addressTo')
+        tag = raw.get('tagFrom') or raw.get('tag') or raw.get('tagTo')
+    else:
+        address = raw.get('addressTo') or raw.get('address') or raw.get('addressFrom')
+        tag = raw.get('tagTo') or raw.get('tag') or raw.get('tagFrom')
+    return _finalize_row(
+        kind=kind,
+        asset=raw.get('currency'),
+        amount=raw.get('amount'),
+        occurred_ms=raw.get('timestamp'),
+        status=raw.get('status'),
+        external_id=raw.get('id'),
+        txid=raw.get('txid'),
+        network=raw.get('network'),
+        address=address,
+        tag=tag,
+        fee=raw.get('fee'),
+        # Kraken hardcodes this to None, Coinbase omits it, Binance sets it for
+        # real. None means "unknown", which is not the same as "external".
+        is_internal=raw.get('internal'),
+        info=raw.get('info'),
+    )
+
+
+def normalize_ledger_transfer(entry: dict) -> dict | None:
+    """One Coinbase ledger entry -> one row, or None when it isn't a transfer.
+
+    ccxt has already collapsed the sign into ``direction`` and made ``amount``
+    absolute, so direction is what decides the kind — ``send`` covers crypto
+    moving in *and* out, and the raw type alone cannot tell them apart.
+    """
+    entry = entry or {}
+    info = entry.get('info') or {}
+    raw_type = str(info.get('type') or '').lower()
+    if raw_type not in _COINBASE_TRANSFER_TYPES:
+        return None
+
+    kind = 'deposit' if entry.get('direction') == 'in' else 'withdrawal'
+    network = info.get('network') or {}
+    counterparty = info.get('to') if kind == 'withdrawal' else info.get('from')
+    counterparty = counterparty if isinstance(counterparty, dict) else {}
+
+    return _finalize_row(
+        kind=kind,
+        asset=entry.get('currency'),
+        amount=entry.get('amount'),
+        occurred_ms=entry.get('timestamp'),
+        status=entry.get('status'),
+        external_id=entry.get('id'),
+        txid=network.get('hash') if isinstance(network, dict) else None,
+        network=network.get('name') if isinstance(network, dict) else None,
+        address=counterparty.get('address'),
+        tag=counterparty.get('destination_tag'),
+        fee=entry.get('fee'),
+        is_internal=True if raw_type in _COINBASE_INTERNAL_TYPES else None,
+        info=info,
+    )
+
+
+def fetch_transfer_window(exchange, kind: str, since_ms: int, until_ms: int,
+                          limit: int = 1000) -> list[dict]:
+    """Normalised transfers of one *kind* in the ``[since_ms, until_ms]`` window.
+
+    The client-side re-filter is not redundant. Exchanges do not reliably
+    honour ``since`` — the same reason :func:`get_price_extremes` re-filters its
+    candles — and a window loop that trusts the server would either double-read
+    or skip depending on which way the exchange rounded. Rows with no timestamp
+    at all are kept rather than dropped; the dedupe key stops them accumulating.
+    """
+    method = _TRANSFER_METHODS[kind]
+    since_ms, until_ms = int(since_ms), int(until_ms)
+    raw = getattr(exchange, method)(None, since_ms, limit, {'until': until_ms}) or []
+
+    rows = []
+    for item in raw:
+        ts = item.get('timestamp')
+        if ts is not None and not (since_ms <= ts <= until_ms):
+            continue
+        rows.append(normalize_transfer(item, kind))
+    return rows
+
+
+def list_transfer_accounts(exchange) -> list[str]:
+    """Account ids to walk for a ledger-sourced exchange (Coinbase).
+
+    Resolved once per pass and cached by the caller. Going through
+    ``fetch_accounts`` rather than a currency list matters: passing
+    ``params['account_id']`` short-circuits ccxt's ``find_account_id``, which
+    would otherwise re-list every account on each currency lookup.
+    """
+    accounts = exchange.fetch_accounts() or []
+    return [str(a.get('id')) for a in accounts if a.get('id')]
+
+
+def fetch_ledger_transfers(exchange, account_id: str, since_ms: int,
+                           limit: int = 100, max_pages: int = 10) -> list[dict]:
+    """Normalised transfers from one Coinbase account's ledger.
+
+    ``since_ms`` must not be None: ccxt's cursor pagination compares
+    ``lastTimestamp < since`` and would raise ``TypeError`` against None,
+    mid-walk, where the retry logic re-raises it several pages later as
+    something much harder to read.
+
+    Trades, interest and staking rewards come back from the same endpoint and
+    are dropped by :func:`normalize_ledger_transfer` returning None.
+    """
+    entries = exchange.fetch_ledger(None, int(since_ms), limit, {
+        'account_id': str(account_id),
+        'paginate': True,
+        'paginationCalls': max_pages,
+    }) or []
+
+    rows = []
+    for entry in entries:
+        row = normalize_ledger_transfer(entry)
+        if row is not None:
+            rows.append(row)
+    return rows
 
 
 def get_ohlcv_price_map(exchange: ccxt.Exchange, base_asset: str,

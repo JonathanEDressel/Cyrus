@@ -72,6 +72,24 @@ function applyTheme(theme: string): void {
     title: 'Limit Orders',
   });
 
+  router.register('transfers', {
+    view: 'app/views/overview/transfers.html',
+    viewModel: '../dist/app/viewmodels/overview/transfers.js',
+    // home.css carries the page shell and table, commands.css the .btn-icon,
+    // holdings.css the toolbar and numeric cells; transfers.css loads last.
+    style: [
+      'app/styles/overview/home.css',
+      'app/styles/overview/commands.css',
+      'app/styles/overview/holdings.css',
+      'app/styles/overview/transfers.css',
+    ],
+    showChrome: true,
+    // The page has its own connection picker, so the sidebar selector would be
+    // a second, conflicting control over the same thing.
+    showExchangeSelector: false,
+    title: 'Transfers',
+  });
+
   // Whitelisted Addresses page is hidden — withdraw rules read addresses
   // directly from the exchange, so this read-only view isn't needed.
   // router.register('whitelist', {

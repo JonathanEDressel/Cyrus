@@ -1,0 +1,125 @@
+/* Transfers page. The shell (.page-container, .data-table, .empty-row) comes
+   from home.css, the toolbar and numeric cells from holdings.css, and .btn-icon
+   from commands.css — this file only adds what's specific to transfers. */
+
+.transfer-in {
+  color: var(--success, #22c55e);
+}
+
+.transfer-out {
+  color: var(--danger, #ef4444);
+}
+
+.transfer-in i,
+.transfer-out i {
+  margin-right: 0.35rem;
+  font-size: 0.75rem;
+}
+
+.transfers-asset {
+  font-weight: 600;
+}
+
+.transfers-tag {
+  margin-left: 0.4rem;
+  padding: 0.05rem 0.35rem;
+  border-radius: 3px;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  background: var(--bg-tertiary, rgba(127, 127, 127, 0.18));
+  color: var(--text-secondary, #9ca3af);
+  vertical-align: middle;
+}
+
+.transfers-txid {
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 0.78rem;
+  max-width: 190px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-secondary, #9ca3af);
+}
+
+.transfers-status {
+  padding: 0.1rem 0.45rem;
+  border-radius: 10px;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.transfers-status-ok      { background: rgba(34, 197, 94, 0.14);  color: #22c55e; }
+.transfers-status-pending { background: rgba(234, 179, 8, 0.14);  color: #eab308; }
+.transfers-status-bad     { background: rgba(239, 68, 68, 0.14);  color: #ef4444; }
+.transfers-status-unknown { background: rgba(127, 127, 127, 0.14); color: #9ca3af; }
+
+/* Notices for the two actionable states: a key missing the funding-history
+   permission, and an exchange with no transfer API at all. */
+.transfers-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+  padding: 0.7rem 0.9rem;
+  border-radius: 6px;
+  border: 1px solid var(--border-color, rgba(127, 127, 127, 0.25));
+  background: var(--bg-secondary, rgba(127, 127, 127, 0.06));
+  color: var(--text-secondary, #9ca3af);
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+
+.transfers-notice i {
+  margin-top: 0.15rem;
+  color: var(--accent, #6366f1);
+}
+
+.transfers-progress {
+  margin-bottom: 1rem;
+}
+
+.transfers-progress-head {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.35rem;
+  font-size: 0.8rem;
+  color: var(--text-secondary, #9ca3af);
+}
+
+.transfers-progress-track {
+  height: 4px;
+  border-radius: 2px;
+  overflow: hidden;
+  background: var(--bg-tertiary, rgba(127, 127, 127, 0.2));
+}
+
+.transfers-progress-fill {
+  height: 100%;
+  width: 0;
+  border-radius: 2px;
+  background: var(--accent, #6366f1);
+  transition: width 0.4s ease;
+}
+
+.transfers-pager {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.7rem;
+  margin-top: 0.85rem;
+  font-size: 0.82rem;
+  color: var(--text-secondary, #9ca3af);
+}
+
+.transfers-pager .btn-icon[disabled] {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.transfers-footnote {
+  margin-top: 1.25rem;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: var(--text-secondary, #9ca3af);
+}
