@@ -13,12 +13,13 @@ Frontend (run from repo root):
 - `npm run watch` — recompile on change. Use this while developing the frontend.
 - `npm start` — `npm run build` then launch Electron. **Does not start the backend** (see below).
 - `npm run dev` — same, with `--dev` flag.
+- `npm run start:all` — starts the backend (`src/backend/venv`, falling back to the root `venv`), compiles, waits for port 5000, then launches Electron, all in one terminal (`scripts/dev.js`). Quitting Electron or Ctrl+C stops both. If port 5000 is already in use, it assumes that's a backend you started yourself and launches only the frontend.
 
 Backend (run from `src/backend/`, with the venv activated):
 - `python Server.py` — start Flask + the automation worker. Prints `CYRUS_PORT=<n>` once bound.
 - Setup: `python -m venv venv && venv\Scripts\activate && pip install -r requirements.txt`
 
-**Running the app in dev requires two terminals**: terminal 1 runs `python Server.py` in `src/backend/`, terminal 2 runs `npm start` at the root. Electron's `startBackend()` is a no-op in dev (`app.isPackaged` is false) — it assumes you launched the backend yourself on port 5000.
+**Running the app in dev**: `npm run start:all` does everything in one terminal. To do it by hand you need two terminals: terminal 1 runs `python Server.py` in `src/backend/`, terminal 2 runs `npm start` at the root. Electron's `startBackend()` is a no-op in dev (`app.isPackaged` is false) — it assumes you launched the backend yourself on port 5000.
 
 There is **no test suite** and **no linter configured**. To sanity-check backend edits, byte-compile the touched files: `venv\Scripts\python.exe -m py_compile <files...>`. There is no equivalent for the frontend beyond `tsc` succeeding.
 

@@ -7,6 +7,7 @@
   "main": "dist/main.js",
   "scripts": {
     "start": "npm run build && electron .",
+    "start:all": "node scripts/dev.js",
     "build": "tsc",
     "watch": "tsc -w",
     "dev": "npm run build && electron . --dev",
