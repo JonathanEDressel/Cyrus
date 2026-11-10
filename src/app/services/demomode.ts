@@ -1193,6 +1193,146 @@ const DemoData = (() => {
 
   // ── Profile ────────────────────────────────────────────────────────────────
 
+  // ── Taxes ────────────────────────────────────────────────────────────────
+  // A small, fixed set of sales derived from the reference prices, so the
+  // Taxes page and the Limit Orders "gain if filled" column have something
+  // consistent to show. Nothing here is computed by the real engine.
+
+  /** Fixture unit cost for an asset: a fixed fraction of today's price. */
+  function demoUnitCost(asset: string): number | null {
+    const price = PRICE[asset];
+    if (!price || ['USD', 'USDC', 'USDT', 'DAI'].includes(asset)) return null;
+    // ADA is the demo's "deposited from outside" coin, so its cost is unknown.
+    if (asset === 'ADA') return null;
+    return price * 0.72;
+  }
+
+  const TRADE_COUNTS: Record<number, number> = {
+    [KRAKEN]: 412, [COINBASE]: 187, [BINANCE]: 263, [ROBINHOOD]: 58,
+  };
+
+  function taxStatus(): any {
+    return {
+      any_pending: false,
+      connections: connections().map(c => ({
+        connection_id: c.id,
+        exchange: c.exchange_name,
+        label: c.label,
+        trade_count: TRADE_COUNTS[c.id] || 0,
+        trades: {
+          state: 'idle', backfill_complete: true,
+          synced_through: Math.floor(Date.now() / 1000) - 600,
+          last_sync_ok_at: Math.floor(Date.now() / 1000) - 600,
+          age_seconds: 600, last_error: null, skipped_markets: 0,
+        },
+      })),
+    };
+  }
+
+  function taxGains(method: 'fifo' | 'hifo' = 'fifo', year?: number, needsInfoOnly = false): any {
+    const thisYear = new Date().getUTCFullYear();
+    const y = year || thisYear;
+    const yearStart = Date.UTC(y, 0, 1) / 1000;
+    const span = y === thisYear ? (Date.now() / 1000 - yearStart) : 365 * 86400;
+    // [asset, amount, connection, fraction of the year, held days, cost factor]
+    const sales: Array<[string, number, number, number, number, number]> = y === thisYear ? [
+      ['BTC', 0.12, KRAKEN, 0.08, 540, 0.48],
+      ['ETH', 2.5, COINBASE, 0.21, 210, 0.81],
+      ['SOL', 40, BINANCE, 0.33, 95, 1.18],
+      ['LINK', 150, KRAKEN, 0.47, 420, 0.62],
+      ['DOGE', 50000, ROBINHOOD, 0.58, 160, 0.9],
+      ['ADA', 2000, KRAKEN, 0.66, 0, 0],
+      ['AVAX', 120, KRAKEN, 0.79, 61, 1.35],
+      ['XRP', 800, COINBASE, 0.9, 700, 0.41],
+    ] : [
+      ['BTC', 0.2, KRAKEN, 0.15, 300, 0.7],
+      ['ETH', 3, BINANCE, 0.4, 500, 0.55],
+      ['LTC', 30, COINBASE, 0.7, 120, 1.1],
+    ];
+    const label: Record<number, string> = {
+      [KRAKEN]: 'Kraken (Main)', [COINBASE]: 'Coinbase (Trading)',
+      [BINANCE]: 'Binance (Spot)', [ROBINHOOD]: 'Robinhood (Crypto)',
+    };
+    // HIFO picks the dearest lots, so the same sales show a higher cost.
+    const hifo = method === 'hifo' ? 1.12 : 1;
+
+    const disposals = sales.map(([asset, amount, conn, at, held, factor]) => {
+      const soldAt = Math.floor(yearStart + span * at);
+      const proceeds = amount * PRICE[asset] * (y === thisYear ? 1 : 0.8);
+      const missing = factor === 0;
+      const cost = missing ? null : proceeds * Math.min(factor * hifo, 1.6);
+      const heldDays = method === 'hifo' ? Math.round(held * 0.7) : held;
+      return {
+        // The unknown-cost ADA row offers the same Fix as a real one would.
+        fix: missing ? {
+          kind: 'deposit', transfer_id: 1, asset, amount,
+          occurred_at: soldAt - 45 * 86400, connection_id: conn,
+        } : null,
+        trade_id: null,
+        asset, amount,
+        acquired_at: missing ? null : soldAt - heldDays * 86400,
+        sold_at: soldAt,
+        proceeds_usd: Math.round(proceeds * 100) / 100,
+        cost_usd: cost === null ? null : Math.round(cost * 100) / 100,
+        gain_usd: cost === null ? null : Math.round((proceeds - cost) * 100) / 100,
+        term: missing ? null : (heldDays > 365 ? 'long' : 'short'),
+        missing_basis: missing, unpriced: false,
+        basis_source: missing ? 'deposit' : 'trade',
+        kind: 'trade', pair: `${asset}/USD`,
+        connection_id: conn, connection: label[conn],
+      };
+    }).sort((a, b) => b.sold_at - a.sold_at);
+
+    const summary = {
+      proceeds_usd: 0, cost_usd: 0, gain_usd: 0, short_term_gain_usd: 0,
+      long_term_gain_usd: 0, disposals: disposals.length, missing_basis: 0, unpriced: 0,
+    };
+    for (const d of disposals) {
+      summary.proceeds_usd += d.proceeds_usd;
+      if (d.missing_basis) { summary.missing_basis += 1; continue; }
+      summary.cost_usd += d.cost_usd!;
+      summary.gain_usd += d.gain_usd!;
+      if (d.term === 'long') summary.long_term_gain_usd += d.gain_usd!;
+      else summary.short_term_gain_usd += d.gain_usd!;
+    }
+
+    const needsInfo = disposals.filter(d => d.missing_basis).length;
+    const shown = needsInfoOnly ? disposals.filter(d => d.missing_basis) : disposals;
+    return {
+      method, year: y, years: [thisYear, thisYear - 1],
+      summary, disposals: shown, disposals_total: shown.length,
+      needs_info: needsInfo, needs_info_only: needsInfoOnly,
+      warnings: y === thisYear ? [{
+        code: 'unknown_deposit', asset: 'ADA', amount: 2000,
+        message: "2,000 ADA arrived by deposit from outside Cyrus's connected exchanges, so its cost is unknown.",
+      }] : [],
+      trade_count: Object.values(TRADE_COUNTS).reduce((a, b) => a + b, 0),
+      sync: taxStatus(),
+    };
+  }
+
+  function projectSells(method: 'fifo' | 'hifo', sells: any[]): any {
+    const results: Record<string, any> = {};
+    for (const s of sells) {
+      const unit = demoUnitCost(String(s.asset).toUpperCase());
+      const proceeds = s.amount * s.price_usd;
+      if (unit === null) {
+        results[s.key] = {
+          proceeds_usd: proceeds, cost_usd: null, gain_usd: null, missing_basis: true,
+          known_amount: 0, known_cost_usd: 0, known_gain_usd: 0,
+        };
+        continue;
+      }
+      const cost = s.amount * unit * (method === 'hifo' ? 1.12 : 1);
+      results[s.key] = {
+        proceeds_usd: proceeds, cost_usd: cost, gain_usd: proceeds - cost,
+        missing_basis: false, known_amount: s.amount, known_cost_usd: cost,
+        known_gain_usd: proceeds - cost,
+      };
+    }
+    return { method, results, has_history: true };
+  }
+
   function profile(): UserModel {
     // Keep whatever theme is currently applied so toggling doesn't flip it.
     const theme = (localStorage.getItem('cyrus_view_theme') as 'dark' | 'light')
@@ -1257,6 +1397,9 @@ const DemoData = (() => {
     ohlcv,
     ticker,
     profile,
+    taxStatus,
+    taxGains,
+    projectSells,
     assistantReply,
     assistantConfirmed,
     wrap,
@@ -1326,6 +1469,29 @@ class DemoMode {
       }],
       [WalletController, 'importFile', async () => {
         throw new Error('Importing wallets is not available in demo mode.');
+      }],
+      [TaxController, 'getStatus', async () => DemoData.taxStatus()],
+      [TaxController, 'getGains', async (method: 'fifo' | 'hifo', year?: number, needsInfoOnly?: boolean) =>
+        DemoData.taxGains(method, year, !!needsInfoOnly)],
+      [TaxController, 'getManual', async () => ({ lots: [], deposits: [], prices: [] })],
+      // The demo's gains are a fixed fixture, so a saved cost would appear to do
+      // nothing. Refusing says why instead of looking broken.
+      ...(['addLot', 'deleteLot', 'setDepositCost', 'deleteDepositCost', 'setTradePrice',
+           'deleteTradePrice'] as const).map(name =>
+        [TaxController, name, async () => {
+          throw new Error('Entering cost basis is not available in demo mode.');
+        }] as [any, string, (...args: any[]) => any]),
+      // Nothing to sync against: report an instantly-complete pass.
+      [TaxController, 'sync', async () => ({
+        complete: true, new_rows: 0, already_running: false, errors: [],
+        sync: DemoData.taxStatus(),
+      })],
+      [TaxController, 'projectSells', async (method: 'fifo' | 'hifo', sells: any[]) =>
+        DemoData.projectSells(method, sells)],
+      // Tax files are built by the backend from real history. A file full of
+      // fixture sales could be mistaken for a real one, so refuse instead.
+      [TaxController, 'exportFile', async () => {
+        throw new Error('Tax exports are not available in demo mode.');
       }],
       // Placement is honoured for the same reason as cancelling: it only writes
       // to the fake order book, and a no-op would make the ladder look broken.

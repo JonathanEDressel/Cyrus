@@ -1,0 +1,151 @@
+<div class="page-container taxes-page" id="taxes-page">
+  <div class="overview-header">
+    <h1 class="page-title">Taxes</h1>
+    <p class="page-subtitle">
+      Realized gains and cost basis, worked out from the trades and transfers on your connected exchanges
+    </p>
+  </div>
+
+  <div class="alert alert-warning d-none" id="taxes-error">
+    <span id="taxes-error-message"></span>
+  </div>
+
+  <div class="alert alert-success d-none" id="taxes-success">
+    <span id="taxes-success-message"></span>
+  </div>
+
+  <div class="transfers-progress d-none" id="taxes-progress">
+    <div class="transfers-progress-head">
+      <span id="taxes-progress-label">Syncing trade history…</span>
+      <span id="taxes-progress-count"></span>
+    </div>
+    <div class="transfers-progress-track">
+      <div class="transfers-progress-fill taxes-progress-indeterminate" id="taxes-progress-fill"></div>
+    </div>
+  </div>
+
+  <div class="overview-section">
+    <div class="section-header">
+      <h2 class="section-title">Trade history</h2>
+      <div class="holdings-toolbar">
+        <button type="button" class="btn-secondary taxes-btn-sm" id="taxes-sync-btn"
+                title="Fetch new trades and transfers from every connected exchange">
+          <i class="fa-solid fa-rotate"></i> Sync history
+        </button>
+      </div>
+    </div>
+    <div class="taxes-connections" id="taxes-connections">
+      <div class="taxes-empty">Loading connections…</div>
+    </div>
+  </div>
+
+  <div class="overview-section">
+    <div class="section-header taxes-gains-head">
+      <h2 class="section-title">Realized gains</h2>
+      <div class="holdings-toolbar taxes-toolbar">
+        <div class="orders-tab-strip" id="taxes-method-tabs" role="group" aria-label="Lot method">
+          <button class="rules-tab-btn active" data-method="fifo"
+                  title="First in, first out: the oldest coins are treated as sold first">FIFO</button>
+          <button class="rules-tab-btn" data-method="hifo"
+                  title="Highest in, first out: the most expensive coins are treated as sold first, which usually means the smallest gain">HIFO</button>
+        </div>
+        <select id="taxes-year" class="holdings-conn-select" aria-label="Tax year"></select>
+        <button type="button" class="btn-secondary taxes-btn-sm taxes-needs-btn d-none" id="taxes-needs-info"
+                aria-pressed="false"
+                title="Show only the sales missing a cost basis or a USD price, so you can fill them in">
+          <i class="fa-solid fa-circle-exclamation"></i> Needs info
+          <span class="taxes-needs-count" id="taxes-needs-count">0</span>
+        </button>
+        <button type="button" class="btn-secondary taxes-btn-sm" id="taxes-export-8949"
+                title="One row per sale, in the columns of IRS Form 8949, for the selected year">
+          <i class="fa-solid fa-file-csv"></i> Form 8949 CSV
+        </button>
+        <button type="button" class="btn-secondary taxes-btn-sm" id="taxes-export-koinly"
+                title="Every trade and transfer in Koinly's universal import format (full history)">
+          <i class="fa-solid fa-file-export"></i> Koinly CSV
+        </button>
+      </div>
+    </div>
+
+    <div class="taxes-summary" id="taxes-summary"></div>
+
+    <div class="taxes-warnings d-none" id="taxes-warnings"></div>
+
+    <div class="data-table-wrapper">
+      <table class="data-table" id="taxes-table">
+        <thead>
+          <tr>
+            <th>Asset</th>
+            <th class="taxes-num">Amount</th>
+            <th>Acquired</th>
+            <th>Sold</th>
+            <th class="taxes-num">Proceeds</th>
+            <th class="taxes-num">Cost basis</th>
+            <th class="taxes-num">Gain / loss</th>
+            <th>Term</th>
+            <th>Exchange</th>
+            <th class="taxes-fix-col"><span class="visually-hidden">Fix</span></th>
+          </tr>
+        </thead>
+        <tbody id="taxes-tbody">
+          <tr class="empty-row"><td colspan="10">Loading gains…</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="taxes-table-note d-none" id="taxes-table-note"></p>
+  </div>
+
+  <div class="overview-section">
+    <div class="section-header taxes-gains-head">
+      <h2 class="section-title" id="taxes-manual-title">Entered by hand</h2>
+      <button type="button" class="btn-secondary taxes-btn-sm" id="taxes-add-lot"
+              title="Record a purchase Cyrus has no history for: bought before an exchange's records start, on another platform, or on a market Cyrus didn't check">
+        <i class="fa-solid fa-plus"></i> Add a purchase
+      </button>
+    </div>
+    <p class="taxes-manual-lead">
+      Costs, purchases and prices you've filled in for what the exchange history couldn't supply.
+      They're used in every figure above and marked "entered manually" in the Form 8949 export.
+    </p>
+    <div class="taxes-manual" id="taxes-manual">
+      <div class="taxes-empty">Nothing entered yet.</div>
+    </div>
+  </div>
+
+  <p class="transfers-footnote">
+    <strong>Not tax advice.</strong> Figures are worked out from the history Cyrus could fetch
+    from your connected exchanges, valued in USD at the time of each trade, with dates in UTC.
+    Coins are tracked per exchange account; moving them between two of your connected
+    exchanges keeps their original cost and date. USD and dollar stablecoins are treated as
+    cash. Anything Cyrus can't account for (coins deposited from elsewhere, or sold beyond
+    the history it has) is flagged as <em>missing cost basis</em> rather than guessed. Use
+    <strong>Fix</strong> to fill those gaps from your own records, and review the export
+    with your tax software or accountant before filing.
+  </p>
+</div>
+
+<!-- Fix dialog. One shell, three forms: the body is built per fix kind
+     (deposit cost, missing purchase, USD price) by the viewmodel. -->
+<div class="edit-rule-overlay d-none" id="taxes-fix-overlay">
+  <div class="edit-rule-modal taxes-fix-modal" role="dialog" aria-modal="true" aria-labelledby="taxes-fix-title">
+    <div class="edit-rule-modal-header">
+      <div>
+        <h3 id="taxes-fix-title">Fill in missing information</h3>
+        <span class="edit-rule-modal-subtitle" id="taxes-fix-subtitle"></span>
+      </div>
+      <button class="edit-rule-modal-close" id="taxes-fix-close" title="Close">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+    </div>
+    <div class="edit-rule-modal-body">
+      <div class="alert alert-warning d-none" id="taxes-fix-error"></div>
+      <p class="taxes-fix-context" id="taxes-fix-context"></p>
+      <div id="taxes-fix-form"></div>
+      <p class="taxes-fix-preview" id="taxes-fix-preview" aria-live="polite"></p>
+    </div>
+    <div class="edit-rule-modal-footer">
+      <button class="btn-secondary" id="taxes-fix-cancel">Cancel</button>
+      <button class="btn-primary" id="taxes-fix-save">Save</button>
+    </div>
+  </div>
+</div>

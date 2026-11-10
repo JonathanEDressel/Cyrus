@@ -71,7 +71,25 @@ class _Disabled(Exception):
     """A failure that will recur until a human intervenes (usually a key scope)."""
 
 
-def _classify(exc: Exception, exchange_name: str) -> tuple[bool, str]:
+#: Wording per history type for the two messages that name it. The trade sync
+#: (helper/TradeSync.py) shares this classifier rather than keeping a copy.
+_SUBJECTS = {
+    'transfer': {
+        'noun': 'transfer history',
+        'permission': ('the funding-history permission (Kraken: "Query Funds", '
+                       'Binance: "Enable Reading")'),
+    },
+    'trade': {
+        'noun': 'trade history',
+        'permission': ('permission to read closed orders and trades (Kraken: '
+                       '"Query Closed Orders & Trades", Binance: "Enable Reading", '
+                       'Coinbase: "View")'),
+    },
+}
+
+
+def _classify(exc: Exception, exchange_name: str,
+              subject: str = 'transfer') -> tuple[bool, str]:
     """``(is_permanent, message)`` for an exception raised while fetching.
 
     The clause order tracks ccxt's real hierarchy rather than the intuitive one:
@@ -81,6 +99,8 @@ def _classify(exc: Exception, exchange_name: str) -> tuple[bool, str]:
     neither. ``AttributeError`` is in here because the Robinhood adapter simply
     does not define these methods, and that miss is not a ccxt error at all.
     """
+    words = _SUBJECTS.get(subject, _SUBJECTS['transfer'])
+    noun = words['noun']
     if isinstance(exc, (ccxt.DDoSProtection, ccxt.RateLimitExceeded)):
         return False, f"{exchange_name} is rate-limiting requests; will resume shortly."
     if isinstance(exc, (ccxt.ExchangeNotAvailable, ccxt.RequestTimeout)):
@@ -90,17 +110,18 @@ def _classify(exc: Exception, exchange_name: str) -> tuple[bool, str]:
         # first sync: existing keys were only ever validated against
         # fetch_balance, and transfer history needs a funding/read scope on top.
         return True, (
-            f"Your {exchange_name} API key was rejected for transfer history. "
-            f"This usually means the key lacks the funding-history permission "
-            f"(Kraken: \"Query Funds\", Binance: \"Enable Reading\"). Regenerate "
+            f"Your {exchange_name} API key was rejected for {noun}. "
+            f"This usually means the key lacks {words['permission']}. Regenerate "
             f"the key with that permission and re-validate it in your profile.")
     if isinstance(exc, (ccxt.NotSupported, ccxt.ArgumentsRequired, ccxt.BadRequest)):
-        return True, f"{exchange_name} does not expose this transfer history ({exc})."
+        return True, f"{exchange_name} does not expose this {noun} ({exc})."
     if isinstance(exc, ccxt.NetworkError):
         return False, f"Network error talking to {exchange_name}; will retry."
     if isinstance(exc, (RobinhoodError, AttributeError)):
-        return True, f"{exchange_name} has no transfer-history API."
-    return False, str(exc)
+        return True, f"{exchange_name} has no {noun} API."
+    # Some exceptions (cryptography's InvalidToken, for one) stringify to ''.
+    # An empty message reads as "no error" to every caller, so never return one.
+    return False, str(exc) or f"{type(exc).__name__} while reading {exchange_name} {noun}."
 
 
 def _resume_point(state: dict, config: dict, now: int) -> int:

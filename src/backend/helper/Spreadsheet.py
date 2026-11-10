@@ -384,3 +384,37 @@ def read_table(data: bytes, filename: str = '') -> list[list[str]]:
     # Not a zip and no CSV-ish name: still try CSV, since that is the only other
     # thing it can usefully be, and the error from there is the clearer one.
     return read_csv_rows(data)
+
+
+#: Leading characters that make Excel/Sheets treat a cell as a formula.
+_FORMULA_LEADS = ('=', '+', '-', '@', '\t', '\r')
+
+
+def _csv_cell(value) -> str:
+    """One cell as text, defused against formula injection.
+
+    Numbers pass through untouched — a negative gain must stay a number, not
+    become the text "'-12.5". Only TEXT that starts like a formula is prefixed
+    with an apostrophe, which spreadsheets show as nothing and treat as "this
+    is text". Exchange-supplied strings (labels, ids) are the risk here.
+    """
+    if value is None:
+        return ''
+    if isinstance(value, bool):
+        return 'TRUE' if value else 'FALSE'
+    if isinstance(value, (int, float)):
+        return str(value)
+    text = str(value)
+    if text.startswith(_FORMULA_LEADS):
+        return "'" + text
+    return text
+
+
+def write_csv(headers: list[str], rows: list[list]) -> bytes:
+    """CSV bytes with a UTF-8 BOM, so Excel opens it as UTF-8 instead of cp1252."""
+    buffer = io.StringIO(newline='')
+    writer = csv.writer(buffer, lineterminator='\r\n')
+    writer.writerow([_csv_cell(h) for h in headers])
+    for row in rows:
+        writer.writerow([_csv_cell(cell) for cell in row])
+    return ('﻿' + buffer.getvalue()).encode('utf-8')

@@ -38,6 +38,19 @@ SUPPORTED_EXCHANGES: dict[str, dict] = {
             # so they need more room than the 1000ms used for order entry.
             'page_pacing_ms': 1200,
         },
+        # TradesHistory returns every pair at once but only 50 rows a call,
+        # newest first, so each time window is paged with `ofs` until a short
+        # page comes back. ccxt maps `until` to the endpoint's `end`.
+        'supports_trade_history': True,
+        'trade_history': {
+            'strategy': 'window',
+            'paging': 'ofs',
+            'window_seconds': 90 * 86400,
+            'page_cap': 50,
+            'history_epoch': 1420070400,   # 2015-01-01
+            # TradesHistory costs 2 units of the call-rate counter.
+            'page_pacing_ms': 2000,
+        },
         'has_sandbox': False,
         'website': 'https://www.kraken.com',
         'api_key_url': 'https://www.kraken.com/u/security/api',
@@ -70,6 +83,21 @@ SUPPORTED_EXCHANGES: dict[str, dict] = {
             'history_epoch': 1370044800,   # 2013-06-01
             'page_pacing_ms': 350,
         },
+        # Advanced Trade's historical fills endpoint takes no symbol and
+        # accepts start/end times, so it walks time windows like Kraken, with
+        # ccxt following the response cursor inside each window. page_cap is
+        # ccxt's per-call size (250) times paginationCalls: a window returning
+        # that many was probably truncated and is halved.
+        'supports_trade_history': True,
+        'trade_history': {
+            'strategy': 'window',
+            'paging': 'paginate',
+            'pagination_calls': 20,
+            'window_seconds': 30 * 86400,
+            'page_cap': 5000,
+            'history_epoch': 1370044800,   # 2013-06-01
+            'page_pacing_ms': 350,
+        },
         'has_sandbox': False,
         'website': 'https://www.coinbase.com',
         'api_key_url': 'https://www.coinbase.com/settings/api',
@@ -95,6 +123,16 @@ SUPPORTED_EXCHANGES: dict[str, dict] = {
             'history_epoch': 1498867200,   # 2017-07-01, Binance launch
             'page_pacing_ms': 500,
         },
+        # myTrades demands a symbol, and a startTime/endTime pair may span at
+        # most 24 hours, so the sync walks each candidate symbol by fromId
+        # (trade id) instead of by time. See TradeSync._binance_symbols.
+        'supports_trade_history': True,
+        'trade_history': {
+            'strategy': 'per_symbol',
+            'page_cap': 1000,
+            'history_epoch': 1498867200,   # 2017-07-01
+            'page_pacing_ms': 300,
+        },
         'has_sandbox': False,
         'website': 'https://www.binance.com',
         'api_key_url': 'https://www.binance.com/en/my/settings/api-management',
@@ -118,6 +156,15 @@ SUPPORTED_EXCHANGES: dict[str, dict] = {
         # bare AttributeError rather than anything ccxt-shaped.
         'supports_transfer_history': False,
         'transfer_history': None,
+        # No fills endpoint; each filled order becomes one synthetic trade at
+        # its average price. The adapter already pages through every result.
+        'supports_trade_history': True,
+        'trade_history': {
+            'strategy': 'orders',
+            'page_cap': 0,
+            'history_epoch': 1514764800,   # 2018-01-01
+            'page_pacing_ms': 0,
+        },
         # Robinhood issues no secret: the user generates an Ed25519 keypair,
         # registers the public half, and pastes the private half here. The
         # Profile page offers a key generator when this is set.
@@ -201,6 +248,7 @@ def get_supported_exchanges() -> list[dict]:
             'supports_withdraw': meta.get('supports_withdraw', False),
             'supports_rebalance': meta.get('supports_rebalance', False),
             'supports_transfer_history': meta.get('supports_transfer_history', False),
+            'supports_trade_history': meta.get('supports_trade_history', False),
             'order_pacing_ms': meta.get('order_pacing_ms', DEFAULT_ORDER_PACING_MS),
             'needs_generated_keypair': meta.get('needs_generated_keypair', False),
             'has_sandbox': meta.get('has_sandbox', False),
@@ -244,6 +292,25 @@ def get_transfer_history_config(exchange_name: str) -> dict | None:
     Returns None when the exchange has no transfer history at all.
     """
     return SUPPORTED_EXCHANGES.get(exchange_name, {}).get('transfer_history')
+
+
+def supports_trade_history(exchange_name: str) -> bool:
+    """True when executed fills can be read for *exchange_name*.
+
+    Advisory in the same way as :func:`supports_transfer_history`: the key may
+    still lack the read permission, which the sync records per connection.
+    """
+    return SUPPORTED_EXCHANGES.get(exchange_name, {}).get('supports_trade_history', False)
+
+
+def get_trade_history_config(exchange_name: str) -> dict | None:
+    """Fetch-strategy/pacing metadata for *exchange_name*'s fill history.
+
+    ``strategy`` is ``'window'`` (one call returns every pair, walked forward
+    through time windows, paged by ``paging``), ``'per_symbol'`` (Binance — one walk per market, by trade id) or
+    ``'orders'`` (Robinhood — filled orders stand in for fills).
+    """
+    return SUPPORTED_EXCHANGES.get(exchange_name, {}).get('trade_history')
 
 
 def get_order_pacing_ms(exchange_name: str) -> int:

@@ -167,6 +167,34 @@ class TransferDbContext:
         )
 
     @staticmethod
+    def list_for_cost_basis(user_id: int) -> list[dict]:
+        """Every transfer leg with the match fields the cost-basis replay needs.
+
+        Oldest first, and joined to the connection label so an export can name
+        where a leg landed without a second query per row.
+        """
+        return execute_query_all(
+            '''SELECT t.id, t.exchange_connection_id, t.exchange_name, t.kind,
+                      t.external_id, t.txid, t.asset, t.amount, t.amount_num,
+                      t.fee_amount, t.fee_currency, t.status, t.occurred_at,
+                      t.is_internal, t.internal_match_id, t.match_source,
+                      c.label AS connection_label
+               FROM transfer_history t
+               LEFT JOIN exchange_connections c ON c.id = t.exchange_connection_id
+               WHERE t.user_id = ?
+               ORDER BY t.occurred_at ASC, t.id ASC''',
+            (user_id,)
+        )
+
+    @staticmethod
+    def get_assets_for_connection(conn_id: int) -> list[str]:
+        rows = execute_query_all(
+            'SELECT DISTINCT asset FROM transfer_history WHERE exchange_connection_id = ?',
+            (int(conn_id),)
+        )
+        return [str(r['asset']).upper() for r in rows if r['asset']]
+
+    @staticmethod
     def get_distinct_assets(user_id: int) -> list[str]:
         rows = execute_query_all(
             '''SELECT DISTINCT asset FROM transfer_history

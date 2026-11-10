@@ -1242,3 +1242,223 @@ def get_ohlcv_price_map(exchange: ccxt.Exchange, base_asset: str,
             out[bucket] = float(c[4])
         return out
     return {}
+
+
+# ---------------------------------------------------------------------------
+# Trade (fill) history — the raw material for cost basis
+# ---------------------------------------------------------------------------
+
+def trade_dedupe_key(external_id, order_id, symbol: str, side: str,
+                     amount_str: str, price_str: str, occurred_at: int) -> str:
+    """A never-null identity for one fill.
+
+    Same reasoning and same fallback order as :func:`transfer_dedupe_key`: the
+    exchange's own trade id first (stable and unique), then the order id plus
+    the fill's own shape (an order can fill in several pieces, so the order id
+    alone would collapse them), then a content hash as the last resort.
+    """
+    if external_id:
+        return str(external_id)
+    if order_id:
+        return f"ord:{order_id}:{occurred_at}:{amount_str}:{price_str}"
+    raw = f"{symbol}|{side}|{amount_str}|{price_str}|{occurred_at}"
+    return "syn:" + hashlib.sha1(raw.encode('utf-8')).hexdigest()
+
+
+def _split_symbol(symbol: str) -> tuple[str, str] | None:
+    """``'BTC/USD'`` -> ``('BTC', 'USD')``; None for anything that isn't spot.
+
+    A ``:`` marks a derivative (``BTC/USDT:USDT``), whose P&L is settled rather
+    than acquired and disposed of — it has no place in a spot cost-basis ledger.
+    """
+    if not symbol or ':' in symbol or '/' not in symbol:
+        return None
+    base, quote = symbol.split('/', 1)
+    base, quote = base.strip().upper(), quote.strip().upper()
+    if not base or not quote:
+        return None
+    return base, quote
+
+
+def _trade_fee(raw: dict) -> dict:
+    """The fill's fee as ``{'cost', 'currency'}``, or an empty dict.
+
+    ccxt reports either ``fee`` or a ``fees`` list. Several fees in different
+    currencies on one fill are vanishingly rare on spot; when it happens the
+    first non-zero one is kept and the full list survives in ``raw_payload``.
+    """
+    fee = raw.get('fee')
+    if isinstance(fee, dict) and fee.get('cost') not in (None, 0, '0'):
+        return fee
+    for item in raw.get('fees') or []:
+        if isinstance(item, dict) and item.get('cost') not in (None, 0, '0'):
+            return item
+    return {}
+
+
+def normalize_trade(raw: dict) -> dict | None:
+    """One ccxt trade structure -> one ``trade_history`` row (minus USD pricing).
+
+    Returns None for anything that cannot be a spot fill: a derivative symbol,
+    an unknown side, or a zero amount. USD valuation is deliberately not done
+    here — it needs further API calls, which belong to the sync loop that owns
+    the rate-limit budget.
+    """
+    raw = raw or {}
+    pair = _split_symbol(raw.get('symbol') or '')
+    side = str(raw.get('side') or '').lower()
+    if not pair or side not in ('buy', 'sell'):
+        return None
+    base, quote = pair
+
+    amount_str = _canonical_amount(raw.get('amount'))
+    price_str = _canonical_amount(raw.get('price'))
+    amount_num = _amount_float(raw.get('amount'))
+    price_num = _amount_float(raw.get('price'))
+    if amount_num <= 0:
+        return None
+
+    cost_num = _amount_float(raw.get('cost')) or amount_num * price_num
+    ts = raw.get('timestamp')
+    occurred_at = int(ts // 1000) if ts else 0
+    fee = _trade_fee(raw)
+
+    return {
+        'external_id': str(raw['id']) if raw.get('id') else None,
+        'order_id': str(raw['order']) if raw.get('order') else None,
+        'dedupe_key': trade_dedupe_key(raw.get('id'), raw.get('order'), raw.get('symbol'),
+                                       side, amount_str, price_str, occurred_at),
+        'symbol': f"{base}/{quote}",
+        'base': base,
+        'quote': quote,
+        'side': side,
+        'amount': amount_str,
+        'amount_num': amount_num,
+        'price': price_str,
+        'price_num': price_num,
+        'cost_num': cost_num,
+        'fee_amount': _canonical_amount(fee.get('cost')) if fee else None,
+        'fee_amount_num': _amount_float(fee.get('cost')) if fee else None,
+        'fee_currency': str(fee.get('currency')).upper() if fee.get('currency') else None,
+        'occurred_at': occurred_at,
+        'raw_payload': _payload_json(raw.get('info')),
+    }
+
+
+def normalize_filled_order(order: dict) -> list[dict]:
+    """A filled order -> its fills, for an exchange with no fills endpoint.
+
+    Robinhood is the case. Its order carries an ``executions`` list (price,
+    quantity, timestamp per partial fill) which is preferred because it gives
+    each piece its real time and price; failing that, the whole order becomes
+    one fill at its average price, timed at its last update.
+    """
+    order = order or {}
+    info = order.get('info') or {}
+    pair = _split_symbol(order.get('symbol') or '')
+    side = str(order.get('side') or '').lower()
+    if not pair or side not in ('buy', 'sell'):
+        return []
+
+    order_id = str(order.get('id') or info.get('id') or '')
+    pieces = []
+    for i, ex in enumerate(info.get('executions') or []):
+        if not isinstance(ex, dict):
+            continue
+        ts = _iso_to_ms(ex.get('timestamp'))
+        pieces.append({
+            'id': f"{order_id}:{i}" if order_id else None,
+            'order': order_id or None,
+            'symbol': order.get('symbol'),
+            'side': side,
+            'amount': ex.get('quantity'),
+            'price': ex.get('effective_price'),
+            'timestamp': ts if ts is not None else order.get('timestamp'),
+            'info': ex,
+        })
+
+    if not pieces:
+        filled = order.get('filled') or order.get('amount')
+        price = order.get('average') or order.get('price')
+        ts = _iso_to_ms(info.get('updated_at')) or order.get('timestamp')
+        pieces.append({
+            'id': f"{order_id}:0" if order_id else None,
+            'order': order_id or None,
+            'symbol': order.get('symbol'),
+            'side': side,
+            'amount': filled,
+            'price': price,
+            'timestamp': ts,
+            'info': info,
+        })
+
+    rows = []
+    for piece in pieces:
+        row = normalize_trade(piece)
+        if row is not None:
+            rows.append(row)
+    return rows
+
+
+def _iso_to_ms(value) -> int | None:
+    """ISO-8601 (``...Z`` or offset) -> epoch ms; None when absent or unparseable."""
+    if not value:
+        return None
+    if isinstance(value, (int, float)):
+        return int(value)
+    from datetime import datetime, timezone
+    try:
+        dt = datetime.fromisoformat(str(value).replace('Z', '+00:00'))
+    except ValueError:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return int(dt.timestamp() * 1000)
+
+
+def fetch_trades_page(exchange, symbol: str | None, since_ms: int | None,
+                      limit: int, params: dict | None = None) -> list[dict]:
+    """One page of the account's fills, raw ccxt structures, oldest first.
+
+    Sorted here because exchanges disagree on order and every caller advances
+    its cursor from the last row — an unsorted page would move it too far and
+    skip the fills in between.
+    """
+    raw = exchange.fetch_my_trades(symbol, since_ms, limit or None, params or {}) or []
+    return sorted(raw, key=lambda t: (t.get('timestamp') or 0, str(t.get('id') or '')))
+
+
+def get_usd_price_at(exchange, asset: str, ts_sec: int) -> tuple[float, str] | None:
+    """USD value of one *asset* at *ts_sec*, as ``(price, source)``, or None.
+
+    Reads the hourly candle that contains the moment, from the first USD-ish
+    market the exchange lists for the asset. Hourly is the compromise: daily
+    closes can sit far from an intraday fill on a volatile day, and minute
+    candles don't reach back far on most exchanges. None (never 0) when no
+    market or candle exists, so the caller can flag the value as unknown.
+    """
+    asset = str(asset or '').upper()
+    if not asset:
+        return None
+    try:
+        exchange.load_markets()
+    except Exception:
+        return None
+    hour = int(ts_sec) - int(ts_sec) % 3600
+    for quote in ('USD', 'USDT', 'USDC'):
+        symbol = f"{asset}/{quote}"
+        if symbol not in (exchange.markets or {}):
+            continue
+        try:
+            candles = exchange.fetch_ohlcv(symbol, timeframe='1h',
+                                           since=(hour - 3600) * 1000, limit=3) or []
+        except Exception:
+            continue
+        best = None
+        for c in candles:
+            if int(c[0] // 1000) <= int(ts_sec):
+                best = c
+        best = best or (candles[0] if candles else None)
+        if best and best[4]:
+            return float(best[4]), f"ohlcv:{symbol}:1h"
+    return None

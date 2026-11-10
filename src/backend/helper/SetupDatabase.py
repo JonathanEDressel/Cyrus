@@ -249,6 +249,116 @@ def setup_database():
             )
         ''')
 
+        # Executed fills pulled from the exchanges — the raw material for cost
+        # basis and realized gains. Shaped like transfer_history and for the
+        # same reasons: durable, deduplicated, epoch SECONDS, and a NOT NULL
+        # dedupe_key so a re-sync can never insert a silent duplicate (which
+        # would surface as a wrong tax figure, the worst place for one).
+        #
+        # quote_usd_price is the USD value of ONE unit of the quote asset at the
+        # time of the fill: 1.0 for USD and dollar stablecoins, a historical
+        # candle close for BTC- or ETH-quoted pairs, NULL when it couldn't be
+        # priced (the cost-basis engine flags those rather than guessing).
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS trade_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                exchange_connection_id INTEGER NOT NULL,
+                exchange_name TEXT NOT NULL,
+                external_id TEXT,
+                order_id TEXT,
+                dedupe_key TEXT NOT NULL,
+                symbol TEXT NOT NULL,
+                base TEXT NOT NULL,
+                quote TEXT NOT NULL,
+                side TEXT NOT NULL,
+                amount TEXT NOT NULL,
+                amount_num REAL NOT NULL DEFAULT 0,
+                price TEXT NOT NULL,
+                price_num REAL NOT NULL DEFAULT 0,
+                cost_num REAL NOT NULL DEFAULT 0,
+                fee_amount TEXT,
+                fee_amount_num REAL,
+                fee_currency TEXT,
+                occurred_at INTEGER NOT NULL DEFAULT 0,
+                quote_usd_price REAL,
+                fee_usd_value REAL,
+                usd_price_source TEXT,
+                raw_payload TEXT,
+                first_seen_at INTEGER NOT NULL,
+                updated_at INTEGER NOT NULL,
+                UNIQUE(user_id, exchange_connection_id, dedupe_key),
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                FOREIGN KEY (exchange_connection_id) REFERENCES exchange_connections(id) ON DELETE CASCADE
+            )
+        ''')
+        conn.execute('''
+            CREATE INDEX IF NOT EXISTS idx_trade_history_user_time
+            ON trade_history (user_id, occurred_at)
+        ''')
+
+        # Cost basis the user supplies by hand, for what the synced history
+        # can't account for. Kept apart from trade/transfer history so a
+        # re-sync can never overwrite a human answer, and so every manual
+        # figure can be listed (and undone) in one place.
+        #
+        # Manual lots are purchases Cyrus never saw — bought before an
+        # exchange's history starts, on a market Binance wasn't asked about,
+        # or anywhere else. They enter the replay as ordinary acquisitions.
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS cost_basis_manual_lots (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                exchange_connection_id INTEGER NOT NULL,
+                asset TEXT NOT NULL,
+                amount REAL NOT NULL,
+                total_cost_usd REAL NOT NULL,
+                acquired_at INTEGER NOT NULL,
+                note TEXT,
+                created_at INTEGER NOT NULL,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                FOREIGN KEY (exchange_connection_id) REFERENCES exchange_connections(id) ON DELETE CASCADE
+            )
+        ''')
+
+        # What a deposit from outside Cyrus originally cost, and when it was
+        # originally bought (which can be long before it arrived, and decides
+        # short- vs long-term). One per deposit leg.
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS cost_basis_deposit_overrides (
+                transfer_id INTEGER PRIMARY KEY,
+                user_id INTEGER NOT NULL,
+                total_cost_usd REAL NOT NULL,
+                acquired_at INTEGER NOT NULL,
+                note TEXT,
+                created_at INTEGER NOT NULL,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                FOREIGN KEY (transfer_id) REFERENCES transfer_history(id) ON DELETE CASCADE
+            )
+        ''')
+
+        # Resume state for the trade backfill. One row per (connection, scope):
+        # scope is '*' for exchanges that return every fill from one call, or a
+        # market symbol for Binance, which only answers per symbol. The cursor
+        # columns hold whatever the strategy pages on — a timestamp for most,
+        # Binance's fromId for that one.
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS trade_sync_state (
+                exchange_connection_id INTEGER NOT NULL,
+                scope TEXT NOT NULL,
+                synced_through INTEGER NOT NULL DEFAULT 0,
+                cursor TEXT,
+                history_epoch INTEGER NOT NULL DEFAULT 0,
+                backfill_complete INTEGER NOT NULL DEFAULT 0,
+                last_sync_ok_at INTEGER,
+                last_error TEXT,
+                disabled INTEGER NOT NULL DEFAULT 0,
+                disabled_reason TEXT,
+                PRIMARY KEY (exchange_connection_id, scope),
+                FOREIGN KEY (exchange_connection_id) REFERENCES exchange_connections(id) ON DELETE CASCADE
+            )
+        ''')
+
         # Pairs the user has explicitly said are NOT the same movement.
         # Without this a rejection would be undone by the next match run, which
         # would re-score the same two legs and suggest them all over again.

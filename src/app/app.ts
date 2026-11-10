@@ -90,6 +90,26 @@ function applyTheme(theme: string): void {
     title: 'Transfers',
   });
 
+  router.register('taxes', {
+    view: 'app/views/overview/taxes.html',
+    viewModel: '../dist/app/viewmodels/overview/taxes.js',
+    // home.css: shell and table; commands.css: .btn-secondary and alerts;
+    // holdings.css: toolbar and select; transfers.css: progress bar and
+    // footnote. taxes.css loads last.
+    style: [
+      'app/styles/overview/home.css',
+      'app/styles/overview/commands.css',
+      'app/styles/overview/holdings.css',
+      'app/styles/overview/transfers.css',
+      'app/styles/overview/taxes.css',
+    ],
+    showChrome: true,
+    // Gains span every connection (coins move between them), so the sidebar's
+    // single-exchange selector doesn't apply here.
+    showExchangeSelector: false,
+    title: 'Taxes',
+  });
+
   // Whitelisted Addresses page is hidden — withdraw rules read addresses
   // directly from the exchange, so this read-only view isn't needed.
   // router.register('whitelist', {

@@ -286,6 +286,8 @@ class LimitOrdersController {
   private beforeUnload: ((e: BeforeUnloadEvent) => void) | null = null;
   /** Set when the router replaces the view, so a running batch stops. */
   private torndown = false;
+  /** Guards the CSV export against a double click while it projects gains. */
+  private exporting = false;
 
   // Filter + sort state. Held on the instance so a background poll re-render
   // keeps whatever the user has narrowed the table down to.
@@ -2038,6 +2040,8 @@ class LimitOrdersController {
   private bindWizard(): void {
     document.getElementById('limit-new-order-btn')
       ?.addEventListener('click', () => void this.openCreateModal());
+    document.getElementById('limit-export-btn')
+      ?.addEventListener('click', () => void this.exportCsv());
     document.getElementById('limit-wizard-close')
       ?.addEventListener('click', () => this.closeCreateModal());
     document.getElementById('limit-wizard-next')
@@ -4440,6 +4444,255 @@ class LimitOrdersController {
 
   private formatOpened(order: LimitOrder): string {
     return order.opentm ? new Date(order.opentm).toLocaleString() : '--';
+  }
+
+  // ---------------------------------------------------------------------------
+  // CSV export
+  // ---------------------------------------------------------------------------
+
+  private isDollarQuoted(order: LimitOrder): boolean {
+    return LimitOrdersController.DOLLAR_QUOTES.test(this.quoteAsset(order).toUpperCase());
+  }
+
+  /** A number for a spreadsheet cell: fixed places, no grouping, no float noise. */
+  private csvNumber(value: number, places: number): number {
+    const factor = 10 ** places;
+    return Math.round(value * factor) / factor;
+  }
+
+  /**
+   * Every open buy and sell limit order (after the exchange and search
+   * filters) as a CSV, ending with a TOTAL row for the gain if they all fill.
+   *
+   * The gain is measured against cost basis from the Taxes page's engine, not
+   * against today's price: each sell is matched to the actual lots it would
+   * consume (FIFO or HIFO, whichever the Taxes page is set to), with every
+   * sell drawing on one shared pool so two orders can't both count the same
+   * cheap coins. Only dollar-quoted sells get a figure — a BTC-quoted sell
+   * would need a BTC price at some future fill time, which is a guess.
+   */
+  private async exportCsv(): Promise<void> {
+    if (this.exporting) return;
+    const orders = [
+      ...this.sortOrders(this.filteredForSide('buy')),
+      ...this.sortOrders(this.filteredForSide('sell')),
+    ];
+    if (!orders.length) {
+      this.showError(this.isFiltering()
+        ? 'No limit orders match the current filter, so there is nothing to export.'
+        : 'There are no open limit orders to export.');
+      return;
+    }
+
+    this.exporting = true;
+    const btn = document.getElementById('limit-export-btn') as HTMLButtonElement | null;
+    if (btn) btn.disabled = true;
+    this.hideError();
+
+    try {
+      const method = TaxController.getPreferredMethod();
+      const sells: ProjectedSellInput[] = orders
+        .filter(o => (o.side || '').toLowerCase() === 'sell' && this.isDollarQuoted(o))
+        .map(o => ({
+          key: this.selectionKey(o),
+          connection_id: Number(o.connectionId),
+          asset: this.baseAsset(o).toUpperCase(),
+          amount: this.restingVolume(o),
+          price_usd: this.toNumber(o.price),
+        }))
+        .filter(s => s.amount > 0 && s.price_usd > 0 && Number.isFinite(s.connection_id));
+
+      let projected: Record<string, ProjectedSell> = {};
+      let projectionFailed = '';
+      let hasHistory = true;
+      if (sells.length) {
+        try {
+          const result = await TaxController.projectSells(method, sells);
+          projected = result.results || {};
+          hasHistory = result.has_history;
+        } catch (e: any) {
+          // The export still goes out; the gain cells say why they're empty.
+          projectionFailed = e?.message || 'cost basis unavailable';
+        }
+      }
+      if (this.torndown) return;
+
+      const { headers, rows, notes } = this.buildExportRows(orders, projected, method);
+      const csv = this.toCsv(headers, rows);
+      const stamp = new Date().toISOString().slice(0, 10);
+      const result = await FileSave.save({
+        filename: `cyrus-limit-orders-${stamp}.csv`,
+        base64: FileSave.textToBase64(csv),
+        mime: 'text/csv',
+        filterName: 'CSV file',
+        extensions: ['csv'],
+      });
+      if (this.torndown || result.canceled) return;
+      if (!result.saved) {
+        this.showError(result.error || 'Could not save the CSV.');
+        return;
+      }
+
+      let message = `Exported ${orders.length} limit order${orders.length === 1 ? '' : 's'}.`;
+      if (projectionFailed) {
+        message += ` Gains were left blank: ${projectionFailed}.`;
+      } else if (sells.length && !hasHistory) {
+        message += ' Gains need your trade history. Sync it on the Taxes page, then export again.';
+      } else if (notes.unknownBasis) {
+        message += ` ${notes.unknownBasis} sell order${notes.unknownBasis === 1 ? ' has' : 's have'} `
+          + 'no known cost basis. See the Taxes page.';
+      }
+      this.showSuccess(message);
+    } catch (e: any) {
+      if (!this.torndown) this.showError(e?.message || 'Export failed.');
+    } finally {
+      this.exporting = false;
+      if (btn) btn.disabled = false;
+    }
+  }
+
+  private buildExportRows(orders: LimitOrder[], projected: Record<string, ProjectedSell>,
+                          method: CostBasisMethod): {
+    headers: string[]; rows: Array<Array<string | number>>; notes: { unknownBasis: number };
+  } {
+    const headers = [
+      'Exchange', 'Pair', 'Side', 'Limit Price', 'Quote', 'Amount', 'Filled',
+      'Remaining', 'Value if Filled', 'Cost Basis (USD)', 'Est. Gain if Filled (USD)',
+      'Opened (UTC)', 'Order ID',
+    ];
+
+    const rows: Array<Array<string | number>> = [];
+    let gainTotal = 0;
+    let costTotal = 0;
+    let gainCount = 0;
+    let unknownBasis = 0;
+    let nonUsdSells = 0;
+    let sellValue = 0;
+    let buyValue = 0;
+    const quotes = new Set<string>();
+
+    for (const order of orders) {
+      const side = (order.side || '').toLowerCase();
+      const quote = this.quoteAsset(order).toUpperCase();
+      const dollar = this.isDollarQuoted(order);
+      const remaining = this.restingVolume(order);
+      const price = this.toNumber(order.price);
+      const value = remaining * price;
+      const places = dollar ? 2 : 8;
+      quotes.add(quote);
+      if (side === 'sell') sellValue += value; else buyValue += value;
+
+      let cost: string | number = '';
+      let gain: string | number = '';
+      if (side === 'sell') {
+        const p = projected[this.selectionKey(order)];
+        if (!dollar) {
+          gain = 'n/a (non-USD quote)';
+          nonUsdSells += 1;
+        } else if (!p) {
+          cost = 'unknown';
+          gain = 'cost unknown';
+          unknownBasis += 1;
+        } else if (p.gain_usd !== null && p.cost_usd !== null) {
+          cost = this.csvNumber(p.cost_usd, 2);
+          gain = this.csvNumber(p.gain_usd, 2);
+          gainTotal += p.gain_usd;
+          costTotal += p.cost_usd;
+          gainCount += 1;
+        } else {
+          unknownBasis += 1;
+          const base = this.baseAsset(order);
+          if (p.known_amount > 0) {
+            // Part of the order is covered by known lots: give that part's
+            // figure, labelled, rather than nothing at all.
+            const unknown = this.csvNumber(remaining - p.known_amount, 8);
+            cost = `${this.csvNumber(p.known_cost_usd, 2)} (partial)`;
+            gain = `${this.csvNumber(p.known_gain_usd, 2)} on ${this.csvNumber(p.known_amount, 8)} `
+              + `${base}; cost unknown for ${unknown} ${base}`;
+          } else {
+            cost = 'unknown';
+            gain = 'cost unknown';
+          }
+        }
+      }
+
+      rows.push([
+        order.exchangeName || '',
+        order.pair || '',
+        side === 'sell' ? 'Sell' : 'Buy',
+        price,
+        quote,
+        this.toNumber(order.volume),
+        this.filledFraction(order),
+        this.csvNumber(remaining, 8),
+        this.csvNumber(value, places),
+        cost,
+        gain,
+        order.opentm ? new Date(order.opentm).toISOString().replace('T', ' ').slice(0, 19) : '',
+        order.id || '',
+      ]);
+    }
+
+    // Net cash if everything fills: sells bring money in, buys spend it. Only
+    // summed when every order is in dollars — adding USD to BTC is meaningless.
+    const allDollar = Array.from(quotes).every(q => LimitOrdersController.DOLLAR_QUOTES.test(q));
+    const sellCount = orders.filter(o => (o.side || '').toLowerCase() === 'sell').length;
+    const buyCount = orders.length - sellCount;
+
+    rows.push(Array(headers.length).fill(''));
+    rows.push([
+      'TOTAL',
+      `${sellCount} sell${sellCount === 1 ? '' : 's'}, ${buyCount} buy${buyCount === 1 ? '' : 's'}`,
+      '', '', allDollar ? 'USD' : '', '', '', '',
+      allDollar ? this.csvNumber(sellValue - buyValue, 2) : '',
+      gainCount ? this.csvNumber(costTotal, 2) : '',
+      this.csvNumber(gainTotal, 2),
+      '', '',
+    ]);
+
+    const notes: string[] = [
+      `Note: Est. Gain is for sell orders only, measured against the cost basis of the coins `
+      + `each sell would use (${method.toUpperCase()} lot matching, from the Taxes page). `
+      + `It assumes every order fills completely at its limit price, before fees.`,
+    ];
+    if (allDollar) {
+      notes.push('Note: Value if Filled in the TOTAL row is sell proceeds minus buy spend.');
+    } else {
+      notes.push(`Note: Value if Filled is not totalled because orders are priced in different `
+        + `currencies (${Array.from(quotes).sort().join(', ')}).`);
+    }
+    const excluded = unknownBasis + nonUsdSells;
+    if (excluded) {
+      const parts: string[] = [];
+      if (unknownBasis) parts.push(`${unknownBasis} with unknown cost basis (sync trades on the Taxes page)`);
+      if (nonUsdSells) parts.push(`${nonUsdSells} with non-USD quotes`);
+      notes.push(`Note: The gain total excludes ${excluded} sell order${excluded === 1 ? '' : 's'}: `
+        + `${parts.join(', ')}.`);
+    }
+    for (const note of notes) {
+      const row: Array<string | number> = Array(headers.length).fill('');
+      row[0] = note;
+      rows.push(row);
+    }
+
+    return { headers, rows, notes: { unknownBasis } };
+  }
+
+  /**
+   * RFC 4180 CSV with a UTF-8 byte-order mark (so Excel reads it as UTF-8),
+   * CRLF line endings, and the same formula-injection guard as the backend
+   * writer: text starting with = + - @ gets a leading apostrophe. Numbers pass
+   * through untouched, so a negative gain stays a number.
+   */
+  private toCsv(headers: string[], rows: Array<Array<string | number>>): string {
+    const cell = (value: string | number): string => {
+      if (typeof value === 'number') return Number.isFinite(value) ? String(value) : '';
+      let text = String(value ?? '');
+      if (/^[=+\-@\t\r]/.test(text)) text = `'${text}`;
+      return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+    };
+    const lines = [headers, ...rows].map(row => row.map(cell).join(','));
+    return '﻿' + lines.join('\r\n') + '\r\n';
   }
 
   // ---------------------------------------------------------------------------
