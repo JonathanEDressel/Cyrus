@@ -145,3 +145,24 @@ def send_email_async(to_addr: str, subject: str, body: str,
             print(f"[NOTIFIER] Email send failed: {e}")
 
     threading.Thread(target=_run, daemon=True, name="email-notifier").start()
+
+
+def send_html_email_async(to_addr: str, subject: str, html_body: str,
+                          smtp_user: str, smtp_password: str,
+                          text_body: Optional[str] = None,
+                          smtp_host: Optional[str] = None,
+                          smtp_port: Optional[int] = None) -> None:
+    """Fire-and-forget HTML send (with a plaintext alternative).
+
+    Same contract as ``send_email_async``: failures are swallowed (logged) so a
+    notification problem never breaks rule execution.
+    """
+    def _run() -> None:
+        try:
+            send_html_email(to_addr, subject, html_body, smtp_user, smtp_password,
+                            text_body=text_body,
+                            smtp_host=smtp_host, smtp_port=smtp_port)
+        except Exception as e:
+            print(f"[NOTIFIER] Email send failed: {e}")
+
+    threading.Thread(target=_run, daemon=True, name="email-notifier").start()

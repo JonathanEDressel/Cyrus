@@ -521,7 +521,7 @@ class AutomationWorker:
                 )
                 continue
 
-            trigger_event = f"Balance {asset} = {current_balance} >= threshold {threshold}"
+            trigger_event = f"Balance {asset} = {current_balance:.10g} >= threshold {threshold:.10g}"
 
             if rule.action_type == 'convert_crypto':
                 # Convert: market-order into the target asset
@@ -619,7 +619,7 @@ class AutomationWorker:
                 print(f"[WORKER] Balance {withdraw_amount} {asset} below minimum withdrawal {min_withdrawal}")
                 continue
 
-            trigger_event = f"Balance {asset} = {current_balance} >= threshold {threshold}"
+            trigger_event = f"Balance {asset} = {current_balance:.10g} >= threshold {threshold:.10g}"
 
             # Mark as triggered BEFORE executing to prevent duplicate executions
             # The rule is acting, so any previously-logged skip no longer
@@ -1269,18 +1269,24 @@ class AutomationWorker:
         except (TypeError, ValueError):
             return str(v)
 
-    def _format_result(self, result) -> str:
-        """Render a CCXT order/withdrawal result as one human-readable line.
+    def _describe_result(self, result) -> tuple:
+        """Turn a CCXT order/withdrawal result into ``(summary, reference)``.
 
         Orders become e.g. ``Sold 0.5 BTC @ 72000 USD → 36000 USD (closed)``;
-        withdrawals become ``Withdrew 0.25 BTC to my-wallet (success)``.
-        Falls back to ``str(result)`` for any unexpected shape so detail is
-        never lost (the full dict is still kept verbatim in the log).
+        withdrawals become ``Withdrew 0.25 BTC to my-wallet (ok)``. ``reference``
+        is the exchange's order or transaction id, or None.
+
+        Exchanges often return far less than CCXT's full shape — Kraken answers a
+        withdrawal with nothing but a reference id, every other field None — so a
+        sparse result reads as "accepted" rather than falling through to a raw
+        dict dump. The full object is still kept verbatim in the automation log.
         """
         if not isinstance(result, dict):
-            return str(result)
+            text = str(result).strip()
+            return (text or 'Completed', None)
 
         fmt = self._fmt_num
+        info = result.get('info') if isinstance(result.get('info'), dict) else {}
         symbol = result.get('symbol') or ''
         base, quote = '', ''
         if '/' in symbol:
@@ -1288,8 +1294,10 @@ class AutomationWorker:
 
         side = (result.get('side') or '').lower()
         status = result.get('status')
-        fee = result.get('fee') or {}
+        fee = result.get('fee') if isinstance(result.get('fee'), dict) else {}
         fee_cost, fee_ccy = fee.get('cost'), (fee.get('currency') or '')
+        ref = result.get('id') or info.get('refid') or info.get('txid')
+        ref = str(ref) if ref else None
 
         def _with_fee(line: str) -> str:
             if fee_cost:
@@ -1314,15 +1322,14 @@ class AutomationWorker:
                 line += f" → {fmt(cost)}{(' ' + quote) if quote else ''}"
             if status:
                 line += f" ({status})"
-            line = _with_fee(line)
-            oid = result.get('id')
-            return f"{line} [id {oid}]" if oid else line
+            return (_with_fee(line), ref)
 
         # Withdrawal-shaped result (transaction).
         currency = result.get('currency')
-        if currency or result.get('txid') or result.get('address'):
-            amount = result.get('amount')
-            address = result.get('address') or result.get('addressTo')
+        amount = result.get('amount')
+        address = result.get('address') or result.get('addressTo')
+        txid = result.get('txid')
+        if currency or txid or address or amount is not None:
             line = "Withdrew"
             if amount is not None:
                 line += f" {fmt(amount)} {currency or ''}".rstrip()
@@ -1330,18 +1337,31 @@ class AutomationWorker:
                 line += f" to {address}"
             if status:
                 line += f" ({status})"
-            line = _with_fee(line)
-            txid = result.get('txid') or result.get('id')
-            return f"{line} [tx {txid}]" if txid else line
+            return (_with_fee(line), str(txid) if txid else ref)
 
-        return str(result)
+        # Nothing but an id: the exchange took the request and handed back a
+        # reference (Kraken withdrawals). The email's Action line already says
+        # what was asked for.
+        if ref:
+            return ('Accepted by the exchange', ref)
+
+        # Last resort: whatever plain fields it did return, never a dict dump.
+        fields = [f"{k}: {v}" for k, v in result.items()
+                  if k != 'info' and v not in (None, '', {}, [])
+                  and not isinstance(v, (dict, list))]
+        return ('; '.join(fields) or 'Completed', None)
+
+    def _format_result(self, result) -> str:
+        """The result as one line, e.g. for logs: summary plus any reference."""
+        summary, reference = self._describe_result(result)
+        return f"{summary} [ref {reference}]" if reference else summary
 
     def _notify_execution(self, user_id, rule, trigger_event: str,
                           action_executed: str, result) -> None:
         """Email the user that a rule executed, if they enabled email alerts.
 
         ``result`` is the raw CCXT order/withdrawal object; it's rendered into a
-        readable line via ``_format_result``.
+        readable summary and reference via ``_describe_result``.
 
         Best-effort and fully isolated: the SMTP send is fire-and-forget and any
         failure here is swallowed so it can never affect rule execution. Runs in
@@ -1359,24 +1379,32 @@ class AutomationWorker:
                 return
 
             from helper.Security import decrypt_api_key
-            from helper.notifier import send_email_async
+            from helper.notifier import send_html_email_async
+            from helper.report_email import (build_execution_email_html,
+                                             build_execution_email_text)
 
             password = decrypt_api_key(enc_pw)
-            subject = f"Cyrus: '{rule.rule_name}' executed"
-            body = (
-                f"Your automation rule '{rule.rule_name}' just executed.\n\n"
-                f"Trigger: {trigger_event}\n"
-                f"Action:  {action_executed}\n"
-                f"Result:  {self._format_result(result)}\n"
-            )
-            send_email_async(
-                to_addr=to_addr, subject=subject, body=body,
+            summary, reference = self._describe_result(result)
+            now = datetime.now()
+            details = {
+                'rule_name': rule.rule_name,
+                'when': (f"{now:%b} {now.day}, {now.year} at "
+                         f"{now.hour % 12 or 12}:{now:%M} {now:%p}"),
+                'trigger': trigger_event,
+                'action': action_executed,
+                'result': summary,
+                'reference': reference,
+            }
+            send_html_email_async(
+                to_addr=to_addr,
+                subject=f"Cyrus: '{rule.rule_name}' executed",
+                html_body=build_execution_email_html(**details),
+                text_body=build_execution_email_text(**details),
                 smtp_user=to_addr, smtp_password=password,
                 smtp_host=settings.get('smtp_host'), smtp_port=settings.get('smtp_port'),
             )
         except Exception as e:
             print(f"[WORKER] Failed to send execution email for user {user_id}: {e}")
-
 
 _worker_instance = None
 

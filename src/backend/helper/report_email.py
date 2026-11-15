@@ -424,3 +424,84 @@ def build_report_text(ctx: dict) -> str:
         "Open Cyrus to view the full report.",
     ]
     return "\n".join(lines)
+
+
+# ── Automation execution email ──────────────────────────────────────────────
+# Sent by the worker each time a rule runs, when "Email me on execution" is on.
+# Same palette and table-based layout as the monthly report.
+
+def _execution_rows(when, trigger, action, result, reference) -> list:
+    rows = [("When", when), ("Trigger", trigger), ("Action", action), ("Result", result)]
+    if reference:
+        rows.append(("Reference", reference))
+    return [(label, value) for label, value in rows if value]
+
+
+def build_execution_email_html(rule_name: str, when: str, trigger: str, action: str,
+                               result: str, reference: str | None = None) -> str:
+    rows_html = []
+    for i, (label, value) in enumerate(_execution_rows(when, trigger, action, result, reference)):
+        border = "" if i == 0 else f"border-top:1px solid {BORDER};"
+        mono = ("font-family:Consolas,Menlo,monospace;font-size:13px;"
+                if label == "Reference" else "font-size:14px;")
+        rows_html.append(
+            f'<tr>'
+            f'<td style="{border}padding:12px 16px;width:96px;vertical-align:top;'
+            f'color:{MUTED};font-size:11px;font-weight:700;text-transform:uppercase;'
+            f'letter-spacing:.5px;">{escape(label)}</td>'
+            f'<td style="{border}padding:12px 16px;vertical-align:top;color:{TEXT};'
+            f'{mono}line-height:1.45;word-break:break-word;">{escape(str(value))}</td>'
+            f'</tr>'
+        )
+
+    name = escape(rule_name or "Automation")
+    return "".join([
+        f'<!doctype html><html><body style="margin:0;padding:0;background:{BG};">',
+        f'<div style="display:none;max-height:0;overflow:hidden;">'
+        f'{escape(action or "")} — {escape(result or "")}</div>',
+        f'<table role="presentation" cellpadding="0" cellspacing="0" bgcolor="{BG}" '
+        f'style="width:100%;background:{BG};padding:24px 0;"><tr><td align="center">',
+        f'<table role="presentation" cellpadding="0" cellspacing="0" bgcolor="{BG}" '
+        f'style="width:560px;max-width:92%;background:{BG};'
+        f'font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">',
+
+        # Header
+        f'<tr><td style="padding:8px 4px 0;">'
+        f'<table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;">'
+        f'<tr><td style="color:{CYAN};font-size:13px;font-weight:700;'
+        f'letter-spacing:3px;text-transform:uppercase;">CYRUS</td>'
+        f'<td align="right">{_chip("Executed", POS)}</td></tr></table>'
+        f'<h1 style="margin:12px 0 4px;color:{TEXT};font-size:22px;font-weight:800;">'
+        f'Automation executed</h1>'
+        f'<div style="color:{MUTED};font-size:14px;">Your rule '
+        f'<strong style="color:{TEXT};">{name}</strong> just ran.</div>'
+        f'</td></tr>',
+
+        # Details
+        f'<tr><td style="padding:18px 4px 0;">'
+        f'<table role="presentation" cellpadding="0" cellspacing="0" bgcolor="{PANEL}" '
+        f'style="width:100%;background:{PANEL};border:1px solid {BORDER};'
+        f'border-radius:12px;border-collapse:separate;">'
+        + "".join(rows_html) +
+        f'</table></td></tr>',
+
+        # Footer
+        f'<tr><td style="padding:20px 4px 8px;">'
+        f'<div style="border-top:1px solid {BORDER};padding-top:14px;color:{MUTED};'
+        f'font-size:11px;line-height:1.6;">'
+        f'You&rsquo;re receiving this because &ldquo;Email me on execution&rdquo; is turned on '
+        f'in Cyrus. All data stays on your device; this email was sent from your own '
+        f'configured email account.</div></td></tr>',
+
+        '</table></td></tr></table></body></html>',
+    ])
+
+
+def build_execution_email_text(rule_name: str, when: str, trigger: str, action: str,
+                               result: str, reference: str | None = None) -> str:
+    """Plaintext fallback."""
+    lines = [f"Your automation rule '{rule_name}' just executed.", ""]
+    for label, value in _execution_rows(when, trigger, action, result, reference):
+        lines.append(f"{label + ':':<11}{value}")
+    lines += ["", "Sent by Cyrus because \"Email me on execution\" is turned on."]
+    return "\n".join(lines) + "\n"
