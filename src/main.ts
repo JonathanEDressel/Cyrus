@@ -426,13 +426,30 @@ function createWindow(startHidden = false) {
     // an empty root layer — regions redrawn after the first paint (a table
     // whose rows were just replaced) can stay stale until something else
     // invalidates them. Matches --bg-primary so there's no flash on show.
-    backgroundColor: '#0f172a',
+    backgroundColor: '#0B0D0E',
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
       preload: path.join(__dirname, 'preload.js')
     }
   });
+
+  // No File / Edit / View menu bar — the app has its own top bar. Removing
+  // the menu also drops its accelerators, so in dev re-add the two we use.
+  mainWindow.removeMenu();
+  if (!app.isPackaged) {
+    mainWindow.webContents.on('before-input-event', (event, input) => {
+      if (input.type !== 'keyDown') return;
+      const key = input.key.toLowerCase();
+      if (key === 'f12' || (input.control && input.shift && key === 'i')) {
+        mainWindow?.webContents.toggleDevTools();
+        event.preventDefault();
+      } else if (key === 'f5' || (input.control && !input.shift && key === 'r')) {
+        mainWindow?.webContents.reload();
+        event.preventDefault();
+      }
+    });
+  }
 
   const indexPath = path.join(__dirname, '../src/index.html');
 

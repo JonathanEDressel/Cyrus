@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Cyrus">
+  <rect x="0.75" y="0.75" width="62.5" height="62.5" rx="13.25" fill="#0B0D0E" stroke="#262C1E" stroke-width="1.5"/>
+  <path fill="#C6F432" d="M11 14h25v7H18v22h18v7H11z"/>
+  <rect x="40" y="44" width="14" height="6" fill="#C6F432"/>
+</svg>

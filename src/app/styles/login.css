@@ -60,7 +60,6 @@ body.theme-light .auth-card {
   width: 88px;
   height: 88px;
   max-width: 150px;
-  border-radius: 35px;
   object-fit: contain;
   animation: logo-glow-pulse 2.4s ease-in-out infinite;
 }

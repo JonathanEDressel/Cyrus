@@ -756,6 +756,14 @@ body.theme-light .auth-card {
   box-sizing: border-box;
 }
 
+/* Page stylesheets that pad .form-control more (the Profile cards) would
+   otherwise squeeze a select's text out of the fixed 32px box. */
+#app-content select.form-control,
+#app-content .profile-card .form-control {
+  padding-top: 5px;
+  padding-bottom: 5px;
+}
+
 .form-group > label,
 .balancer-page .form-group label {
   font-family: var(--font-mono);
