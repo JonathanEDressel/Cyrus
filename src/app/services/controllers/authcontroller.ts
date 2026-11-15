@@ -27,6 +27,8 @@ class AuthController {
   }
 
   static logout(): void {
+    // The job's API calls need the token about to be removed.
+    OrderJobRunner.stop();
     ExchangeStore.stop();
     NotificationService.stop();
     ApiKeyState.reset();

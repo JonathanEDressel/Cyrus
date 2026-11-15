@@ -84,9 +84,9 @@
   white-space: nowrap;
 }
 
-.taxes-badge-ok      { background: rgba(34, 197, 94, 0.14);  color: #22c55e; }
-.taxes-badge-pending { background: rgba(234, 179, 8, 0.14);  color: #eab308; }
-.taxes-badge-bad     { background: rgba(239, 68, 68, 0.14);  color: #ef4444; }
+.taxes-badge-ok      { background: color-mix(in srgb, var(--pos) 14%, transparent);  color: var(--pos); }
+.taxes-badge-pending { background: color-mix(in srgb, var(--warn) 14%, transparent);  color: var(--warn); }
+.taxes-badge-bad     { background: color-mix(in srgb, var(--neg) 14%, transparent);  color: var(--neg); }
 .taxes-badge-muted   { background: rgba(127, 127, 127, 0.14); color: #9ca3af; }
 
 /* ── Summary tiles ─────────────────────────────────────────────────── */
@@ -137,8 +137,8 @@
   margin-bottom: 1rem;
   padding: 0.75rem 0.95rem;
   border-radius: 8px;
-  border: 1px solid rgba(234, 179, 8, 0.35);
-  background: rgba(234, 179, 8, 0.07);
+  border: 1px solid color-mix(in srgb, var(--warn) 35%, transparent);
+  background: color-mix(in srgb, var(--warn) 7%, transparent);
   font-size: 0.84rem;
   line-height: 1.45;
   color: var(--text-secondary);
@@ -149,7 +149,7 @@
   align-items: center;
   gap: 0.45rem;
   font-weight: 600;
-  color: #eab308;
+  color: var(--warn);
   margin-bottom: 0.35rem;
 }
 
@@ -184,7 +184,7 @@
 }
 
 .taxes-missing {
-  color: #eab308;
+  color: var(--warn);
   font-size: 0.78rem;
   font-style: italic;
 }
@@ -223,27 +223,27 @@
 .taxes-fix-btn {
   padding: 0.2rem 0.6rem;
   font-size: 0.75rem;
-  border-color: rgba(234, 179, 8, 0.5);
-  color: #eab308;
+  border-color: color-mix(in srgb, var(--warn) 50%, transparent);
+  color: var(--warn);
 }
 
 .taxes-fix-btn:hover {
-  background: rgba(234, 179, 8, 0.12);
+  background: color-mix(in srgb, var(--warn) 12%, transparent);
   color: #facc15;
 }
 
 .taxes-needs-btn.active {
-  border-color: rgba(234, 179, 8, 0.6);
-  background: rgba(234, 179, 8, 0.12);
-  color: #eab308;
+  border-color: color-mix(in srgb, var(--warn) 60%, transparent);
+  background: color-mix(in srgb, var(--warn) 12%, transparent);
+  color: var(--warn);
 }
 
 .taxes-needs-count {
   min-width: 1.3rem;
   padding: 0 0.35rem;
   border-radius: 999px;
-  background: rgba(234, 179, 8, 0.2);
-  color: #eab308;
+  background: color-mix(in srgb, var(--warn) 20%, transparent);
+  color: var(--warn);
   font-size: 0.72rem;
   font-weight: 700;
   text-align: center;
@@ -257,8 +257,8 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.03em;
-  background: rgba(99, 102, 241, 0.16);
-  color: var(--accent-purple, #8b5cf6);
+  background: color-mix(in srgb, var(--accent-purple) 16%, transparent);
+  color: var(--accent-purple, var(--accent-purple));
   vertical-align: middle;
 }
 

@@ -16,14 +16,14 @@
 }
 
 .side-buy {
-  color: #22c55e;
+  color: var(--pos);
   font-weight: 600;
   text-transform: uppercase;
   font-size: 0.8rem;
 }
 
 .side-sell {
-  color: #ef4444;
+  color: var(--neg);
   font-weight: 600;
   text-transform: uppercase;
   font-size: 0.8rem;
@@ -35,8 +35,8 @@
   font-size: 0.78rem;
   font-weight: 600;
   border-radius: 6px;
-  background: rgba(34, 197, 94, 0.1);
-  color: #22c55e;
+  background: color-mix(in srgb, var(--pos) 10%, transparent);
+  color: var(--pos);
   text-transform: capitalize;
 }
 

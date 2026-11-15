@@ -5,8 +5,8 @@
   display: flex;
   align-items: flex-start;
   gap: 1rem;
-  background: linear-gradient(135deg, rgba(6, 182, 212, 0.08), rgba(6, 182, 212, 0.04));
-  border: 1px solid rgba(6, 182, 212, 0.22);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent-cyan) 8%, transparent), color-mix(in srgb, var(--accent-cyan) 4%, transparent));
+  border: 1px solid color-mix(in srgb, var(--accent-cyan) 22%, transparent);
   border-radius: 12px;
   padding: 1.25rem 1.5rem;
   margin-bottom: 2rem;
@@ -20,7 +20,7 @@
   width: 40px;
   height: 40px;
   border-radius: 10px;
-  background: rgba(6, 182, 212, 0.12);
+  background: color-mix(in srgb, var(--accent-cyan) 12%, transparent);
   color: var(--accent-cyan);
   display: flex;
   align-items: center;
@@ -115,27 +115,27 @@
 }
 
 .privacy-tag-local {
-  background: rgba(6, 182, 212, 0.1);
-  color: #06b6d4;
-  border: 1px solid rgba(6, 182, 212, 0.25);
+  background: color-mix(in srgb, var(--accent-cyan) 10%, transparent);
+  color: var(--accent-cyan);
+  border: 1px solid color-mix(in srgb, var(--accent-cyan) 25%, transparent);
 }
 
 .privacy-tag-secure {
-  background: rgba(99, 102, 241, 0.1);
-  color: #818cf8;
-  border: 1px solid rgba(99, 102, 241, 0.25);
+  background: color-mix(in srgb, var(--accent-purple) 10%, transparent);
+  color: var(--accent-purple-light);
+  border: 1px solid color-mix(in srgb, var(--accent-purple) 25%, transparent);
 }
 
 .privacy-tag-exchange {
   background: rgba(251, 191, 36, 0.08);
-  color: #fbbf24;
+  color: var(--warn);
   border: 1px solid rgba(251, 191, 36, 0.22);
 }
 
 .privacy-tag-none {
-  background: rgba(239, 68, 68, 0.08);
-  color: #f87171;
-  border: 1px solid rgba(239, 68, 68, 0.2);
+  background: color-mix(in srgb, var(--neg) 8%, transparent);
+  color: var(--neg);
+  border: 1px solid color-mix(in srgb, var(--neg) 20%, transparent);
 }
 
 /* Lists */
@@ -181,7 +181,7 @@
 }
 
 .privacy-list-icon-none {
-  color: #ef4444;
+  color: var(--neg);
   font-size: 0.8rem;
   margin-top: 0.2rem;
   flex-shrink: 0;

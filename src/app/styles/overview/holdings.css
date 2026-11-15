@@ -232,8 +232,8 @@
   color: var(--text-tertiary);
 }
 
-.holdings-pos { color: #4ade80; }
-.holdings-neg { color: #f87171; }
+.holdings-pos { color: var(--pos); }
+.holdings-neg { color: var(--neg); }
 
 .holdings-spark {
   padding-top: 0.35rem !important;
@@ -245,8 +245,8 @@
   vector-effect: non-scaling-stroke;
 }
 
-.holdings-spark-up polyline { stroke: #4ade80; }
-.holdings-spark-down polyline { stroke: #f87171; }
+.holdings-spark-up polyline { stroke: var(--pos); }
+.holdings-spark-down polyline { stroke: var(--neg); }
 
 /* ── Detail panel ────────────────────────────────────────────────────────── */
 
@@ -338,9 +338,9 @@
 }
 
 .holdings-page .alert-warning {
-  background: rgba(245, 158, 11, 0.1);
-  border: 1px solid rgba(245, 158, 11, 0.25);
-  color: #f59e0b;
+  background: color-mix(in srgb, var(--warn) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--warn) 25%, transparent);
+  color: var(--warn);
 }
 
 .holdings-notice {
@@ -370,9 +370,9 @@
 
 /* ── Light theme ─────────────────────────────────────────────────────────── */
 
-body.theme-light .holdings-pos { color: #15803d; }
-body.theme-light .holdings-neg { color: #b91c1c; }
-body.theme-light .holdings-spark-up polyline { stroke: #15803d; }
-body.theme-light .holdings-spark-down polyline { stroke: #b91c1c; }
-body.theme-light .holdings-page .alert-warning { color: #b45309; }
+body.theme-light .holdings-pos { color: var(--pos); }
+body.theme-light .holdings-neg { color: var(--neg); }
+body.theme-light .holdings-spark-up polyline { stroke: var(--pos); }
+body.theme-light .holdings-spark-down polyline { stroke: var(--neg); }
+body.theme-light .holdings-page .alert-warning { color: var(--warn); }
 body.theme-light .holdings-detail-heading { color: var(--accent-purple); }

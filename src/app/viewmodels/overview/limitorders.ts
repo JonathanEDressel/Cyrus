@@ -65,18 +65,6 @@ interface LimitLeg {
   error: string | null;
 }
 
-interface Batch {
-  connId: number;
-  exchangeName: string;
-  side: 'buy' | 'sell';
-  base: string;
-  legs: LimitLeg[];
-  cancelRequested: boolean;
-  running: boolean;
-  placed: number;
-  failed: number;
-}
-
 /**
  * One row of a distribution plot. Price runs down the side and volume across, the
  * way an order book is drawn, so a row is positioned by price and sized by volume.
@@ -278,14 +266,14 @@ class LimitOrdersController {
    */
   private selected = new Set<string>();
   private bulkPending: LimitOrder[] = [];
-  private bulkRunning = false;
   /** The order the confirm modal is currently asking about. */
   private pending: LimitOrder | null = null;
   private cancelling = false;
   private escHandler: ((e: KeyboardEvent) => void) | null = null;
-  private beforeUnload: ((e: BeforeUnloadEvent) => void) | null = null;
-  /** Set when the router replaces the view, so a running batch stops. */
+  /** Set when the router replaces the view, so late async work leaves it alone.
+   *  Ladder placement and bulk cancel don't stop: they run in OrderJobRunner. */
   private torndown = false;
+  private jobUnsub: (() => void) | null = null;
   /** Guards the CSV export against a double click while it projects gains. */
   private exporting = false;
 
@@ -351,7 +339,6 @@ class LimitOrdersController {
   private legs: LimitLeg[] = [];
   private legSeq = 0;
   private submitting = false;
-  private batch: Batch | null = null;
 
   constructor() {
     this.init();
@@ -376,6 +363,12 @@ class LimitOrdersController {
 
     this.unsubscribe = ExchangeStore.onUpdate(() => this.render());
 
+    // A ladder or bulk cancel keeps running in OrderJobRunner when this page
+    // is left. Watch it, and pick up one already in progress (or finished
+    // while you were away).
+    this.jobUnsub = OrderJobRunner.onUpdate((e) => this.onJobEvent(e));
+    this.restoreJob();
+
     // The router swaps #app-content wholesale, so the store subscription and
     // the document-level key handler have to be torn down when the table goes.
     const observer = new MutationObserver(() => {
@@ -389,12 +382,15 @@ class LimitOrdersController {
   }
 
   private teardown(): void {
-    // Flag first: a running placement loop checks this between rungs, so a long
-    // ladder can't keep a dead controller alive for minutes after navigation.
     this.torndown = true;
     if (this.unsubscribe) {
       this.unsubscribe();
       this.unsubscribe = null;
+    }
+    // Only stop listening — the job itself carries on in OrderJobRunner.
+    if (this.jobUnsub) {
+      this.jobUnsub();
+      this.jobUnsub = null;
     }
     if (this.escHandler) {
       document.removeEventListener('keydown', this.escHandler);
@@ -404,7 +400,34 @@ class LimitOrdersController {
       window.cancelAnimationFrame(this.distRaf);
       this.distRaf = 0;
     }
-    this.disarmUnloadGuard();
+  }
+
+  /** Redraw a job that was started before this page was (re)opened. */
+  private restoreJob(): void {
+    const job = OrderJobRunner.current();
+    if (!job) return;
+    if (job.kind === 'place') {
+      this.showProgress();
+      if (job.running) {
+        document.getElementById('limit-progress-section')
+          ?.scrollIntoView({ block: 'start' });
+      }
+    } else {
+      this.restoreCancelJob(job);
+    }
+  }
+
+  private onJobEvent(e: OrderJobEvent): void {
+    if (this.torndown) return;
+    const job = e.job;
+    if (!job) {
+      document.getElementById('limit-progress-section')?.classList.add('d-none');
+    } else if (job.kind === 'place') {
+      this.onPlaceJobEvent(job, e);
+    } else {
+      this.onCancelJobEvent(job, e);
+    }
+    this.syncCreateButton();
   }
 
   // ---------------------------------------------------------------------------
@@ -1607,11 +1630,27 @@ class LimitOrdersController {
   private openBulkModal(): void {
     const orders = this.selectedOrders();
     if (orders.length === 0) return;
+    const lock = this.lockReason();
+    if (lock) {
+      this.showError(lock);
+      return;
+    }
 
     this.bulkPending = orders;
+    this.populateBulkModal(orders);
+    this.setBulkProgress(0, orders.length, false);
+    this.setBulkBusy(false);
+
+    document.getElementById('bulk-cancel-overlay')?.classList.remove('d-none');
+    (document.getElementById('bulk-cancel-dismiss') as HTMLButtonElement | null)?.focus();
+  }
+
+  /** Titles, notes and rows for a list of orders. Shared by open and restore. */
+  private populateBulkModal(orders: LimitOrder[]): void {
     this.hideBulkError();
 
-    const isAll = ExchangeStore.isAllMode();
+    const isAll = ExchangeStore.isAllMode()
+      || new Set(orders.map(o => o.connectionId)).size > 1;
     document.getElementById('bulk-cancel-exchange-th')?.classList.toggle('d-none', !isAll);
 
     const title = document.getElementById('bulk-cancel-title');
@@ -1637,10 +1676,10 @@ class LimitOrdersController {
     const note = document.getElementById('bulk-cancel-note-text');
     if (note) {
       note.textContent = orders.length === 1
-        ? 'This order is cancelled from this page. Leaving before it finishes leaves it resting on the exchange.'
+        ? 'Closing Cyrus before it finishes leaves the order resting on the exchange.'
         : `These are cancelled one at a time, taking ${this.bulkEstimateText(orders.length)}. `
-          + 'Leaving this page part-way through stops the rest — anything not yet '
-          + 'cancelled stays resting on the exchange.';
+          + 'You can leave this page while it runs. Closing Cyrus part-way through stops the '
+          + 'rest — anything not yet cancelled stays resting on the exchange.';
     }
 
     const partial = orders.filter(o => this.filledFraction(o) > 0);
@@ -1668,11 +1707,6 @@ class LimitOrdersController {
     }
 
     this.renderBulkRows(isAll);
-    this.setBulkProgress(0, orders.length, false);
-    this.setBulkBusy(false);
-
-    document.getElementById('bulk-cancel-overlay')?.classList.remove('d-none');
-    (document.getElementById('bulk-cancel-dismiss') as HTMLButtonElement | null)?.focus();
   }
 
   private bulkEstimateText(count: number): string {
@@ -1715,21 +1749,24 @@ class LimitOrdersController {
     }).join('');
   }
 
-  private setBulkRowStatus(order: LimitOrder, state: 'working' | 'done' | 'failed',
-                           detail?: string): void {
-    const key = this.selectionKey(order);
-    const row = document.querySelector(`#bulk-cancel-tbody tr[data-bulk-key="${CSS.escape(key)}"]`);
+  private setBulkRowStatus(item: CancelOrderItem): void {
+    const row = document.querySelector(`#bulk-cancel-tbody tr[data-bulk-key="${CSS.escape(item.key)}"]`);
     const cell = row?.querySelector('[data-bulk-status]');
     if (!cell) return;
 
-    if (state === 'working') {
+    const detail = item.detail || '';
+    if (item.status === 'waiting') {
+      cell.innerHTML = '<span class="bulk-status bulk-status-waiting">Waiting</span>';
+    } else if (item.status === 'working') {
       cell.innerHTML = '<span class="bulk-status bulk-status-working">'
         + '<i class="fa-solid fa-spinner fa-spin"></i> Cancelling</span>';
-    } else if (state === 'done') {
+    } else if (item.status === 'done') {
       cell.innerHTML = `<span class="bulk-status bulk-status-done">`
         + `<i class="fa-solid fa-check"></i> ${this.escapeHtml(detail || 'Cancelled')}</span>`;
+    } else if (item.status === 'skipped') {
+      cell.innerHTML = '<span class="bulk-status bulk-status-waiting">Not sent</span>';
     } else {
-      cell.innerHTML = `<span class="bulk-status bulk-status-failed" title="${this.escapeAttr(detail || '')}">`
+      cell.innerHTML = `<span class="bulk-status bulk-status-failed" title="${this.escapeAttr(detail)}">`
         + `<i class="fa-solid fa-triangle-exclamation"></i> ${this.escapeHtml(detail || 'Failed')}</span>`;
     }
   }
@@ -1751,12 +1788,27 @@ class LimitOrdersController {
     if (close) close.disabled = busy;
   }
 
+  /** The bulk-cancel job, if that's what the runner holds (running or finished). */
+  private cancelJob(): CancelOrderJob | null {
+    const job = OrderJobRunner.current();
+    return job && job.kind === 'cancel' ? job : null;
+  }
+
   private closeBulkModal(): void {
+    const job = this.cancelJob();
     // A run in flight owns the dialog — its results have to land somewhere.
-    if (this.bulkRunning) return;
+    if (job?.running) return;
+    this.closeBulkModalForce();
+  }
+
+  /** Close past the in-flight guard, for the success path that owns the run. */
+  private closeBulkModalForce(): void {
     this.bulkPending = [];
     this.hideBulkError();
     document.getElementById('bulk-cancel-overlay')?.classList.add('d-none');
+    // A finished run has been reported; forget it, which also clears the pill.
+    const job = this.cancelJob();
+    if (job && !job.running) OrderJobRunner.clear();
   }
 
   private showBulkError(message: string): void {
@@ -1771,102 +1823,88 @@ class LimitOrdersController {
   }
 
   /**
-   * Cancel the listed orders one at a time.
-   *
-   * Sequential and paced rather than fired in parallel: these are private,
-   * rate-limited calls against the same keys the automation worker uses, and a
-   * burst that trips a throttle would leave an unknown subset cancelled.
-   *
-   * Each row reports its own outcome as it lands, and a failure never stops the
-   * run — one synthetic-pair order that Kraken refuses must not strand the
-   * other nineteen. The dialog stays open when anything failed, so the list of
-   * what did and didn't go is still on screen.
+   * Hand the listed orders to OrderJobRunner, which cancels them one at a time
+   * and keeps going if you leave this page. The dialog shows each row's outcome
+   * as it lands, and stays open when anything failed.
    */
-  private async confirmBulkCancel(): Promise<void> {
-    if (this.bulkRunning || this.bulkPending.length === 0) return;
+  private confirmBulkCancel(): void {
+    if (OrderJobRunner.isBusy() || this.bulkPending.length === 0) return;
 
     const orders = this.bulkPending.slice();
-    this.bulkRunning = true;
+    const started = OrderJobRunner.startCancel({
+      paceMs: LimitOrdersController.BULK_CANCEL_PACE_MS,
+      items: orders.map(o => ({
+        key: this.selectionKey(o),
+        connectionId: o.connectionId,
+        orderId: o.id,
+        pair: o.pair,
+        order: o,
+      })),
+    });
+    if (!started) {
+      this.showBulkError(this.lockReason() || 'Another batch is still running.');
+      return;
+    }
     this.hideBulkError();
     this.setBulkBusy(true);
     this.setBulkProgress(0, orders.length, true);
+  }
 
-    const touched = new Set<number>();
-    const failures: Array<{ order: LimitOrder; message: string }> = [];
-    let done = 0;
-
-    for (let i = 0; i < orders.length; i++) {
-      // Navigating away mid-run: stop issuing, keep whatever already happened.
-      if (this.torndown) break;
-
-      const order = orders[i];
-      this.setBulkRowStatus(order, 'working');
-      try {
-        const result = await ExchangeController.cancelOrder(
-          order.connectionId, order.id, order.pair);
-        touched.add(order.connectionId);
-        // Robinhood only acknowledges the request and cancels asynchronously,
-        // so don't claim it's gone.
-        const pending = String(result?.status || '').toLowerCase() === 'canceling';
-        this.setBulkRowStatus(order, 'done', pending ? 'Submitted' : 'Cancelled');
-      } catch (err: any) {
-        const message = err?.message || 'Failed';
-        failures.push({ order, message });
-        this.setBulkRowStatus(order, 'failed', message);
-      }
-
-      done++;
-      this.setBulkProgress(done, orders.length, true);
-      if (i < orders.length - 1 && !this.torndown) {
-        await this.sleep(LimitOrdersController.BULK_CANCEL_PACE_MS);
-      }
+  private onCancelJobEvent(job: CancelOrderJob, e: OrderJobEvent): void {
+    if (e.changed) {
+      const item = job.items.find(i => i.key === e.changed);
+      if (item) this.setBulkRowStatus(item);
+    } else {
+      for (const item of job.items) this.setBulkRowStatus(item);
     }
+    this.setBulkProgress(job.done, job.items.length, true);
+    if (e.finished) this.onCancelJobFinished(job);
+  }
 
-    this.bulkRunning = false;
+  /** Reopen the dialog for a bulk cancel started before this page was opened. */
+  private restoreCancelJob(job: CancelOrderJob): void {
+    this.bulkPending = job.items.map(i => i.order as LimitOrder);
+    this.populateBulkModal(this.bulkPending);
+    for (const item of job.items) this.setBulkRowStatus(item);
+    this.setBulkProgress(job.done, job.items.length, true);
+    document.getElementById('bulk-cancel-overlay')?.classList.remove('d-none');
+
+    if (job.running) {
+      this.setBulkBusy(true);
+    } else {
+      this.onCancelJobFinished(job);
+    }
+  }
+
+  private onCancelJobFinished(job: CancelOrderJob): void {
     this.setBulkBusy(false);
 
-    // Other pages share the store's order cache — drop every connection we
-    // touched before refetching, or they keep showing cancelled orders.
-    for (const connId of touched) ExchangeStore.invalidateConnectionData(connId);
-
-    if (this.torndown) return;
-
-    const succeeded = done - failures.length;
     // Only clear what actually went. A failed order stays ticked so the user
     // can retry it without hunting through the table again.
-    for (const order of orders) {
-      if (!failures.some(f => this.selectionKey(f.order) === this.selectionKey(order))) {
-        this.selected.delete(this.selectionKey(order));
-      }
+    for (const item of job.items) {
+      if (item.status === 'failed') this.selected.add(item.key);
+      else this.selected.delete(item.key);
     }
+    this.syncSelectionUi();
 
-    if (failures.length === 0) {
+    const succeeded = job.done - job.failed;
+    const skipped = job.items.filter(i => i.status === 'skipped').length;
+    if (job.failed === 0 && skipped === 0) {
       this.closeBulkModalForce();
       this.showSuccess(succeeded === 1
         ? 'Cancelled 1 limit order.'
         : `Cancelled ${succeeded} limit orders.`);
-    } else {
-      // Dialog stays open: the per-row outcomes are the only record of which
-      // orders went and which are still resting.
-      this.showBulkError(
-        `${succeeded} cancelled, ${failures.length} failed. The failures are listed above and `
-        + 'stay selected so you can retry them.');
+      return;
     }
 
-    // Best-effort: the cancels have already happened and been reported, so a
-    // failed refresh must not surface as though the run itself failed.
-    try {
-      await ExchangeStore.refreshOrders();
-    } catch {
-      /* the next poll picks it up */
-    }
-  }
-
-  /** Close past the in-flight guard, for the success path that owns the run. */
-  private closeBulkModalForce(): void {
-    this.bulkPending = [];
-    this.hideBulkError();
-    document.getElementById('bulk-cancel-overlay')?.classList.add('d-none');
+    // Dialog stays open: the per-row outcomes are the only record of which
+    // orders went and which are still resting.
+    const parts = [`${succeeded} cancelled`];
+    if (job.failed > 0) parts.push(`${job.failed} failed`);
+    if (skipped > 0) parts.push(`${skipped} not sent`);
+    this.showBulkError(`${parts.join(', ')}. `
+      + (job.failed > 0 ? 'The failures are listed above and stay selected so you can retry them.'
+                        : 'Anything not sent is still resting on the exchange.'));
   }
 
   // ---------------------------------------------------------------------------
@@ -2164,13 +2202,25 @@ class LimitOrdersController {
     document.getElementById('limit-progress-stop')?.addEventListener('click', () => this.stopBatch());
     document.getElementById('limit-progress-dismiss')?.addEventListener('click', () => {
       document.getElementById('limit-progress-section')?.classList.add('d-none');
+      // Forget the finished ladder, which also clears the sidebar pill.
+      if (this.placeJob()) OrderJobRunner.clear();
     });
   }
 
-  /** Which coin/exchange a running batch has locked, or null when free. */
-  private lockedBy(): { base: string; exchangeName: string } | null {
-    const b = this.batch;
-    return b && b.running ? { base: b.base, exchangeName: b.exchangeName } : null;
+  /**
+   * Why new batches are blocked right now, or null when they aren't. Any running
+   * job blocks them, ladder or bulk cancel: both use the same keys and pacing.
+   */
+  private lockReason(): string | null {
+    const job = OrderJobRunner.current();
+    if (!job || !job.running) return null;
+    if (job.kind === 'place') {
+      return `Still placing ${job.base} orders on ${job.exchangeName}. Wait for it to finish, `
+           + 'or stop it from the progress panel above.';
+    }
+    const n = job.items.length;
+    return `Still cancelling ${n} order${n === 1 ? '' : 's'}. Wait for it to finish before `
+         + 'starting another batch.';
   }
 
   private syncCreateButton(): void {
@@ -2179,22 +2229,36 @@ class LimitOrdersController {
     if (label) label.textContent = `New ${this.side} limit order`;
     btn?.classList.toggle('is-buy', this.side === 'buy');
     btn?.classList.toggle('is-sell', this.side === 'sell');
-    if (!btn) return;
 
-    const lock = this.lockedBy();
+    const lock = this.lockReason();
+
+    // Said on the page, not just in a tooltip, so a disabled button isn't a mystery.
+    const note = document.getElementById('limit-lock-note');
+    if (note) {
+      note.textContent = lock || '';
+      note.classList.toggle('d-none', !lock);
+    }
+
+    const bulk = document.getElementById('limit-bulk-cancel') as HTMLButtonElement | null;
+    if (bulk) {
+      bulk.disabled = lock !== null;
+      bulk.title = lock || '';
+    }
+
+    if (!btn) return;
     const noConnection = this.loadState() === 'no-connection';
     btn.disabled = lock !== null || noConnection;
     btn.title = lock
-      ? `Still placing ${lock.base} orders on ${lock.exchangeName} — wait for the batch to finish, or stop it.`
+      ? lock
       : noConnection
         ? 'Connect an exchange in your profile to place orders.'
         : 'Create a new resting limit order';
   }
 
   private async openCreateModal(): Promise<void> {
-    const lock = this.lockedBy();
+    const lock = this.lockReason();
     if (lock) {
-      this.showError(`Still placing ${lock.base} orders — wait for that batch to finish, or stop it.`);
+      this.showError(lock);
       return;
     }
     if (ExchangeStore.connections.length === 0) {
@@ -4097,14 +4161,14 @@ class LimitOrdersController {
     return Math.max(this.pacingMs, LimitOrdersController.MIN_PACE_MS);
   }
 
-  private estimateMs(count: number): number {
+  private estimateMs(count: number, paceMs = this.paceMs()): number {
     if (count <= 0) return 0;
     // count requests, but only count-1 waits: the first goes out immediately.
-    return count * LimitOrdersController.PLACE_OVERHEAD_MS + (count - 1) * this.paceMs();
+    return count * LimitOrdersController.PLACE_OVERHEAD_MS + (count - 1) * paceMs;
   }
 
-  private estimateText(count: number): string {
-    const ms = this.estimateMs(count);
+  private estimateText(count: number, paceMs?: number): string {
+    const ms = this.estimateMs(count, paceMs);
     if (ms <= 0) return '';
     if (ms < 1500) return 'under 2 seconds';
     const seconds = Math.round(ms / 1000);
@@ -4125,54 +4189,75 @@ class LimitOrdersController {
   // Create wizard — placement
   // ---------------------------------------------------------------------------
 
-  private sleep(ms: number): Promise<void> {
-    return new Promise(resolve => window.setTimeout(resolve, ms));
+  /** The ladder job, if that's what the runner holds (running or finished). */
+  private placeJob(): PlaceOrderJob | null {
+    const job = OrderJobRunner.current();
+    return job && job.kind === 'place' ? job : null;
   }
 
-  private async submitBatch(): Promise<void> {
-    if (this.submitting || (this.batch && this.batch.running)) return;
+  /**
+   * Hand the ladder to OrderJobRunner, which places it outside this page so it
+   * keeps going if you navigate away. This page just watches it.
+   */
+  private submitBatch(): void {
+    if (this.submitting || OrderJobRunner.isBusy()) return;
     const problem = this.validateLegs();
     if (problem) { this.showModalError(problem); return; }
 
     this.submitting = true;
-    this.batch = {
+    const started = OrderJobRunner.startPlace({
       connId: this.wizardConnId!,
       exchangeName: ExchangeStore.getExchangeName(this.wizardConnId!),
       side: this.wizardSide,
       base: this.base,
-      legs: this.legs.map(leg => ({
-        ...leg, status: 'queued' as LegStatus, orderId: null, error: null,
-      })),
-      cancelRequested: false, running: false, placed: 0, failed: 0,
-    };
-    this.closeCreateModal(true);
+      // Only where the exchange has the flag — Robinhood has none, and sending
+      // it there would fail every leg with a 400.
+      postOnly: this.supportsPostOnly && this.postOnly,
+      paceMs: this.paceMs(),
+      legs: this.legs.map(leg => {
+        const market = this.markets[leg.pair];
+        return {
+          id: leg.id,
+          pair: leg.pair,
+          price: leg.price!,
+          amount: leg.amount!,
+          priceDecimals: market ? market.priceDecimals : 8,
+          amountDecimals: market ? market.amountDecimals : 8,
+        };
+      }),
+    });
     this.submitting = false;
-
+    if (!started) {
+      this.showModalError('Another batch is still running — wait for it to finish, or stop it.');
+      return;
+    }
+    this.closeCreateModal(true);
     this.showProgress();
     this.syncCreateButton();
-    this.armUnloadGuard();
-    await this.runBatch();
   }
 
   private showProgress(): void {
-    const b = this.batch;
+    const b = this.placeJob();
     if (!b) return;
     document.getElementById('limit-progress-section')?.classList.remove('d-none');
     document.getElementById('limit-progress-footer')?.classList.add('d-none');
 
     const stop = document.getElementById('limit-progress-stop') as HTMLButtonElement | null;
     if (stop) {
-      stop.disabled = false;
-      stop.innerHTML = '<i class="fa-solid fa-stop"></i> Stop';
-      stop.classList.remove('d-none');
+      stop.disabled = !b.running || b.cancelRequested;
+      stop.innerHTML = b.running && b.cancelRequested
+        ? '<i class="fa-solid fa-spinner fa-spin"></i> Stopping…'
+        : '<i class="fa-solid fa-stop"></i> Stop';
+      stop.classList.toggle('d-none', !b.running);
     }
 
     const tbody = document.getElementById('limit-progress-tbody');
     if (tbody) tbody.innerHTML = b.legs.map((leg, i) => this.progressRow(leg, i)).join('');
     this.renderProgressHeader();
+    if (!b.running) this.renderProgressFooter();
   }
 
-  private statusPill(leg: LimitLeg): string {
+  private statusPill(leg: OrderJobLeg): string {
     const map: Record<LegStatus, [string, string]> = {
       queued: ['limit-status-queued', '<i class="fa-regular fa-clock"></i> Queued'],
       placing: ['limit-status-placing', '<i class="fa-solid fa-spinner fa-spin"></i> Placing…'],
@@ -4188,15 +4273,12 @@ class LimitOrdersController {
     return text.length > max ? `${text.slice(0, max - 1)}…` : text;
   }
 
-  private progressRow(leg: LimitLeg, index: number): string {
-    const market = this.markets[leg.pair];
-    const pd = market ? market.priceDecimals : 8;
-    const ad = market ? market.amountDecimals : 8;
+  private progressRow(leg: OrderJobLeg, index: number): string {
     return `<tr class="limit-progress-row limit-progress-${leg.status}" data-prog="${this.escapeAttr(leg.id)}">
       <td class="limit-leg-num">${index + 1}</td>
       <td>${this.escapeHtml(leg.pair)}</td>
-      <td>${this.escapeHtml(this.fmtNum(leg.price ?? 0, pd))}</td>
-      <td>${this.escapeHtml(this.fmtNum(leg.amount ?? 0, ad))}</td>
+      <td>${this.escapeHtml(this.fmtNum(leg.price, leg.priceDecimals))}</td>
+      <td>${this.escapeHtml(this.fmtNum(leg.amount, leg.amountDecimals))}</td>
       <td>${this.statusPill(leg)}</td>
       <td class="order-id-cell" title="${this.escapeAttr(leg.orderId || leg.error || '')}">
         ${this.escapeHtml(leg.orderId || (leg.error ? this.truncate(leg.error, 44) : '--'))}
@@ -4208,7 +4290,7 @@ class LimitOrdersController {
    * Update one row in place — never a table rebuild, so the spinner doesn't
    * restart and the scroll position holds. No-ops safely once the page is gone.
    */
-  private updateProgressRow(leg: LimitLeg): void {
+  private updateProgressRow(leg: OrderJobLeg): void {
     const row = document.querySelector(`[data-prog="${CSS.escape(leg.id)}"]`) as HTMLElement | null;
     if (!row) return;
     row.className = `limit-progress-row limit-progress-${leg.status}`;
@@ -4221,7 +4303,7 @@ class LimitOrdersController {
   }
 
   private renderProgressHeader(): void {
-    const b = this.batch;
+    const b = this.placeJob();
     if (!b) return;
     const done = b.placed + b.failed;
     const total = b.legs.length;
@@ -4250,12 +4332,12 @@ class LimitOrdersController {
     if (eta) {
       const remaining = b.legs.filter(l => l.status === 'queued').length;
       eta.textContent = b.running && remaining > 0
-        ? `${this.estimateText(remaining)} left` : '';
+        ? `${this.estimateText(remaining, b.paceMs)} left` : '';
     }
   }
 
   private renderProgressFooter(): void {
-    const b = this.batch;
+    const b = this.placeJob();
     if (!b) return;
     document.getElementById('limit-progress-stop')?.classList.add('d-none');
     document.getElementById('limit-progress-footer')?.classList.remove('d-none');
@@ -4270,102 +4352,34 @@ class LimitOrdersController {
                         + 'resting on the exchange and appear in the table below.';
   }
 
-  /** Errors that guarantee every remaining leg fails too. */
-  private isFatalPlacementError(err: any): boolean {
-    if (err?.keys_invalid) return true;
-    const message = String(err?.message || '').toLowerCase();
-    return message.includes('authentic') || message.includes('unauthor')
-        || message.includes('api key') || message.includes('rate limit')
-        || message.includes('too many requests')
-        // The budget is gone, so later legs can't fit either.
-        || message.includes('insufficient') || message.includes('not enough');
-  }
-
-  private async runBatch(): Promise<void> {
-    const b = this.batch;
-    if (!b || b.running) return;
-    b.running = true;
-
-    for (let i = 0; i < b.legs.length; i++) {
-      const leg = b.legs[i];
-
-      // Two ways out: the user hit Stop, or the router replaced #app-content.
-      if (b.cancelRequested || this.torndown) {
-        leg.status = 'skipped';
-        this.updateProgressRow(leg);
-        continue;
-      }
-
-      leg.status = 'placing';
-      this.updateProgressRow(leg);
-      this.renderProgressHeader();
-
-      try {
-        const result = await ExchangeController.createOrder(b.connId, {
-          symbol: leg.pair,
-          side: b.side,
-          type: 'limit',
-          amount: leg.amount!,
-          price: leg.price!,
-          // Only where the exchange has the flag — Robinhood has none, and
-          // sending it there would fail every leg with a 400.
-          post_only: this.supportsPostOnly && this.postOnly,
-          // So a retried or duplicated request can't double-place this leg.
-          client_order_id: `cyrus-${leg.id}-${i}`,
-        });
-        leg.orderId = String(result?.id || '');
-        leg.status = 'placed';
-        b.placed++;
-      } catch (err: any) {
-        leg.error = err?.message || 'The exchange rejected this order.';
-        leg.status = 'failed';
-        b.failed++;
-        if (this.isFatalPlacementError(err)) {
-          b.cancelRequested = true;
-          this.showError(`Stopped after ${b.placed} of ${b.legs.length} orders: ${leg.error}`);
-        }
-      }
-
-      this.updateProgressRow(leg);
-      this.renderProgressHeader();
-
-      // Pace between placements only — no trailing wait after the last one.
-      if (!b.cancelRequested && !this.torndown && i < b.legs.length - 1) {
-        await this.sleep(this.paceMs());
-      }
+  /**
+   * Runner events for the ladder: patch the one row that changed, keep the
+   * header current, and report the outcome once it ends.
+   */
+  private onPlaceJobEvent(b: PlaceOrderJob, e: OrderJobEvent): void {
+    if (e.changed) {
+      const leg = b.legs.find(l => l.id === e.changed);
+      if (leg) this.updateProgressRow(leg);
+    } else if (!e.finished) {
+      // Stop marks every queued leg at once.
+      for (const leg of b.legs) this.updateProgressRow(leg);
     }
-
-    b.running = false;
-
-    // Other pages share the store's per-connection cache, so drop this
-    // connection's entry before refetching or they keep serving the pre-batch
-    // snapshot for the rest of the TTL.
-    ExchangeStore.invalidateConnectionData(b.connId);
-
     this.renderProgressHeader();
-    this.renderProgressFooter();
-    this.disarmUnloadGuard();
-    this.syncCreateButton();
 
+    if (!e.finished) return;
+    for (const leg of b.legs) this.updateProgressRow(leg);
+    this.renderProgressFooter();
+    if (b.stopReason) this.showError(b.stopReason);
     if (b.placed > 0) {
       this.showSuccess(`Placed ${b.placed} of ${b.legs.length} ${b.side} limit `
         + `order${b.legs.length === 1 ? '' : 's'} for ${b.base} on ${b.exchangeName}.`);
     }
-    if (!this.torndown) await ExchangeStore.refreshOrders();
   }
 
   private stopBatch(): void {
-    const b = this.batch;
+    const b = this.placeJob();
     if (!b || !b.running) return;
-    b.cancelRequested = true;
-
-    // Mark the untouched tail straight away so the table matches what will happen.
-    for (const leg of b.legs) {
-      if (leg.status === 'queued') {
-        leg.status = 'skipped';
-        this.updateProgressRow(leg);
-      }
-    }
+    OrderJobRunner.stop();
 
     const btn = document.getElementById('limit-progress-stop') as HTMLButtonElement | null;
     if (btn) {
@@ -4376,22 +4390,6 @@ class LimitOrdersController {
     this.showError(`Stopping. The ${b.placed} order${b.placed === 1 ? '' : 's'} already placed `
       + 'are still resting on the exchange — cancel them from the table below if you '
       + 'do not want them.');
-  }
-
-  private armUnloadGuard(): void {
-    if (this.beforeUnload) return;
-    this.beforeUnload = (e: BeforeUnloadEvent) => {
-      if (!this.batch?.running) return;
-      e.preventDefault();
-      e.returnValue = '';
-    };
-    window.addEventListener('beforeunload', this.beforeUnload);
-  }
-
-  private disarmUnloadGuard(): void {
-    if (!this.beforeUnload) return;
-    window.removeEventListener('beforeunload', this.beforeUnload);
-    this.beforeUnload = null;
   }
 
   // ---------------------------------------------------------------------------

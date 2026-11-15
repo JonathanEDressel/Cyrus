@@ -46,6 +46,7 @@ class Router {
       footer?.classList.remove('d-none');
       aiLauncher?.classList.remove('d-none');
       this.updateActiveNav(name);
+      if (typeof TopBar !== 'undefined') TopBar.onChromeShown();
     } else {
       header?.classList.add('d-none');
       footer?.classList.add('d-none');
@@ -100,6 +101,15 @@ class Router {
     });
 
     document.getElementById('logout-btn')?.addEventListener('click', () => {
+      // A ladder or bulk cancel runs in the background; logging out ends it.
+      if (OrderJobRunner.isBusy()) {
+        const job = OrderJobRunner.current();
+        const what = job?.kind === 'cancel' ? 'cancelled' : 'placed';
+        if (!window.confirm(`Orders are still being ${what}. Logging out stops the rest — `
+            + 'anything not yet sent is never sent. Log out anyway?')) {
+          return;
+        }
+      }
       AuthController.logout();
       this.navigate('login');
     });
@@ -124,6 +134,10 @@ class Router {
     link.href = href;
     document.head.appendChild(link);
     this.loadedStyles.add(href);
+    // The Terminal design layer restyles every page, so it must stay after
+    // each page stylesheet in the cascade. Moving the <link> doesn't reload it.
+    const terminal = document.getElementById('terminal-css');
+    if (terminal) document.head.appendChild(terminal);
   }
 
   private loadScript(src: string, params?: Record<string, string>): void {

@@ -31,7 +31,7 @@
 
 .balancer-page .asset-badge {
   color: var(--accent-purple-light);
-  background: rgba(129, 140, 248, 0.14);
+  background: color-mix(in srgb, var(--accent-purple) 14%, transparent);
 }
 
 /* Alerts: the only .alert-warning in the app lives in login.css (light theme,
@@ -47,15 +47,15 @@
 }
 
 .balancer-page .alert-warning {
-  background: rgba(245, 158, 11, 0.1);
-  border: 1px solid rgba(245, 158, 11, 0.25);
-  color: #f59e0b;
+  background: color-mix(in srgb, var(--warn) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--warn) 25%, transparent);
+  color: var(--warn);
 }
 
 .balancer-page .alert-success {
-  background: rgba(34, 197, 94, 0.1);
-  border: 1px solid rgba(34, 197, 94, 0.2);
-  color: #22c55e;
+  background: color-mix(in srgb, var(--pos) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--pos) 20%, transparent);
+  color: var(--pos);
 }
 
 .balancer-page .data-table td {
@@ -239,7 +239,7 @@
 }
 
 .ac-bar-over {
-  fill: #f59e0b;
+  fill: var(--warn);
 }
 
 .ac-bar-empty {
@@ -338,7 +338,7 @@
 }
 
 .balancer-swatch-bar { background: var(--accent-cyan); }
-.balancer-swatch-over { background: #f59e0b; }
+.balancer-swatch-over { background: var(--warn); }
 .balancer-swatch-cap { background: var(--accent-purple); }
 .balancer-swatch-target {
   height: 0;
@@ -410,7 +410,7 @@
 }
 
 .balancer-over {
-  color: #f59e0b;
+  color: var(--warn);
   font-weight: 600;
 }
 
@@ -423,10 +423,10 @@
 }
 
 .balancer-dirty-flag {
-  color: #f59e0b;
+  color: var(--warn);
   font-size: 0.75rem;
   font-weight: 600;
-  border: 1px solid #f59e0b;
+  border: 1px solid var(--warn);
   border-radius: 999px;
   padding: 0.15rem 0.6rem;
 }
@@ -469,12 +469,12 @@
 
 body.theme-light .balancer-over,
 body.theme-light .balancer-page .alert-warning {
-  color: #b45309;
+  color: var(--warn);
 }
 
 body.theme-light .balancer-dirty-flag {
-  color: #b45309;
-  border-color: #b45309;
+  color: var(--warn);
+  border-color: var(--warn);
 }
 
 body.theme-light .ac-cap-label {

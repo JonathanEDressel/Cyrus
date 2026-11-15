@@ -107,7 +107,7 @@
   height: 46px;
   border-radius: 12px;
   font-size: 1.2rem;
-  color: #fff;
+  color: var(--accent-ink);
   flex-shrink: 0;
   background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
 }
@@ -126,7 +126,7 @@
 }
 
 .partner-icon-tangem {
-  background: linear-gradient(135deg, #f0b90b, #d97706);
+  background: linear-gradient(135deg, #f0b90b, var(--warn));
 }
 
 .partner-card-meta {

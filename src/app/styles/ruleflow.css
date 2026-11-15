@@ -105,7 +105,7 @@
 .rf-node.rf-clickable:hover {
   border-color: var(--accent-purple-light);
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35),
-              0 0 0 3px rgba(99, 102, 241, 0.22);
+              0 0 0 3px color-mix(in srgb, var(--accent-purple) 22%, transparent);
 }
 
 .rf-node.rf-clickable:active {
@@ -152,11 +152,11 @@
 .rf-node-mid      { border-color: var(--accent-purple-light); }
 .rf-node-mid      .rf-node-icon { color: var(--accent-purple-light); }
 
-.rf-node-terminal { border-color: #22c55e; }
-.rf-node-terminal .rf-node-icon { color: #22c55e; }
+.rf-node-terminal { border-color: var(--pos); }
+.rf-node-terminal .rf-node-icon { color: var(--pos); }
 
-.rf-node-wallet   { border-color: #f59e0b; }
-.rf-node-wallet   .rf-node-icon { color: #f59e0b; }
+.rf-node-wallet   { border-color: var(--warn); }
+.rf-node-wallet   .rf-node-icon { color: var(--warn); }
 
 .rf-node.rf-paused {
   opacity: 0.5;
@@ -312,7 +312,7 @@
 
 .rules-tab-btn.active {
   background: var(--accent-purple);
-  color: #fff;
+  color: var(--accent-ink);
 }
 
 .rules-tab-btn:hover:not(.active) {
@@ -347,5 +347,5 @@
 
 .rf-legend-source   { color: var(--accent-cyan); }
 .rf-legend-mid      { color: var(--accent-purple-light); }
-.rf-legend-terminal { color: #22c55e; }
-.rf-legend-wallet   { color: #f59e0b; }
+.rf-legend-terminal { color: var(--pos); }
+.rf-legend-wallet   { color: var(--warn); }

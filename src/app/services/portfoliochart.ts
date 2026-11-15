@@ -9,9 +9,9 @@
 const PortfolioChart = (() => {
   const W = 420, H = 300;
   const CX = 210, CY = 150, R = 98, IR = 60;
-  const PALETTE = ['#06b6d4', '#8b5cf6', '#22c55e', '#f59e0b', '#3b82f6',
-                   '#ec4899', '#14b8a6', '#eab308', '#a78bfa', '#f97316'];
-  const OTHER_COLOR = '#64748b';
+  // Theme colours, read when a chart is drawn so light/dark both work.
+  const palette = (): string[] => ChartTheme.get().palette;
+  const otherColor = (): string => ChartTheme.get().muted;
   const OTHER_THRESHOLD = 0.03;
 
   interface Position { asset: string; amount: number; usd_value: number; }
@@ -50,16 +50,16 @@ const PortfolioChart = (() => {
     const small = positions.filter(p => p.usd_value / total < OTHER_THRESHOLD);
 
     const slices: Slice[] = big.map((p, i) => ({
-      label: p.asset, value: p.usd_value, color: PALETTE[i % PALETTE.length],
+      label: p.asset, value: p.usd_value, color: palette()[i % palette().length],
       isOther: false, items: [p],
     }));
 
     if (small.length === 1) {
       const p = small[0];
-      slices.push({ label: p.asset, value: p.usd_value, color: PALETTE[slices.length % PALETTE.length], isOther: false, items: [p] });
+      slices.push({ label: p.asset, value: p.usd_value, color: palette()[slices.length % palette().length], isOther: false, items: [p] });
     } else if (small.length > 1) {
       const sum = small.reduce((s, p) => s + p.usd_value, 0);
-      slices.push({ label: 'Other', value: sum, color: OTHER_COLOR, isOther: true, items: small });
+      slices.push({ label: 'Other', value: sum, color: otherColor(), isOther: true, items: small });
     }
     return slices;
   }

@@ -33,9 +33,10 @@
     <p class="limit-progress-note">
       <i class="fa-solid fa-triangle-exclamation"></i>
       <span>
-        Orders are sent one at a time from this page. <strong>Stop</strong> only prevents the
-        remaining orders from being sent — anything already placed stays resting on the
-        exchange and has to be cancelled individually. Leaving this page has the same effect.
+        Orders are sent one at a time, and you can leave this page while they go — progress
+        shows in the sidebar. <strong>Stop</strong> only prevents the remaining orders from being
+        sent — anything already placed stays resting on the exchange and has to be cancelled
+        individually. Closing Cyrus has the same effect.
       </span>
     </p>
 
@@ -84,6 +85,9 @@
         </button>
       </div>
     </div>
+
+    <!-- Why New limit order / Cancel selected are disabled while a job runs. -->
+    <p class="limit-lock-note d-none" id="limit-lock-note" role="status"></p>
 
     <div class="limit-toolbar">
       <div class="limit-search">
@@ -763,9 +767,9 @@
           <p class="limit-batch-warning">
             <i class="fa-solid fa-triangle-exclamation"></i>
             <span>
-              These orders are placed one at a time from this page. If you navigate away before
-              the batch finishes, the remaining orders are never sent — and anything already
-              placed stays resting on the exchange.
+              These orders are placed one at a time. You can leave this page while they go, but if
+              you close Cyrus before the batch finishes, the remaining orders are never sent — and
+              anything already placed stays resting on the exchange.
             </span>
           </p>
         </div>

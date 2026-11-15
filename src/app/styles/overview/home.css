@@ -195,18 +195,18 @@
   font-style: italic;
 }
 
-.pnl-positive { color: #22c55e; }
-.pnl-negative { color: #ef4444; }
+.pnl-positive { color: var(--pos); }
+.pnl-negative { color: var(--neg); }
 
 .side-buy {
-  color: #22c55e;
+  color: var(--pos);
   font-weight: 600;
   text-transform: uppercase;
   font-size: 0.8rem;
 }
 
 .side-sell {
-  color: #ef4444;
+  color: var(--neg);
   font-weight: 600;
   text-transform: uppercase;
   font-size: 0.8rem;
@@ -225,8 +225,8 @@
 .status-success,
 .status-open,
 .status-verified {
-  background: rgba(34, 197, 94, 0.1);
-  color: #22c55e;
+  background: color-mix(in srgb, var(--pos) 10%, transparent);
+  color: var(--pos);
 }
 
 .status-inactive,
@@ -236,8 +236,8 @@
 }
 
 .status-error {
-  background: rgba(239, 68, 68, 0.1);
-  color: #ef4444;
+  background: color-mix(in srgb, var(--neg) 10%, transparent);
+  color: var(--neg);
 }
 
 /* ── Live Data Charts ──────────────────────────────────────────── */
@@ -282,7 +282,7 @@
 .live-data-selector:hover,
 .live-data-selector:focus {
   border-color: var(--accent-cyan);
-  box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.12);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-cyan) 12%, transparent);
 }
 
 .live-data-selector option {
@@ -324,8 +324,8 @@
 }
 
 .chart-card:hover {
-  border-color: rgba(6, 182, 212, 0.5);
-  box-shadow: 0 4px 24px rgba(6, 182, 212, 0.08);
+  border-color: color-mix(in srgb, var(--accent-cyan) 50%, transparent);
+  box-shadow: 0 4px 24px color-mix(in srgb, var(--accent-cyan) 8%, transparent);
 }
 
 .chart-card[draggable="true"] {
@@ -340,7 +340,7 @@
 
 .chart-card.drag-over {
   border-color: var(--accent-cyan);
-  box-shadow: 0 0 0 2px rgba(6, 182, 212, 0.25);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-cyan) 25%, transparent);
 }
 
 /* Chart header */
@@ -381,13 +381,13 @@
 }
 
 .price-positive {
-  color: #22c55e;
-  background: rgba(34, 197, 94, 0.1);
+  color: var(--pos);
+  background: color-mix(in srgb, var(--pos) 10%, transparent);
 }
 
 .price-negative {
-  color: #ef4444;
-  background: rgba(239, 68, 68, 0.1);
+  color: var(--neg);
+  background: color-mix(in srgb, var(--neg) 10%, transparent);
 }
 
 .chart-remove-btn {
@@ -402,8 +402,8 @@
 }
 
 .chart-remove-btn:hover {
-  color: #ef4444;
-  background: rgba(239, 68, 68, 0.1);
+  color: var(--neg);
+  background: color-mix(in srgb, var(--neg) 10%, transparent);
 }
 
 /* Time range pills */
@@ -433,7 +433,7 @@
 }
 
 .time-range-btn.active {
-  background: rgba(6, 182, 212, 0.15);
+  background: color-mix(in srgb, var(--accent-cyan) 15%, transparent);
   color: var(--accent-cyan);
 }
 
@@ -458,7 +458,7 @@
 
 .add-crypto-btn {
   background: var(--accent-cyan);
-  color: #fff;
+  color: var(--accent-ink);
   border: none;
   padding: 0.4rem 0.85rem;
   border-radius: 8px;
@@ -472,7 +472,7 @@
 }
 
 .add-crypto-btn:hover {
-  background: var(--accent-cyan-hover, #0891b2);
+  background: var(--accent-cyan-hover, var(--accent-cyan-hover));
 }
 
 /* ── Add Crypto Modal ──────────────────────────────────────────── */
@@ -628,7 +628,7 @@
 }
 
 .ov-meta-warn {
-  color: #f59e0b;
+  color: var(--warn);
 }
 
 .ov-refresh-btn {
@@ -681,7 +681,7 @@
 
 .ov-stat:hover {
   border-color: var(--accent-cyan);
-  box-shadow: 0 0 0 1px rgba(6, 182, 212, 0.14);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent-cyan) 14%, transparent);
   transform: translateY(-1px);
 }
 
@@ -811,8 +811,8 @@
   background: var(--text-dimmer);
 }
 
-.ov-worker-up .ov-worker-dot   { background: #22c55e; }
-.ov-worker-down .ov-worker-dot { background: #ef4444; }
+.ov-worker-up .ov-worker-dot   { background: var(--pos); }
+.ov-worker-down .ov-worker-dot { background: var(--neg); }
 
 /* ── Shared list scaffolding ────────────────────────────────────── */
 
@@ -881,7 +881,7 @@
   display: inline-block;
   padding: 0.12em 0.45em;
   border-radius: 5px;
-  background: rgba(6, 182, 212, 0.12);
+  background: color-mix(in srgb, var(--accent-cyan) 12%, transparent);
   color: var(--accent-cyan);
   font-size: 0.72rem;
   font-weight: 700;
@@ -901,9 +901,9 @@
   font-weight: 400;
 }
 
-.ov-up   { color: #22c55e; }
-.ov-down { color: #ef4444; }
-.ov-warn { color: #f59e0b; }
+.ov-up   { color: var(--pos); }
+.ov-down { color: var(--neg); }
+.ov-warn { color: var(--warn); }
 
 /* ── Biggest holdings ───────────────────────────────────────────── */
 
@@ -947,8 +947,8 @@
   vector-effect: non-scaling-stroke;
 }
 
-.ov-spark-up polyline   { stroke: #4ade80; }
-.ov-spark-down polyline { stroke: #f87171; }
+.ov-spark-up polyline   { stroke: var(--pos); }
+.ov-spark-down polyline { stroke: var(--neg); }
 
 /* ── Resting limit orders ───────────────────────────────────────── */
 
@@ -966,13 +966,13 @@
 }
 
 .ov-side-buy {
-  color: #22c55e;
-  background: rgba(34, 197, 94, 0.12);
+  color: var(--pos);
+  background: color-mix(in srgb, var(--pos) 12%, transparent);
 }
 
 .ov-side-sell {
-  color: #ef4444;
-  background: rgba(239, 68, 68, 0.12);
+  color: var(--neg);
+  background: color-mix(in srgb, var(--neg) 12%, transparent);
 }
 
 .ov-order-pair {
@@ -1042,7 +1042,7 @@
 }
 
 .ov-cap-over .ov-cap-fill {
-  background: #f59e0b;
+  background: var(--warn);
 }
 
 .ov-cap-paused .ov-cap-fill {
@@ -1085,8 +1085,8 @@
   background: var(--text-dimmer);
 }
 
-.ov-act-success .ov-act-dot { background: #22c55e; }
-.ov-act-error .ov-act-dot   { background: #ef4444; }
+.ov-act-success .ov-act-dot { background: var(--pos); }
+.ov-act-error .ov-act-dot   { background: var(--neg); }
 .ov-act-skipped .ov-act-dot { background: #64748b; }
 
 .ov-act-body {
@@ -1146,10 +1146,10 @@ body.theme-light .ov-badge {
   background: rgba(8, 145, 178, 0.12);
 }
 
-body.theme-light .ov-spark-up polyline   { stroke: #15803d; }
-body.theme-light .ov-spark-down polyline { stroke: #b91c1c; }
-body.theme-light .ov-up   { color: #15803d; }
-body.theme-light .ov-down { color: #b91c1c; }
-body.theme-light .ov-warn { color: #b45309; }
-body.theme-light .ov-meta-warn { color: #b45309; }
-body.theme-light .ov-cap-over .ov-cap-fill { background: #d97706; }
+body.theme-light .ov-spark-up polyline   { stroke: var(--pos); }
+body.theme-light .ov-spark-down polyline { stroke: var(--neg); }
+body.theme-light .ov-up   { color: var(--pos); }
+body.theme-light .ov-down { color: var(--neg); }
+body.theme-light .ov-warn { color: var(--warn); }
+body.theme-light .ov-meta-warn { color: var(--warn); }
+body.theme-light .ov-cap-over .ov-cap-fill { background: var(--warn); }

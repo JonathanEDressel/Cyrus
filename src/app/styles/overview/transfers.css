@@ -3,11 +3,11 @@
    from commands.css — this file only adds what's specific to transfers. */
 
 .transfer-in {
-  color: var(--success, #22c55e);
+  color: var(--success, var(--pos));
 }
 
 .transfer-out {
-  color: var(--danger, #ef4444);
+  color: var(--danger, var(--neg));
 }
 
 .transfer-in i,
@@ -49,9 +49,9 @@
   font-weight: 600;
 }
 
-.transfers-status-ok      { background: rgba(34, 197, 94, 0.14);  color: #22c55e; }
-.transfers-status-pending { background: rgba(234, 179, 8, 0.14);  color: #eab308; }
-.transfers-status-bad     { background: rgba(239, 68, 68, 0.14);  color: #ef4444; }
+.transfers-status-ok      { background: color-mix(in srgb, var(--pos) 14%, transparent);  color: var(--pos); }
+.transfers-status-pending { background: color-mix(in srgb, var(--warn) 14%, transparent);  color: var(--warn); }
+.transfers-status-bad     { background: color-mix(in srgb, var(--neg) 14%, transparent);  color: var(--neg); }
 .transfers-status-unknown { background: rgba(127, 127, 127, 0.14); color: #9ca3af; }
 
 /* Notices for the two actionable states: a key missing the funding-history
@@ -72,7 +72,7 @@
 
 .transfers-notice i {
   margin-top: 0.15rem;
-  color: var(--accent, #6366f1);
+  color: var(--accent, var(--accent-purple));
 }
 
 .transfers-progress {
@@ -98,7 +98,7 @@
   height: 100%;
   width: 0;
   border-radius: 2px;
-  background: var(--accent, #6366f1);
+  background: var(--accent, var(--accent-purple));
   transition: width 0.4s ease;
 }
 
@@ -166,9 +166,9 @@
 
 /* The left edge carries the meaning: paired both-ends-known, money leaving,
    money arriving. Colour rather than an icon so a long list reads at a glance. */
-.roadmap-hop-internal { border-left-color: var(--accent, #6366f1); }
-.roadmap-hop-outbound { border-left-color: #ef4444; }
-.roadmap-hop-inbound  { border-left-color: #22c55e; }
+.roadmap-hop-internal { border-left-color: var(--accent, var(--accent-purple)); }
+.roadmap-hop-outbound { border-left-color: var(--neg); }
+.roadmap-hop-inbound  { border-left-color: var(--pos); }
 
 .roadmap-time {
   flex: 0 0 3.2rem;
@@ -206,8 +206,8 @@
 }
 
 .roadmap-node i { font-size: 0.7rem; opacity: 0.8; }
-.roadmap-node-wallet { background: rgba(99, 102, 241, 0.14); }
-.roadmap-node-external { background: rgba(234, 179, 8, 0.12); }
+.roadmap-node-wallet { background: color-mix(in srgb, var(--accent-purple) 14%, transparent); }
+.roadmap-node-external { background: color-mix(in srgb, var(--warn) 12%, transparent); }
 
 .roadmap-node-unknown {
   background: transparent;
@@ -225,7 +225,7 @@
 
 .roadmap-label-btn:hover {
   border-style: solid;
-  border-color: var(--accent, #6366f1);
+  border-color: var(--accent, var(--accent-purple));
   color: var(--text-primary);
 }
 
@@ -234,7 +234,7 @@
   font-size: 0.68rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: var(--accent, #6366f1);
+  color: var(--accent, var(--accent-purple));
 }
 
 .roadmap-arrow {
@@ -273,9 +273,9 @@
   font-weight: 700;
 }
 
-.roadmap-badge-paired { background: rgba(99, 102, 241, 0.15); color: #818cf8; }
-.roadmap-badge-review { background: rgba(234, 179, 8, 0.15); color: #eab308; }
-.roadmap-badge-wallet { background: rgba(34, 197, 94, 0.13); color: #22c55e; }
+.roadmap-badge-paired { background: color-mix(in srgb, var(--accent-purple) 15%, transparent); color: var(--accent-purple-light); }
+.roadmap-badge-review { background: color-mix(in srgb, var(--warn) 15%, transparent); color: var(--warn); }
+.roadmap-badge-wallet { background: color-mix(in srgb, var(--pos) 13%, transparent); color: var(--pos); }
 
 .roadmap-fee, .roadmap-arrived { font-size: 0.7rem; }
 
@@ -286,9 +286,9 @@
   gap: 0.6rem;
   margin-top: 0.5rem;
   padding: 0.5rem 0.65rem;
-  border: 1px solid rgba(234, 179, 8, 0.3);
+  border: 1px solid color-mix(in srgb, var(--warn) 30%, transparent);
   border-radius: 5px;
-  background: rgba(234, 179, 8, 0.07);
+  background: color-mix(in srgb, var(--warn) 7%, transparent);
   font-size: 0.78rem;
   line-height: 1.45;
 }
@@ -364,7 +364,7 @@
 
 .wallet-suggestion:hover {
   border-style: solid;
-  border-color: var(--accent, #6366f1);
+  border-color: var(--accent, var(--accent-purple));
 }
 
 .wallet-suggestion-addr {
@@ -420,10 +420,10 @@
   font-weight: 700;
 }
 
-.preview-chip-new   { background: rgba(34, 197, 94, 0.15);  color: #22c55e; }
+.preview-chip-new   { background: color-mix(in srgb, var(--pos) 15%, transparent);  color: var(--pos); }
 .preview-chip-dupe  { background: rgba(127, 127, 127, 0.18); color: #9ca3af; }
-.preview-chip-error { background: rgba(239, 68, 68, 0.15);  color: #ef4444; }
-.preview-chip-warn  { background: rgba(234, 179, 8, 0.15);  color: #eab308; }
+.preview-chip-error { background: color-mix(in srgb, var(--neg) 15%, transparent);  color: var(--neg); }
+.preview-chip-warn  { background: color-mix(in srgb, var(--warn) 15%, transparent);  color: var(--warn); }
 
 /* Capped and scrollable: a forty-row import must not push the confirm button
    off the bottom of the dialog. */
@@ -459,8 +459,8 @@
   line-height: 1.4;
 }
 
-.preview-section-error li { color: #f87171; }
-.preview-section-warn li  { color: #eab308; }
+.preview-section-error li { color: var(--neg); }
+.preview-section-warn li  { color: var(--warn); }
 
 .preview-row {
   flex: 0 0 auto;
@@ -515,8 +515,8 @@
 .wallet-tag {
   padding: 0.05rem 0.35rem;
   border-radius: 3px;
-  background: rgba(234, 179, 8, 0.15);
-  color: #eab308;
+  background: color-mix(in srgb, var(--warn) 15%, transparent);
+  color: var(--warn);
   font-size: 0.62rem;
   font-weight: 700;
   text-transform: uppercase;

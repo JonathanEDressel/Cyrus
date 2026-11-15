@@ -40,15 +40,15 @@
 #limit-orders-page .alert-warning,
 .cancel-order-modal .alert-warning,
 .create-limit-modal .alert-warning {
-  background: rgba(245, 158, 11, 0.1);
-  border: 1px solid rgba(245, 158, 11, 0.25);
-  color: #f59e0b;
+  background: color-mix(in srgb, var(--warn) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--warn) 25%, transparent);
+  color: var(--warn);
 }
 
 body.theme-light #limit-orders-page .alert-warning,
 body.theme-light .cancel-order-modal .alert-warning,
 body.theme-light .create-limit-modal .alert-warning {
-  color: #b45309;
+  color: var(--warn);
 }
 
 /* These two keep their own spacing, hence margin-bottom: 0 above. */
@@ -114,11 +114,11 @@ body.theme-light .create-limit-modal .alert-warning {
 /* The active tab picks up the side's colour so which list you're looking at is
  * obvious without reading the label — green buys, red sells. */
 .side-tab-buy.active {
-  background: #16a34a;
+  background: var(--pos);
 }
 
 .side-tab-sell.active {
-  background: #dc2626;
+  background: var(--neg);
 }
 
 /* ── Filter toolbar ──────────────────────────────────────────────── */
@@ -267,7 +267,7 @@ body.theme-light .create-limit-modal .alert-warning {
   width: 0.95rem;
   height: 0.95rem;
   cursor: pointer;
-  accent-color: var(--accent, #6366f1);
+  accent-color: var(--accent, var(--accent-purple));
   vertical-align: middle;
 }
 
@@ -286,13 +286,13 @@ body.theme-light .create-limit-modal .alert-warning {
 }
 
 .limit-row:focus-visible {
-  outline: 2px solid var(--accent, #6366f1);
+  outline: 2px solid var(--accent, var(--accent-purple));
   outline-offset: -2px;
 }
 
 .limit-row-selected,
 .limit-row-selected:hover {
-  background: rgba(99, 102, 241, 0.10);
+  background: color-mix(in srgb, var(--accent-purple) 10%, transparent);
 }
 
 /* ── Bulk action bar ───────────────────────────────────────────────────── */
@@ -303,9 +303,9 @@ body.theme-light .create-limit-modal .alert-warning {
   gap: 0.7rem;
   margin-bottom: 0.75rem;
   padding: 0.5rem 0.75rem;
-  border: 1px solid rgba(99, 102, 241, 0.3);
+  border: 1px solid color-mix(in srgb, var(--accent-purple) 30%, transparent);
   border-radius: 8px;
-  background: rgba(99, 102, 241, 0.07);
+  background: color-mix(in srgb, var(--accent-purple) 7%, transparent);
 }
 
 .limit-bulk-count {
@@ -357,11 +357,11 @@ body.theme-light .create-limit-modal .alert-warning {
 }
 
 .bulk-status-waiting { color: var(--text-dim); }
-.bulk-status-working { color: var(--accent, #6366f1); }
-.bulk-status-done    { color: #22c55e; }
+.bulk-status-working { color: var(--accent, var(--accent-purple)); }
+.bulk-status-done    { color: var(--pos); }
 
 .bulk-status-failed {
-  color: #ef4444;
+  color: var(--neg);
   cursor: help;
   /* Exchange errors can be a paragraph long; the full text is on the title. */
   max-width: 8.5rem;
@@ -377,8 +377,8 @@ body.theme-light .create-limit-modal .alert-warning {
   margin-left: 0.35rem;
   padding: 0.05rem 0.4rem;
   border-radius: 6px;
-  background: rgba(239, 68, 68, 0.12);
-  color: #ef4444;
+  background: color-mix(in srgb, var(--neg) 12%, transparent);
+  color: var(--neg);
   font-size: 0.68rem;
   font-weight: 700;
   text-transform: uppercase;
@@ -392,10 +392,10 @@ body.theme-light .create-limit-modal .alert-warning {
   gap: 0.5rem;
   margin: 0;
   padding: 0.65rem 0.8rem;
-  border: 1px solid rgba(239, 68, 68, 0.25);
+  border: 1px solid color-mix(in srgb, var(--neg) 25%, transparent);
   border-radius: 8px;
-  background: rgba(239, 68, 68, 0.08);
-  color: #ef4444;
+  background: color-mix(in srgb, var(--neg) 8%, transparent);
+  color: var(--neg);
   font-size: 0.8rem;
   line-height: 1.45;
 }
@@ -405,8 +405,8 @@ body.theme-light .create-limit-modal .alert-warning {
   margin-left: 0.35rem;
   padding: 0.05rem 0.4rem;
   border-radius: 6px;
-  background: rgba(234, 179, 8, 0.12);
-  color: #eab308;
+  background: color-mix(in srgb, var(--warn) 12%, transparent);
+  color: var(--warn);
   font-size: 0.68rem;
   font-weight: 700;
   text-transform: uppercase;
@@ -418,10 +418,10 @@ body.theme-light .create-limit-modal .alert-warning {
   align-items: center;
   gap: 0.35rem;
   padding: 0.3rem 0.65rem;
-  border: 1px solid rgba(239, 68, 68, 0.35);
+  border: 1px solid color-mix(in srgb, var(--neg) 35%, transparent);
   border-radius: 6px;
-  background: rgba(239, 68, 68, 0.08);
-  color: #ef4444;
+  background: color-mix(in srgb, var(--neg) 8%, transparent);
+  color: var(--neg);
   font-size: 0.78rem;
   font-weight: 600;
   cursor: pointer;
@@ -430,8 +430,8 @@ body.theme-light .create-limit-modal .alert-warning {
 }
 
 .btn-cancel-order:hover {
-  background: rgba(239, 68, 68, 0.18);
-  border-color: rgba(239, 68, 68, 0.6);
+  background: color-mix(in srgb, var(--neg) 18%, transparent);
+  border-color: color-mix(in srgb, var(--neg) 60%, transparent);
 }
 
 .btn-cancel-order i {
@@ -516,10 +516,10 @@ body.theme-light .create-limit-modal .alert-warning {
   gap: 0.5rem;
   margin: 0;
   padding: 0.65rem 0.8rem;
-  border: 1px solid rgba(234, 179, 8, 0.25);
+  border: 1px solid color-mix(in srgb, var(--warn) 25%, transparent);
   border-radius: 8px;
-  background: rgba(234, 179, 8, 0.08);
-  color: #eab308;
+  background: color-mix(in srgb, var(--warn) 8%, transparent);
+  color: var(--warn);
   font-size: 0.8rem;
   line-height: 1.4;
 }
@@ -532,7 +532,7 @@ body.theme-light .create-limit-modal .alert-warning {
   padding: 0.6rem 1.1rem;
   border: none;
   border-radius: 8px;
-  background: #dc2626;
+  background: var(--neg);
   color: #fff;
   font-size: 0.9rem;
   font-weight: 600;
@@ -541,7 +541,7 @@ body.theme-light .create-limit-modal .alert-warning {
 }
 
 .btn-danger:hover:not(:disabled) {
-  background: #b91c1c;
+  background: var(--neg);
 }
 
 .btn-danger:disabled {
@@ -576,10 +576,10 @@ body.theme-light .create-limit-modal .alert-warning {
   white-space: nowrap;
 }
 
-.btn-new-limit.is-buy { background: #16a34a; }
-.btn-new-limit.is-buy:hover:not(:disabled) { background: #15803d; }
-.btn-new-limit.is-sell { background: #dc2626; }
-.btn-new-limit.is-sell:hover:not(:disabled) { background: #b91c1c; }
+.btn-new-limit.is-buy { background: var(--pos); }
+.btn-new-limit.is-buy:hover:not(:disabled) { background: var(--pos); }
+.btn-new-limit.is-sell { background: var(--neg); }
+.btn-new-limit.is-sell:hover:not(:disabled) { background: var(--neg); }
 
 .btn-new-limit:disabled {
   opacity: 0.5;
@@ -627,7 +627,7 @@ body.theme-light .create-limit-modal .alert-warning {
 }
 
 .limit-market-price.is-stale {
-  color: #eab308;
+  color: var(--warn);
 }
 
 /* Quote-pair chips */
@@ -659,7 +659,7 @@ body.theme-light .create-limit-modal .alert-warning {
 
 .limit-quote-chip.selected {
   border-color: var(--accent-purple);
-  background: rgba(99, 102, 241, 0.12);
+  background: color-mix(in srgb, var(--accent-purple) 12%, transparent);
   color: var(--text-primary);
 }
 
@@ -706,7 +706,7 @@ body.theme-light .create-limit-modal .alert-warning {
   min-width: 0;
   font-size: 0.78rem;
   line-height: 1.35;
-  color: #eab308;
+  color: var(--warn);
 }
 
 .limit-wizard-blocker i {
@@ -715,7 +715,7 @@ body.theme-light .create-limit-modal .alert-warning {
 }
 
 body.theme-light .limit-wizard-blocker {
-  color: #b45309;
+  color: var(--warn);
 }
 
 /* Not `disabled`: the click is what surfaces the full red alert, so the button
@@ -864,12 +864,12 @@ body.theme-light .limit-wizard-blocker {
 }
 
 .limit-leg-remove:hover {
-  color: #ef4444;
-  background: rgba(239, 68, 68, 0.1);
+  color: var(--neg);
+  background: color-mix(in srgb, var(--neg) 10%, transparent);
 }
 
 .limit-leg-row.limit-leg-bad .limit-num {
-  border-color: rgba(239, 68, 68, 0.6);
+  border-color: color-mix(in srgb, var(--neg) 60%, transparent);
 }
 
 /* A hand-edited leg stays identifiable after a Regenerate. */
@@ -887,7 +887,7 @@ body.theme-light .limit-wizard-blocker {
 }
 
 .limit-legs-total.is-over {
-  color: #ef4444;
+  color: var(--neg);
   font-weight: 600;
 }
 
@@ -975,11 +975,11 @@ body.theme-light .limit-wizard-blocker {
   flex-shrink: 0;
 }
 
-.limit-tier-deepest  { background: #22c55e; }
-.limit-tier-deep     { background: #06b6d4; }
-.limit-tier-moderate { background: #818cf8; }
-.limit-tier-thin     { background: #eab308; }
-.limit-tier-sparse   { background: #ef4444; }
+.limit-tier-deepest  { background: var(--pos); }
+.limit-tier-deep     { background: var(--accent-cyan); }
+.limit-tier-moderate { background: var(--accent-purple-light); }
+.limit-tier-thin     { background: var(--warn); }
+.limit-tier-sparse   { background: var(--neg); }
 
 .limit-liquidity-caveat {
   margin: 0 !important;
@@ -1012,10 +1012,10 @@ body.theme-light .limit-wizard-blocker {
   gap: 0.5rem;
   margin: 0;
   padding: 0.65rem 0.8rem;
-  border: 1px solid rgba(234, 179, 8, 0.25);
+  border: 1px solid color-mix(in srgb, var(--warn) 25%, transparent);
   border-radius: 8px;
-  background: rgba(234, 179, 8, 0.08);
-  color: #eab308;
+  background: color-mix(in srgb, var(--warn) 8%, transparent);
+  color: var(--warn);
   font-size: 0.8rem;
   line-height: 1.45;
 }
@@ -1049,7 +1049,7 @@ body.theme-light .limit-wizard-blocker {
 }
 
 .limit-progress-fill.has-failures {
-  background: #eab308;
+  background: var(--warn);
 }
 
 .limit-progress-count {
@@ -1071,10 +1071,10 @@ body.theme-light .limit-wizard-blocker {
   gap: 0.5rem;
   margin: 0 0 1rem;
   padding: 0.65rem 0.8rem;
-  border: 1px solid rgba(234, 179, 8, 0.25);
+  border: 1px solid color-mix(in srgb, var(--warn) 25%, transparent);
   border-radius: 8px;
-  background: rgba(234, 179, 8, 0.08);
-  color: #eab308;
+  background: color-mix(in srgb, var(--warn) 8%, transparent);
+  color: var(--warn);
   font-size: 0.78rem;
   line-height: 1.45;
 }
@@ -1111,13 +1111,13 @@ body.theme-light .limit-wizard-blocker {
 }
 
 .limit-status-queued  { background: rgba(148, 163, 184, 0.12); color: var(--text-muted); }
-.limit-status-placing { background: rgba(6, 182, 212, 0.12);  color: var(--accent-cyan); }
-.limit-status-placed  { background: rgba(34, 197, 94, 0.12);  color: #22c55e; }
-.limit-status-failed  { background: rgba(239, 68, 68, 0.12);  color: #ef4444; }
+.limit-status-placing { background: color-mix(in srgb, var(--accent-cyan) 12%, transparent);  color: var(--accent-cyan); }
+.limit-status-placed  { background: color-mix(in srgb, var(--pos) 12%, transparent);  color: var(--pos); }
+.limit-status-failed  { background: color-mix(in srgb, var(--neg) 12%, transparent);  color: var(--neg); }
 .limit-status-skipped { background: rgba(148, 163, 184, 0.08); color: var(--text-dim); }
 
 .limit-progress-row.limit-progress-failed td {
-  color: #ef4444;
+  color: var(--neg);
 }
 
 /* ── Chart palette ───────────────────────────────────────────────────
@@ -1247,7 +1247,7 @@ body.theme-light .limit-wizard-blocker {
 
 .limit-shape-chip.active {
   border-color: var(--accent-cyan);
-  background: rgba(6, 182, 212, 0.12);
+  background: color-mix(in srgb, var(--accent-cyan) 12%, transparent);
   color: var(--accent-cyan);
 }
 
@@ -1330,8 +1330,8 @@ body.theme-light .limit-wizard-blocker {
 .limit-dist-plot .limit-dist-row.is-bad {
   background: repeating-linear-gradient(
     45deg,
-    rgba(245, 158, 11, 0.6) 0, rgba(245, 158, 11, 0.6) 3px,
-    rgba(245, 158, 11, 0.18) 3px, rgba(245, 158, 11, 0.18) 6px);
+    color-mix(in srgb, var(--warn) 60%, transparent) 0, color-mix(in srgb, var(--warn) 60%, transparent) 3px,
+    color-mix(in srgb, var(--warn) 18%, transparent) 3px, color-mix(in srgb, var(--warn) 18%, transparent) 6px);
 }
 
 /* ── Market price marker ─────────────────────────────────────────────── */
@@ -1340,7 +1340,7 @@ body.theme-light .limit-wizard-blocker {
   left: 0;
   right: 0;
   height: 0;
-  border-top: 1px dashed rgba(245, 158, 11, 0.85);
+  border-top: 1px dashed color-mix(in srgb, var(--warn) 85%, transparent);
   pointer-events: none;
   z-index: 2;
 }
@@ -1351,8 +1351,8 @@ body.theme-light .limit-wizard-blocker {
   bottom: 3px;
   padding: 1px 5px;
   border-radius: 4px;
-  background: rgba(245, 158, 11, 0.16);
-  color: #f59e0b;
+  background: color-mix(in srgb, var(--warn) 16%, transparent);
+  color: var(--warn);
   font-size: 0.68rem;
   font-weight: 700;
   white-space: nowrap;
@@ -1380,7 +1380,7 @@ body.theme-light .limit-wizard-blocker {
   height: 3px;
   border-radius: 2px;
   background: var(--accent-cyan);
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35), 0 0 8px rgba(6, 182, 212, 0.5);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35), 0 0 8px color-mix(in srgb, var(--accent-cyan) 50%, transparent);
   transition: height 0.12s, box-shadow 0.12s;
 }
 
@@ -1398,7 +1398,7 @@ body.theme-light .limit-wizard-blocker {
 .limit-dist-handle:hover .limit-dist-grip,
 .limit-dist-handle.is-dragging .limit-dist-grip {
   height: 5px;
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35), 0 0 12px rgba(6, 182, 212, 0.8);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35), 0 0 12px color-mix(in srgb, var(--accent-cyan) 80%, transparent);
 }
 
 .limit-dist-handle.is-dragging {
@@ -1411,7 +1411,7 @@ body.theme-light .limit-wizard-blocker {
 
 .limit-dist-handle:focus-visible .limit-dist-grip {
   height: 5px;
-  box-shadow: 0 0 0 2px var(--accent-cyan), 0 0 12px rgba(6, 182, 212, 0.8);
+  box-shadow: 0 0 0 2px var(--accent-cyan), 0 0 12px color-mix(in srgb, var(--accent-cyan) 80%, transparent);
 }
 
 .limit-dist-readback {
@@ -1463,9 +1463,9 @@ body.theme-light .limit-wizard-blocker {
   margin: 0.5rem 0 0;
   padding: 0.5rem 0.7rem;
   border-radius: 8px;
-  background: rgba(245, 158, 11, 0.1);
-  border: 1px solid rgba(245, 158, 11, 0.25);
-  color: #f59e0b;
+  background: color-mix(in srgb, var(--warn) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--warn) 25%, transparent);
+  color: var(--warn);
   font-size: 0.76rem;
   line-height: 1.45;
 }
@@ -1487,20 +1487,20 @@ body.theme-light .limit-dist {
 }
 
 body.theme-light .limit-dist-note {
-  color: #b45309;
+  color: var(--warn);
 }
 
 body.theme-light .limit-dist-market-label {
-  color: #b45309;
+  color: var(--warn);
 }
 
 body.theme-light .limit-dist-grip {
-  box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.18), 0 0 8px rgba(6, 182, 212, 0.35);
+  box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.18), 0 0 8px color-mix(in srgb, var(--accent-cyan) 35%, transparent);
 }
 
 body.theme-light .limit-dist-handle:hover .limit-dist-grip,
 body.theme-light .limit-dist-handle.is-dragging .limit-dist-grip {
-  box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.18), 0 0 12px rgba(6, 182, 212, 0.55);
+  box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.18), 0 0 12px color-mix(in srgb, var(--accent-cyan) 55%, transparent);
 }
 /* ── Why some inputs are outlined red ────────────────────────────────
  * .limit-leg-bad puts a red border on a step's price and amount inputs. That's
@@ -1509,9 +1509,9 @@ body.theme-light .limit-dist-handle.is-dragging .limit-dist-grip {
 .limit-legs-problems {
   margin-top: 0.85rem;
   padding: 0.7rem 0.85rem;
-  border: 1px solid rgba(239, 68, 68, 0.3);
+  border: 1px solid color-mix(in srgb, var(--neg) 30%, transparent);
   border-radius: 8px;
-  background: rgba(239, 68, 68, 0.07);
+  background: color-mix(in srgb, var(--neg) 7%, transparent);
 }
 
 .limit-legs-problems-head {
@@ -1526,11 +1526,11 @@ body.theme-light .limit-dist-handle.is-dragging .limit-dist-grip {
 
 .limit-legs-problems-head i {
   margin-top: 0.15rem;
-  color: #ef4444;
+  color: var(--neg);
 }
 
 .limit-legs-problems-head strong {
-  color: #ef4444;
+  color: var(--neg);
   font-weight: 700;
 }
 
@@ -1558,8 +1558,8 @@ body.theme-light .limit-dist-handle.is-dragging .limit-dist-grip {
   min-width: 5.5rem;
   padding: 0.05rem 0.4rem;
   border-radius: 6px;
-  background: rgba(239, 68, 68, 0.14);
-  color: #ef4444;
+  background: color-mix(in srgb, var(--neg) 14%, transparent);
+  color: var(--neg);
   font-size: 0.72rem;
   font-weight: 700;
   white-space: nowrap;
@@ -1568,14 +1568,14 @@ body.theme-light .limit-dist-handle.is-dragging .limit-dist-grip {
 body.theme-light .limit-legs-problems-head strong,
 body.theme-light .limit-legs-problems-steps,
 body.theme-light .limit-legs-problems-head i {
-  color: #b91c1c;
+  color: var(--neg);
 }
 
 /* The actionable line under the reason list — what to change, not what's wrong. */
 .limit-legs-problems-tip {
   margin: 0.6rem 0 0;
   padding-top: 0.55rem;
-  border-top: 1px solid rgba(239, 68, 68, 0.2);
+  border-top: 1px solid color-mix(in srgb, var(--neg) 20%, transparent);
   font-size: 0.78rem;
   line-height: 1.5;
   color: var(--text-muted);
@@ -1833,4 +1833,21 @@ body.theme-light .limit-flow-chart {
 
 @media (prefers-reduced-motion: reduce) {
   .limit-flow-bar { transition: none; }
+}
+
+/* Why New limit order / Cancel selected are disabled while a background job
+   runs. Amber, like .limit-batch-warning. */
+.limit-lock-note {
+  margin: 0 0 0.75rem;
+  padding: 0.55rem 0.8rem;
+  border: 1px solid color-mix(in srgb, var(--warn) 25%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--warn) 8%, transparent);
+  color: var(--warn);
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+body.theme-light .limit-lock-note {
+  color: #a16207;
 }

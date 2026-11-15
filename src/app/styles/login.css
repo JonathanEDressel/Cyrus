@@ -3,13 +3,13 @@
   min-height: 100vh;
   margin: 0;
   padding: 0;
-  background: radial-gradient(ellipse at 50% 0%, rgba(6, 182, 212, 0.07) 0%, transparent 60%),
+  background: radial-gradient(ellipse at 50% 0%, color-mix(in srgb, var(--accent-cyan) 7%, transparent) 0%, transparent 60%),
               linear-gradient(160deg, #060d1a 0%, #0a1628 50%, #030a14 100%);
   font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
 body.theme-light {
-  background: radial-gradient(ellipse at 50% 0%, rgba(6, 182, 212, 0.06) 0%, transparent 60%),
+  background: radial-gradient(ellipse at 50% 0%, color-mix(in srgb, var(--accent-cyan) 6%, transparent) 0%, transparent 60%),
               linear-gradient(160deg, #f8fafc 0%, #e2e8f0 50%, #f1f5f9 100%);
 }
 
@@ -23,14 +23,14 @@ body.theme-light {
 
 .auth-card {
   background: rgba(14, 24, 42, 0.85);
-  border: 1px solid rgba(6, 182, 212, 0.18);
+  border: 1px solid color-mix(in srgb, var(--accent-cyan) 18%, transparent);
   border-radius: 20px;
   padding: 2.75rem 2.5rem;
   max-width: 440px;
   width: 100%;
-  box-shadow: 0 0 0 1px rgba(6, 182, 212, 0.06),
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent-cyan) 6%, transparent),
               0 24px 64px var(--shadow-heavy),
-              0 0 80px rgba(6, 182, 212, 0.04);
+              0 0 80px color-mix(in srgb, var(--accent-cyan) 4%, transparent);
   backdrop-filter: blur(12px);
 }
 
@@ -52,8 +52,8 @@ body.theme-light .auth-card {
 }
 
 @keyframes logo-glow-pulse {
-  0%, 100% { filter: drop-shadow(0 0 18px rgba(6, 182, 212, 0.45)); }
-  50%       { filter: drop-shadow(0 0 52px rgba(6, 182, 212, 0.85)); }
+  0%, 100% { filter: drop-shadow(0 0 18px color-mix(in srgb, var(--accent-cyan) 45%, transparent)); }
+  50%       { filter: drop-shadow(0 0 52px color-mix(in srgb, var(--accent-cyan) 85%, transparent)); }
 }
 
 .auth-logo img {
@@ -114,8 +114,8 @@ body.theme-light .auth-card {
 .form-control:focus {
   outline: none;
   border-color: var(--accent-cyan);
-  box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.12), 0 0 12px rgba(6, 182, 212, 0.08);
-  background: rgba(6, 182, 212, 0.03);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-cyan) 12%, transparent), 0 0 12px color-mix(in srgb, var(--accent-cyan) 8%, transparent);
+  background: color-mix(in srgb, var(--accent-cyan) 3%, transparent);
 }
 
 .form-control::placeholder {
@@ -169,19 +169,19 @@ body.theme-light .auth-card {
 
 .btn.btn-primary {
   background: linear-gradient(135deg, var(--accent-cyan) 0%, var(--accent-cyan-hover) 100%);
-  color: #fff;
-  box-shadow: 0 4px 14px rgba(6, 182, 212, 0.3);
+  color: var(--accent-ink);
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--accent-cyan) 30%, transparent);
 }
 
 .btn.btn-primary:hover:not(:disabled) {
   background: linear-gradient(135deg, var(--accent-cyan-light) 0%, var(--accent-cyan) 100%);
-  box-shadow: 0 6px 20px rgba(6, 182, 212, 0.45);
+  box-shadow: 0 6px 20px color-mix(in srgb, var(--accent-cyan) 45%, transparent);
   transform: translateY(-1px);
 }
 
 .btn.btn-primary:active:not(:disabled) {
   transform: translateY(0);
-  box-shadow: 0 2px 8px rgba(6, 182, 212, 0.3);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--accent-cyan) 30%, transparent);
 }
 
 .btn.btn-primary:disabled {
@@ -302,18 +302,18 @@ body.theme-light .divider span {
 .auth-card .alert-warning {
   background: rgba(251, 191, 36, 0.08);
   border: 1px solid rgba(251, 191, 36, 0.25);
-  color: #fbbf24;
+  color: var(--warn);
 }
 
 .auth-card .alert-success {
-  background: rgba(34, 197, 94, 0.08);
-  border: 1px solid rgba(34, 197, 94, 0.25);
-  color: #4ade80;
+  background: color-mix(in srgb, var(--pos) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--pos) 25%, transparent);
+  color: var(--pos);
 }
 
 .auth-card .alert-info {
-  background: rgba(6, 182, 212, 0.07);
-  border: 1px solid rgba(6, 182, 212, 0.22);
+  background: color-mix(in srgb, var(--accent-cyan) 7%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent-cyan) 22%, transparent);
   color: #67e8f9;
 }
 
@@ -435,12 +435,12 @@ body.theme-light .divider span {
 }
 
 .form-check-label:hover {
-  border-color: #22c55e;
+  border-color: var(--pos);
   background: #f0fdf4;
 }
 
 .form-check-input:checked + .form-check-label {
-  border-color: #22c55e;
+  border-color: var(--pos);
   background: #f0fdf4;
 }
 
@@ -458,11 +458,11 @@ body.theme-light .divider span {
 }
 
 .badge.bg-primary {
-  background-color: #22c55e;
+  background-color: var(--pos);
 }
 
 .badge.bg-success {
-  background-color: #16a34a;
+  background-color: var(--pos);
 }
 
 @media (max-width: 480px) {
@@ -496,7 +496,7 @@ body.theme-light .divider span {
   text-transform: uppercase;
   letter-spacing: 0.5px;
   padding: 0.6rem 0.75rem;
-  border-bottom: 1px solid rgba(6, 182, 212, 0.15);
+  border-bottom: 1px solid color-mix(in srgb, var(--accent-cyan) 15%, transparent);
 }
 
 .accounts-table td {
@@ -507,7 +507,7 @@ body.theme-light .divider span {
 }
 
 .accounts-table tbody tr:hover {
-  background: rgba(6, 182, 212, 0.04);
+  background: color-mix(in srgb, var(--accent-cyan) 4%, transparent);
 }
 
 .account-username {
@@ -535,15 +535,15 @@ body.theme-light .divider span {
 }
 
 .status-active {
-  background: rgba(34, 197, 94, 0.12);
-  color: #4ade80;
-  border: 1px solid rgba(34, 197, 94, 0.25);
+  background: color-mix(in srgb, var(--pos) 12%, transparent);
+  color: var(--pos);
+  border: 1px solid color-mix(in srgb, var(--pos) 25%, transparent);
 }
 
 .status-inactive {
-  background: rgba(239, 68, 68, 0.10);
-  color: #f87171;
-  border: 1px solid rgba(239, 68, 68, 0.25);
+  background: color-mix(in srgb, var(--neg) 10%, transparent);
+  color: var(--neg);
+  border: 1px solid color-mix(in srgb, var(--neg) 25%, transparent);
 }
 
 /* Toggle buttons */
@@ -558,23 +558,23 @@ body.theme-light .divider span {
 }
 
 .btn-activate {
-  background: rgba(34, 197, 94, 0.12);
-  color: #4ade80;
-  border-color: rgba(34, 197, 94, 0.3);
+  background: color-mix(in srgb, var(--pos) 12%, transparent);
+  color: var(--pos);
+  border-color: color-mix(in srgb, var(--pos) 30%, transparent);
 }
 
 .btn-activate:hover {
-  background: rgba(34, 197, 94, 0.22);
+  background: color-mix(in srgb, var(--pos) 22%, transparent);
 }
 
 .btn-deactivate {
-  background: rgba(239, 68, 68, 0.08);
-  color: #f87171;
-  border-color: rgba(239, 68, 68, 0.2);
+  background: color-mix(in srgb, var(--neg) 8%, transparent);
+  color: var(--neg);
+  border-color: color-mix(in srgb, var(--neg) 20%, transparent);
 }
 
 .btn-deactivate:hover {
-  background: rgba(239, 68, 68, 0.18);
+  background: color-mix(in srgb, var(--neg) 18%, transparent);
 }
 
 /* Toggle switch */
@@ -599,14 +599,14 @@ body.theme-light .divider span {
   width: 40px;
   height: 22px;
   border-radius: 999px;
-  background: rgba(239, 68, 68, 0.25);
-  border: 1px solid rgba(239, 68, 68, 0.35);
+  background: color-mix(in srgb, var(--neg) 25%, transparent);
+  border: 1px solid color-mix(in srgb, var(--neg) 35%, transparent);
   transition: background 0.22s, border-color 0.22s;
 }
 
 .toggle-input:checked + .toggle-track {
-  background: rgba(34, 197, 94, 0.25);
-  border-color: rgba(34, 197, 94, 0.45);
+  background: color-mix(in srgb, var(--pos) 25%, transparent);
+  border-color: color-mix(in srgb, var(--pos) 45%, transparent);
 }
 
 .toggle-thumb {
@@ -616,14 +616,14 @@ body.theme-light .divider span {
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: #f87171;
+  background: var(--neg);
   transition: transform 0.22s, background 0.22s;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
 }
 
 .toggle-input:checked + .toggle-track .toggle-thumb {
   transform: translateX(18px);
-  background: #4ade80;
+  background: var(--pos);
 }
 
 .text-center {

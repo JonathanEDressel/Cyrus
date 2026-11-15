@@ -35,9 +35,10 @@ const PortfolioHistoryChart = (() => {
   // Withhold the chart until this many snapshots have been recorded.
   const MIN_RECORDS = 20;
 
-  const TOTAL_COLOR = '#06b6d4';
-  const PALETTE = ['#8b5cf6', '#22c55e', '#f59e0b', '#3b82f6', '#ec4899',
-                   '#14b8a6', '#eab308', '#a78bfa', '#f97316', '#64748b'];
+  // Theme colours, read when the chart is built. The total takes the accent;
+  // per-asset lines take the rest of the palette.
+  const totalColor = (): string => ChartTheme.get().accent;
+  const palette = (): string[] => ChartTheme.get().palette.slice(1);
 
   interface Opts {
     fetch: (range: string) => Promise<any>;
@@ -123,14 +124,15 @@ const PortfolioHistoryChart = (() => {
 
     function buildChart(): void {
       const isDark = opts.isDark !== false;
-      const gridColor   = isDark ? 'rgba(148,163,184,0.05)' : 'rgba(0,0,0,0.05)';
-      const borderColor = isDark ? 'rgba(148,163,184,0.10)' : 'rgba(0,0,0,0.10)';
-      const textColor   = '#64748b';
+      const theme = ChartTheme.get();
+      const gridColor   = theme.grid;
+      const borderColor = theme.border;
+      const textColor   = theme.text;
 
       chart = LightweightCharts.createChart(chartEl, {
         width: chartEl.clientWidth,
         height: 300,
-        layout: { background: { type: 'solid', color: 'transparent' }, textColor, fontSize: 11 },
+        layout: { background: { type: 'solid', color: 'transparent' }, textColor, fontSize: 11, fontFamily: theme.font },
         grid: { vertLines: { color: gridColor }, horzLines: { color: gridColor } },
         rightPriceScale: { borderColor, scaleMargins: { top: 0.12, bottom: 0.08 } },
         timeScale: {
@@ -142,8 +144,8 @@ const PortfolioHistoryChart = (() => {
         localization: { priceFormatter: (v: number) => fmtUsd(v) },
         crosshair: {
           mode: LightweightCharts.CrosshairMode.Normal,
-          vertLine: { color: 'rgba(6,182,212,0.4)', labelBackgroundColor: '#0891b2' },
-          horzLine: { color: 'rgba(6,182,212,0.4)', labelBackgroundColor: '#0891b2' },
+          vertLine: { color: theme.crosshair, labelBackgroundColor: theme.accent },
+          horzLine: { color: theme.crosshair, labelBackgroundColor: theme.accent },
         },
       });
 
@@ -190,7 +192,7 @@ const PortfolioHistoryChart = (() => {
 
       // Per-asset lines (under the total).
       assets.forEach((a, i) => {
-        const color = PALETTE[i % PALETTE.length];
+        const color = palette()[i % palette().length];
         const s = chart.addSeries(LightweightCharts.LineSeries, {
           color, lineWidth: 1.5, priceLineVisible: false, lastValueVisible: false,
           crosshairMarkerVisible: true,
@@ -201,18 +203,18 @@ const PortfolioHistoryChart = (() => {
 
       // Total line (bold, on top).
       const totalSeries = chart.addSeries(LightweightCharts.LineSeries, {
-        color: TOTAL_COLOR, lineWidth: 3, priceLineVisible: true,
-        priceLineColor: 'rgba(6,182,212,0.4)', lastValueVisible: true,
+        color: totalColor(), lineWidth: 3, priceLineVisible: true,
+        priceLineColor: ChartTheme.get().crosshair, lastValueVisible: true,
       });
       totalSeries.setData(total.map((p: any) => ({ time: p.time, value: p.value })));
-      seriesList.unshift({ name: 'Total', series: totalSeries, color: TOTAL_COLOR });
+      seriesList.unshift({ name: 'Total', series: totalSeries, color: totalColor() });
 
       // Estimated overlay (dashed) on top of the total.
       const overlay = estimatedOverlay(total);
       const hasEstimated = overlay.some(p => p.value !== undefined);
       if (hasEstimated) {
         const est = chart.addSeries(LightweightCharts.LineSeries, {
-          color: TOTAL_COLOR, lineWidth: 2,
+          color: totalColor(), lineWidth: 2,
           lineStyle: LightweightCharts.LineStyle?.Dashed ?? 1,
           priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false,
         });
