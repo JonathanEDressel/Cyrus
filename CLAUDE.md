@@ -33,7 +33,9 @@ Windows is built locally; macOS is built in CI.
 
 `package.json` `build.win.extraResources` copies `CyrusServer.exe` into the installer, so step 2 must run before step 4.
 
-**macOS** is built by `.github/workflows/mac-release.yml`, triggered by publishing the release in step 5 (or by hand from the Actions tab). On `macos-15` (arm64) and `macos-15-intel` (x64) runners it builds the backend from the same `server.spec` (folder build on darwin), bundles the tutorial videos from a shallow clone of the public Cyrus-Landing repo, packages a `.dmg` per arch (`build.mac`), smoke-tests the backend and the packaged app, and uploads `Cyrus-X.X.X-<arch>.dmg` to the release. Builds are ad-hoc signed by the `afterPack` hook `scripts/mac-adhoc-sign.js` (no Apple Developer ID yet), so users approve the first open via System Settings → Privacy & Security → Open Anyway.
+On Windows the same `afterPack` hook runs `scripts/win-exe-resources.js`, which stamps `src/assets/icon.ico` and the version details into `Cyrus.exe` with `rcedit`. electron-builder would do this itself only with `win.signAndEditExecutable` on, which needs its winCodeSign toolkit — and that archive won't unpack on Windows without admin rights or Developer Mode (it contains symlinks). Without the hook, the exe and every shortcut show Electron's default icon.
+
+**macOS** is built by `.github/workflows/mac-release.yml`, triggered by publishing the release in step 5 (or by hand from the Actions tab). On `macos-15` (arm64) and `macos-15-intel` (x64) runners it builds the backend from the same `server.spec` (folder build on darwin), bundles the tutorial videos from a shallow clone of the public Cyrus-Landing repo, packages a `.dmg` per arch (`build.mac`), smoke-tests the backend and the packaged app, and uploads `Cyrus-X.X.X-<arch>.dmg` to the release. Builds are ad-hoc signed by the `afterPack` hook (`scripts/after-pack.js` → `scripts/mac-adhoc-sign.js`) (no Apple Developer ID yet), so users approve the first open via System Settings → Privacy & Security → Open Anyway.
 
 ## Frontend architecture — read this before editing `src/app/`
 

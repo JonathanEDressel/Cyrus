@@ -57,7 +57,7 @@
     "asarUnpack": [
       "src/tutorials/*.mp4"
     ],
-    "afterPack": "scripts/mac-adhoc-sign.js",
+    "afterPack": "scripts/after-pack.js",
     "mac": {
       "icon": "src/assets/mac/icon.png",
       "category": "public.app-category.finance",
@@ -91,6 +91,7 @@
     "@types/node": "^20.11.0",
     "electron": "44.11.3",
     "electron-builder": "^24.13.3",
+    "rcedit": "4.0.1",
     "typescript": "^5.3.3"
   },
   "dependencies": {
