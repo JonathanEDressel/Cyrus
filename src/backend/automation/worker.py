@@ -365,7 +365,10 @@ class AutomationWorker:
                     # Pass the symbol so exchanges like Binance that require it work correctly.
                     pair = snapshot.get('pair') or None
                     try:
-                        closed_orders = get_closed_orders(exchange, symbol=pair)
+                        # order_id lets an exchange with no closed-orders list
+                        # (Gemini) answer by looking this one order up.
+                        closed_orders = get_closed_orders(exchange, symbol=pair,
+                                                          order_id=order_id)
                     except (DDoSProtection, RateLimitExceeded, ExchangeNotAvailable):
                         # Transient: leave the snapshot in place and let the
                         # handler below log it as a retry-next-cycle.

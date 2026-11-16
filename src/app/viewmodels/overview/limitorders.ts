@@ -889,7 +889,7 @@ class LimitOrdersController {
    * and says so rather than summing things that aren't the same money.
    */
   private static readonly DOLLAR_QUOTES =
-    /^(Z?USD|USDT|USDC|USDS|USDD|USDG|DAI|TUSD|PYUSD|FDUSD|BUSD|RLUSD)$/;
+    /^(Z?USD|USDT|USDC|USDS|USDD|USDG|DAI|TUSD|PYUSD|FDUSD|BUSD|RLUSD|GUSD)$/;
 
   private flowComparable(group: FlowGroup): boolean {
     return group.bars.every(

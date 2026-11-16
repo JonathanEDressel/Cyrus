@@ -61,8 +61,14 @@ def get_open_orders(exchange: ccxt.Exchange, symbol: str | None = None) -> list[
 
 
 def get_closed_orders(exchange: ccxt.Exchange, symbol: str | None = None,
-                      since: int | None = None) -> list[dict]:
+                      since: int | None = None, order_id: str | None = None) -> list[dict]:
     """Return a list of closed orders in CCXT unified format.
+
+    Gemini has no closed-orders call in ccxt (``has['fetchClosedOrders']`` is
+    False), but it can look a single order up by id. When the caller is after
+    one order — the automation worker resolving an order that left the book —
+    passing ``order_id`` returns ``[that order]`` on such an exchange, or ``[]``
+    if it is still open. Callers already filter on id and ``status``.
 
     A **synthetic pair** (see ``cancel_order`` below) is one the exchange routes
     without listing it as a market — LUNA/USDT and XDC/USDT on Kraken. Passing
@@ -72,6 +78,10 @@ def get_closed_orders(exchange: ccxt.Exchange, symbol: str | None = None,
     the result), so retrying without it returns the same orders instead of
     failing outright. Callers already match on the order id.
     """
+    has = getattr(exchange, 'has', None) or {}
+    if order_id and not has.get('fetchClosedOrders') and has.get('fetchOrder'):
+        order = exchange.fetch_order(order_id, symbol)
+        return [order] if isinstance(order, dict) and order.get('status') != 'open' else []
     try:
         return exchange.fetch_closed_orders(symbol, since=since)
     except ccxt.BadSymbol:
@@ -244,8 +254,9 @@ def is_spot_market(market: dict) -> bool:
 
 
 #: Exchanges whose ccxt driver we have verified maps ``params['postOnly']``:
-#: Kraken -> ``oflags=post``, Coinbase -> ``post_only``, Binance -> LIMIT_MAKER.
-_POST_ONLY_EXCHANGES = ('kraken', 'coinbase', 'binance')
+#: Kraken -> ``oflags=post``, Coinbase -> ``post_only``, Binance -> LIMIT_MAKER,
+#: Gemini -> ``options: ['maker-or-cancel']``.
+_POST_ONLY_EXCHANGES = ('kraken', 'coinbase', 'binance', 'gemini')
 
 
 def supports_post_only(exchange) -> bool:
@@ -472,7 +483,7 @@ def create_limit_order(exchange: ccxt.Exchange, symbol: str, side: str,
     return _normalize_placed_order(raw, symbol, side, amount, price, post_only)
 
 
-_USD_STABLES = {'USD', 'USDT', 'USDC', 'DAI', 'USDD', 'TUSD', 'PYUSD', 'ZUSD'}
+_USD_STABLES = {'USD', 'USDT', 'USDC', 'DAI', 'USDD', 'TUSD', 'PYUSD', 'ZUSD', 'GUSD'}
 
 
 def _ticker_price(ticker: dict | None) -> float | None:
@@ -706,22 +717,28 @@ def convert(exchange: ccxt.Exchange, from_asset: str, to_asset: str,
       - ``FROM/TO`` exists → market sell *amount* of FROM for TO.
       - ``TO/FROM`` exists → market buy TO, spending *amount* of FROM as quote.
     Raises ``ValueError`` when no suitable pair is found or amount is below minimum.
+
+    Exchanges with no market orders at all (Gemini) get the same routing, but
+    each leg is an immediate-or-cancel limit order — see :func:`_ioc_convert`.
     """
     exchange.load_markets()
 
     sell_symbol = f"{from_asset}/{to_asset}"
     buy_symbol = f"{to_asset}/{from_asset}"
+    ioc_only = _needs_ioc_convert(exchange)
 
     if sell_symbol in exchange.markets:
         market = exchange.markets[sell_symbol]
         min_amount = market.get('limits', {}).get('amount', {}).get('min', 0)
-        
+
         if min_amount and amount < min_amount:
             raise ValueError(
                 f"Amount {amount} {from_asset} is below the minimum order size "
                 f"of {min_amount} {from_asset} for {sell_symbol} on {exchange.id}"
             )
-        
+
+        if ioc_only:
+            return _ioc_convert(exchange, sell_symbol, market, 'sell', amount)
         return exchange.create_market_sell_order(sell_symbol, amount)
 
     if buy_symbol in exchange.markets:
@@ -734,6 +751,9 @@ def convert(exchange: ccxt.Exchange, from_asset: str, to_asset: str,
                 f"of {min_cost} {from_asset} for {buy_symbol} on {exchange.id}"
             )
         
+        if ioc_only:
+            return _ioc_convert(exchange, buy_symbol, market, 'buy', amount)
+
         params: dict = {}
         if exchange.id == 'kraken':
             params['cost'] = amount
@@ -746,6 +766,83 @@ def convert(exchange: ccxt.Exchange, from_asset: str, to_asset: str,
         f"No trading pair found for {from_asset}/{to_asset} or "
         f"{to_asset}/{from_asset} on {exchange.id}"
     )
+
+
+#: How far through the touch an immediate-or-cancel convert is priced. It is a
+#: ceiling, not the fill price: the order takes the best levels available and
+#: only stops at this one. 2% clears a normal spread and a few levels of depth
+#: while still refusing to sweep a thin book at any price.
+IOC_CONVERT_SLIPPAGE = 0.02
+
+
+def _needs_ioc_convert(exchange) -> bool:
+    """True for an exchange whose API places no market orders at all (Gemini).
+
+    A positive list, like :data:`_POST_ONLY_EXCHANGES`: ccxt's
+    ``has['createMarketOrder']`` is not reliable enough across drivers to route
+    real money on.
+    """
+    return getattr(exchange, 'id', None) == 'gemini'
+
+
+def _ioc_convert(exchange, symbol: str, market: dict, side: str, amount: float) -> dict:
+    """A market-style convert as an immediate-or-cancel limit order.
+
+    Gemini's API refuses market orders by design ("they provide you with no
+    price protection") and documents this as the substitute: a limit priced
+    through the book with ``immediate-or-cancel``, which fills what it can at
+    the best levels and cancels the rest instead of resting.
+
+    *amount* means what it means in :func:`convert`: base to sell for a sell,
+    quote to SPEND for a buy. The buy is sized as ``amount / limit_price``, so
+    even a fill at the limit cannot cost more than *amount*, and any better
+    level leaves some of it unspent rather than overspending.
+
+    Raises ``ValueError`` when nothing filled — the book had no liquidity within
+    ``IOC_CONVERT_SLIPPAGE`` — so the worker logs an error, not a success.
+    """
+    ticker = exchange.fetch_ticker(symbol) or {}
+    reference = ticker.get('bid') if side == 'sell' else ticker.get('ask')
+    try:
+        reference = float(reference) if reference else _ticker_price(ticker)
+    except (TypeError, ValueError):
+        reference = _ticker_price(ticker)
+    if not reference:
+        raise ValueError(f"No price available for {symbol} on {exchange.id}")
+
+    if side == 'sell':
+        limit_price = _to_price_precision(exchange, symbol, market,
+                                          reference * (1 - IOC_CONVERT_SLIPPAGE))
+        base_amount = _to_amount_precision(exchange, symbol, market, amount)
+    else:
+        limit_price = _to_price_precision(exchange, symbol, market,
+                                          reference * (1 + IOC_CONVERT_SLIPPAGE))
+        # Round the base amount DOWN so price x amount stays within the spend.
+        base_amount = _to_amount_precision(exchange, symbol, market,
+                                           float(amount) / limit_price)
+
+    min_amount = ((market.get('limits') or {}).get('amount') or {}).get('min')
+    if base_amount <= 0 or (min_amount and base_amount < float(min_amount)):
+        base, _ = market_base_quote(symbol, market)
+        raise ValueError(
+            f"{base_amount:.10g} {base} is below {symbol}'s minimum order size "
+            f"of {float(min_amount or 0):.10g} {base} on {exchange.id}")
+
+    order = exchange.create_order(symbol, 'limit', side, base_amount, limit_price,
+                                  {'timeInForce': 'IOC'})
+    order = order if isinstance(order, dict) else {}
+    filled = _amount_float(order.get('filled'))
+    if filled <= 0:
+        raise ValueError(
+            f"No liquidity on {symbol} within {IOC_CONVERT_SLIPPAGE:.0%} of the "
+            f"{'bid' if side == 'sell' else 'ask'} on {exchange.id}; nothing was traded")
+    # An IOC that filled in part reports is_cancelled -> 'canceled', which
+    # would read as "nothing happened" in the log and the email.
+    if filled < base_amount:
+        order['status'] = 'partially filled'
+    elif order.get('status') == 'canceled':
+        order['status'] = 'closed'
+    return order
 
 
 def has_convert_pair(exchange: ccxt.Exchange, from_asset: str, to_asset: str) -> bool:
@@ -780,6 +877,7 @@ _STABLECOIN_FALLBACKS: dict[str, list[str]] = {
     'USDT': ['USD', 'USDC'],
     'USDC': ['USD', 'USDT'],
     'BUSD': ['USD', 'USDT'],
+    'GUSD': ['USD', 'USDC'],
     'USD':  ['USDT', 'USDC'],
 }
 
@@ -980,6 +1078,8 @@ def can_fetch_transfers(exchange, kind: str, source: str = 'transactions') -> bo
     """
     if source == 'ledger':
         name, has_key = 'fetch_ledger', 'fetchLedger'
+    elif source == 'combined':
+        name, has_key = 'fetch_deposits_withdrawals', 'fetchDepositsWithdrawals'
     else:
         name, has_key = _TRANSFER_METHODS.get(kind), _TRANSFER_HAS_KEYS.get(kind)
     if not name:
@@ -1174,6 +1274,36 @@ def fetch_transfer_window(exchange, kind: str, since_ms: int, until_ms: int,
             continue
         rows.append(normalize_transfer(item, kind))
     return rows
+
+
+def fetch_combined_transfers_page(exchange, since_ms: int,
+                                  limit: int) -> tuple[list[dict], int, int | None]:
+    """One forward page of a combined deposit+withdrawal feed (Gemini).
+
+    Returns ``(rows, raw_count, newest_ms)``. ``raw_count`` is what the
+    exchange sent, before rows of other types are dropped, because that — not
+    the kept count — is what says whether the page was full. ``newest_ms`` is
+    the newest timestamp seen, from which the caller starts the next page.
+
+    Gemini's ``/v1/transfers`` mixes in rows that are not crypto moving in or
+    out (``Reward``, ``AdminCredit`` …); only deposits and withdrawals are kept,
+    with ccxt's lower-cased ``type`` deciding the kind.
+    """
+    raw = exchange.fetch_deposits_withdrawals(None, int(since_ms), int(limit)) or []
+    rows, newest = [], None
+    for item in raw:
+        ts = item.get('timestamp')
+        if ts is not None:
+            newest = ts if newest is None else max(newest, ts)
+        kind_raw = str(item.get('type') or '').lower()
+        if kind_raw == 'deposit':
+            kind = 'deposit'
+        elif kind_raw.startswith('withdraw'):
+            kind = 'withdrawal'
+        else:
+            continue
+        rows.append(normalize_transfer(item, kind))
+    return rows, len(raw), newest
 
 
 def list_transfer_accounts(exchange) -> list[str]:

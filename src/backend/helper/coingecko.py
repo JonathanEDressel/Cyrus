@@ -38,6 +38,7 @@ SYMBOL_TO_ID: dict[str, str] = {
     'FIL': 'filecoin',          'LUNA2': 'terra-luna-2',   'LUNA': 'terra-luna',
     'USDT': 'tether',           'USDC': 'usd-coin',        'DAI': 'dai',
     'PYUSD': 'paypal-usd',      'TUSD': 'true-usd',        'BUSD': 'binance-usd',
+    'GUSD': 'gemini-dollar',
     'UNI': 'uniswap',           'AAVE': 'aave',            'CRV': 'curve-dao-token',
     'SNX': 'havven',            'COMP': 'compound-governance-token',
     'SUSHI': 'sushi',           'YFI': 'yearn-finance',    '1INCH': '1inch',

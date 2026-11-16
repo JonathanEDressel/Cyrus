@@ -59,7 +59,7 @@ class BalancerController {
       const text = document.getElementById('balancer-unsupported-text');
       if (text && ExchangeStore.connections.length > 0) {
         text.textContent = 'None of your connected exchanges support automated rebalancing. '
-          + 'Kraken, Coinbase Advanced, Binance and Robinhood all do.';
+          + 'Kraken, Coinbase Advanced, Binance, Gemini and Robinhood all do.';
       }
       return;
     }

@@ -28,8 +28,9 @@ import traceback
 import ccxt
 
 from controllers.TransferDbContext import TransferDbContext
-from helper.ExchangeClient import (can_fetch_transfers, fetch_ledger_transfers,
-                                   fetch_transfer_window, list_transfer_accounts)
+from helper.ExchangeClient import (can_fetch_transfers, fetch_combined_transfers_page,
+                                   fetch_ledger_transfers, fetch_transfer_window,
+                                   list_transfer_accounts)
 from helper.ExchangeRegistry import (get_connection_row, get_transfer_history_config,
                                      get_user_exchange, supports_transfer_history)
 from helper.robinhood.errors import RobinhoodError
@@ -77,13 +78,13 @@ _SUBJECTS = {
     'transfer': {
         'noun': 'transfer history',
         'permission': ('the funding-history permission (Kraken: "Query Funds", '
-                       'Binance: "Enable Reading")'),
+                       'Binance: "Enable Reading", Gemini: the Trader or Auditor role)'),
     },
     'trade': {
         'noun': 'trade history',
         'permission': ('permission to read closed orders and trades (Kraken: '
                        '"Query Closed Orders & Trades", Binance: "Enable Reading", '
-                       'Coinbase: "View")'),
+                       'Coinbase: "View", Gemini: the Trader or Auditor role)'),
     },
 }
 
@@ -256,6 +257,49 @@ def _sync_ledger(exchange, user_id: int, conn_id: int, exchange_name: str,
     return {'complete': True, 'new_rows': new_rows, 'synced_through': pass_started_at}
 
 
+def _sync_combined(exchange, user_id: int, conn_id: int, exchange_name: str,
+                   config: dict, deadline: float) -> dict:
+    """Walk a combined deposit+withdrawal feed forward by timestamp (Gemini).
+
+    Gemini's ``/v1/transfers`` returns both directions in one list, at most
+    ``page_cap`` rows a call, and takes a start time but no end time. So there
+    is no window to bisect: each page starts 1ms after the newest row of the
+    one before, and a short page means the feed is exhausted.
+
+    Both kinds share one walk, so they share one resume point — the earlier of
+    the two — and both watermarks move together.
+    """
+    now = int(time.time())
+    # The caller has already run ensure_sync_state for both kinds.
+    resume = min(_resume_point(TransferDbContext.get_sync_state(conn_id, kind), config, now)
+                 for kind in KINDS)
+    cursor_ms = resume * 1000
+    page_cap = int(config['page_cap'])
+    pacing = config.get('page_pacing_ms', 500) / 1000.0
+    new_rows = 0
+
+    while True:
+        if time.time() >= deadline:
+            return {'complete': False, 'new_rows': new_rows, 'synced_through': cursor_ms // 1000}
+
+        rows, raw_count, newest_ms = fetch_combined_transfers_page(exchange, cursor_ms, page_cap)
+        full = raw_count >= page_cap and newest_ms is not None and newest_ms + 1 > cursor_ms
+        next_ms = (newest_ms + 1) if full else now * 1000
+
+        # The watermark moves only to where this page provably reaches: the
+        # next page's start while paging, or now once the feed ran dry.
+        for kind in KINDS:
+            new_rows += TransferDbContext.save_window(
+                conn_id, user_id, exchange_name,
+                [r for r in rows if r['kind'] == kind],
+                kind=kind, synced_through=next_ms // 1000)
+
+        if not full:
+            return {'complete': True, 'new_rows': new_rows, 'synced_through': now}
+        cursor_ms = next_ms
+        time.sleep(pacing)
+
+
 def _sync_target(exchange, user_id: int, conn_id: int, exchange_name: str,
                  kind: str, config: dict, deadline: float) -> dict:
     """One (connection, kind) target, with the full error net around it."""
@@ -327,17 +371,27 @@ def sync_connection(user_id: int, conn_id: int,
         # One client for every target on this connection, so ccxt's own rate
         # limiter stays meaningful across deposits and withdrawals instead of
         # each getting a fresh, empty token bucket.
-        if config['source'] == 'ledger':
+        # Ledger (Coinbase) and combined (Gemini) sources yield both kinds from
+        # one fetch, so they run once for the connection rather than per kind.
+        if config['source'] in ('ledger', 'combined'):
+            source = config['source']
             for kind in KINDS:
                 TransferDbContext.ensure_sync_state(conn_id, kind, config['history_epoch'])
             state = TransferDbContext.get_sync_state(conn_id, 'deposit') or {}
             if state.get('disabled'):
                 return {'complete': True, 'new_rows': 0, 'skipped': 'disabled'}
             try:
-                if not can_fetch_transfers(exchange, 'deposit', 'ledger'):
-                    raise _Disabled(f"{exchange_name} does not expose a ledger.")
-                result = _sync_ledger(exchange, user_id, conn_id, exchange_name,
-                                      config, state, deadline)
+                if not can_fetch_transfers(exchange, 'deposit', source):
+                    raise _Disabled(f"{exchange_name} does not expose {source} transfer history.")
+                if source == 'ledger':
+                    result = _sync_ledger(exchange, user_id, conn_id, exchange_name,
+                                          config, state, deadline)
+                else:
+                    result = _sync_combined(exchange, user_id, conn_id, exchange_name,
+                                            config, deadline)
+                    if result['complete']:
+                        for kind in KINDS:
+                            TransferDbContext.finish_pass(conn_id, kind, result['synced_through'])
                 return {'complete': result['complete'], 'new_rows': result['new_rows']}
             except _Disabled as e:
                 for kind in KINDS:
@@ -352,7 +406,7 @@ def sync_connection(user_id: int, conn_id: int,
                         TransferDbContext.mark_sync_error(conn_id, kind, message)
                 if not permanent:
                     traceback.print_exc()
-                print(f"[TRANSFERS] conn {conn_id} ledger: {message}")
+                print(f"[TRANSFERS] conn {conn_id} {source}: {message}")
                 return {'complete': False, 'new_rows': 0, 'error': message}
 
         total_new, complete, error = 0, True, None

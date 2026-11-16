@@ -11,6 +11,7 @@ const EXCHANGE_NAMES: Record<string, string> = {
   kraken: 'Kraken',
   coinbase: 'Coinbase',
   binance: 'Binance',
+  gemini: 'Gemini',
   robinhood: 'Robinhood',
 };
 
@@ -253,6 +254,9 @@ class TaxesController {
       else if (t.state === 'unsupported') reason = 'This exchange has no trade-history API.';
       else if (conn.exchange === 'binance') {
         reason = 'Binance only reports trades market by market, so Cyrus checks the '
+          + 'markets for coins you hold, have moved, or have traded before.';
+      } else if (conn.exchange === 'gemini') {
+        reason = 'Gemini only reports trades market by market, so Cyrus checks the '
           + 'markets for coins you hold, have moved, or have traded before.';
       } else if (conn.exchange === 'robinhood') {
         reason = 'Robinhood has no fills endpoint; each filled order counts as one trade.';

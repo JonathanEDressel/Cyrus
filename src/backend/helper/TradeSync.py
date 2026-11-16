@@ -11,8 +11,9 @@ Three fetch strategies, chosen per exchange in the registry:
 * ``window`` (Kraken, Coinbase): one endpoint returns fills for every pair, so
   history is walked forward in time windows. Kraken pages inside a window with
   ``ofs``; Coinbase lets ccxt follow the response cursor.
-* ``per_symbol`` (Binance): fills are only returned per market, so each
-  candidate market is its own resumable scope, paged by trade id.
+* ``per_symbol`` (Binance, Gemini): fills are only returned per market, so
+  each candidate market is its own resumable scope — paged by trade id on
+  Binance and by timestamp on Gemini (``paging: 'timestamp'``).
 * ``orders`` (Robinhood): no fills endpoint; filled orders stand in.
 
 USD valuation is a second pass. A fill on a USD or stablecoin pair is priced
@@ -40,11 +41,12 @@ from helper.ExchangeRegistry import (SUPPORTED_EXCHANGES, get_connection_row,
 from helper.TransferSync import (BUDGET_SECONDS, MIN_BISECT_SECONDS, OVERLAP_SECONDS,
                                  _classify, _lock_for)
 
-#: Scope name for exchanges whose history is one stream. Binance also uses it,
-#: as the row that holds the list of markets still to walk this pass.
+#: Scope name for exchanges whose history is one stream. Per-symbol exchanges
+#: also use it, as the row that holds the list of markets still to walk.
 ALL = '*'
 
-#: Quotes paired with each candidate asset when guessing Binance markets.
+#: Quotes paired with each candidate asset when guessing Binance markets. An
+#: exchange can override this with ``quotes`` in its trade_history config.
 BINANCE_QUOTES = ('USDT', 'USDC', 'FDUSD', 'BTC', 'ETH', 'BNB')
 
 
@@ -222,10 +224,11 @@ def _sync_window(exchange, user_id: int, conn_id: int, exchange_name: str,
     return {'complete': True, 'new_rows': new_rows}
 
 
-def _binance_symbols(exchange, conn_id: int) -> list[str]:
-    """Spot markets worth asking Binance about for this account.
+def _candidate_symbols(exchange, conn_id: int,
+                       quotes: tuple[str, ...] = BINANCE_QUOTES) -> list[str]:
+    """Spot markets worth asking a per-symbol exchange about for this account.
 
-    Binance answers fills only per market and there are thousands, so this is a
+    Binance (and Gemini) answer fills only per market, so this is a
     deliberate guess: every asset the account holds now, has moved in or out,
     or has traded before, crossed with the common quotes, kept only where the
     market exists. A coin bought and fully sold without ever being held at a
@@ -245,9 +248,9 @@ def _binance_symbols(exchange, conn_id: int) -> list[str]:
 
     symbols = set()
     for asset in assets:
-        if asset in CASH_ASSETS and asset not in BINANCE_QUOTES:
+        if asset in CASH_ASSETS and asset not in quotes:
             continue
-        for quote in BINANCE_QUOTES:
+        for quote in quotes:
             if asset == quote:
                 continue
             for symbol in (f"{asset}/{quote}", f"{quote}/{asset}"):
@@ -268,12 +271,14 @@ def _sync_per_symbol(exchange, user_id: int, conn_id: int, exchange_name: str,
     # remaining queue is persisted, so an interrupted pass resumes.
     queue = cursor.get('queue')
     if not queue:
-        queue = _binance_symbols(exchange, conn_id)
+        queue = _candidate_symbols(exchange, conn_id,
+                                   tuple(config.get('quotes') or BINANCE_QUOTES))
         cursor = {'queue': queue, 'built_at': now, 'symbols': len(queue)}
         TradeDbContext.set_cursor(conn_id, ALL, cursor)
 
     page_cap = int(config['page_cap'])
     pacing = config.get('page_pacing_ms', 300) / 1000.0
+    by_time = config.get('paging') == 'timestamp'
     new_rows = 0
 
     while queue:
@@ -286,22 +291,39 @@ def _sync_per_symbol(exchange, user_id: int, conn_id: int, exchange_name: str,
         if state.get('disabled'):
             queue.pop(0)
             continue
-        from_id = int(_load_cursor(state).get('from_id') or 0)
+        symbol_cursor = _load_cursor(state)
         try:
-            raw = fetch_trades_page(exchange, symbol, None, page_cap, {'fromId': from_id})
+            if by_time:
+                # Gemini's documented walk: start at 0, then each page's newest
+                # timestamp + 1. Sent in ms through params (not ``since``, which
+                # ccxt truncates to whole seconds — that would re-read the same
+                # second forever on a busy market).
+                from_ms = int(symbol_cursor.get('from_ms') or 0)
+                raw = fetch_trades_page(exchange, symbol, None, page_cap, {'timestamp': from_ms})
+            else:
+                from_id = int(symbol_cursor.get('from_id') or 0)
+                raw = fetch_trades_page(exchange, symbol, None, page_cap, {'fromId': from_id})
         except ccxt.BadSymbol as e:
             TradeDbContext.set_disabled(conn_id, symbol, f"Market not available: {e}")
             queue.pop(0)
             continue
 
         rows = _normalize_all(raw)
-        ids = [int(r['id']) for r in raw if str(r.get('id') or '').isdigit()]
-        next_id = (max(ids) + 1) if ids else from_id
+        if by_time:
+            stamps = [int(r['timestamp']) for r in raw if r.get('timestamp') is not None]
+            next_cursor = {'from_ms': (max(stamps) + 1) if stamps else from_ms}
+            # A full page whose newest row is no newer than the cursor can't
+            # advance; treat it as the end rather than loop on it.
+            exhausted = len(raw) < page_cap or next_cursor['from_ms'] <= from_ms
+        else:
+            ids = [int(r['id']) for r in raw if str(r.get('id') or '').isdigit()]
+            next_cursor = {'from_id': (max(ids) + 1) if ids else from_id}
+            exhausted = len(raw) < page_cap
         new_rows += TradeDbContext.save_page(conn_id, user_id, exchange_name, rows,
                                              symbol, synced_through=now,
-                                             cursor={'from_id': next_id})
-        if len(raw) < page_cap:
-            TradeDbContext.finish_pass(conn_id, symbol, now, cursor={'from_id': next_id})
+                                             cursor=next_cursor)
+        if exhausted:
+            TradeDbContext.finish_pass(conn_id, symbol, now, cursor=next_cursor)
             queue.pop(0)
         time.sleep(pacing)
 

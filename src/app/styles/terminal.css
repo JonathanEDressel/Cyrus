@@ -439,11 +439,13 @@ button:disabled,
 .exchange-kraken   { color: #B9A3FF; border-color: color-mix(in srgb, #B9A3FF 40%, transparent); background: transparent; }
 .exchange-coinbase { color: #8AB4FF; border-color: color-mix(in srgb, #8AB4FF 40%, transparent); background: transparent; }
 .exchange-binance  { color: #F2C94C; border-color: color-mix(in srgb, #F2C94C 40%, transparent); background: transparent; }
+.exchange-gemini   { color: #5EE6F7; border-color: color-mix(in srgb, #5EE6F7 40%, transparent); background: transparent; }
 .exchange-robinhood{ color: var(--pos); border-color: color-mix(in srgb, var(--pos) 40%, transparent); background: transparent; }
 
 body.theme-light .exchange-kraken   { color: #5B3FC4; }
 body.theme-light .exchange-coinbase { color: #1D4ED8; }
 body.theme-light .exchange-binance  { color: #8A6100; }
+body.theme-light .exchange-gemini   { color: #0E7490; }
 
 .side-buy,
 .side-sell {

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-Cyrus is a desktop app (Windows and macOS) for automating crypto trades/transfers across exchanges (Kraken, Coinbase Advanced, Binance) via [CCXT](https://github.com/ccxt/ccxt). It is an **Electron frontend (TypeScript, no framework, no bundler)** talking over HTTP to a **local Python Flask backend** backed by **SQLite**. In a packaged install the Electron main process spawns the backend as a bundled PyInstaller binary (`CyrusServer.exe` on Windows, `CyrusServer/CyrusServer` folder build on macOS); in dev you run the two halves in separate terminals.
+Cyrus is a desktop app (Windows and macOS) for automating crypto trades/transfers across exchanges (Kraken, Coinbase Advanced, Binance, Gemini; Robinhood via a direct adapter) via [CCXT](https://github.com/ccxt/ccxt). It is an **Electron frontend (TypeScript, no framework, no bundler)** talking over HTTP to a **local Python Flask backend** backed by **SQLite**. In a packaged install the Electron main process spawns the backend as a bundled PyInstaller binary (`CyrusServer.exe` on Windows, `CyrusServer/CyrusServer` folder build on macOS); in dev you run the two halves in separate terminals.
 
 ## Commands
 
@@ -68,6 +68,7 @@ Windows is built locally; macOS is built in CI.
 - `ExchangeRegistry.py` — `SUPPORTED_EXCHANGES` metadata (capability flags like `supports_withdraw`), `get_user_exchange(user_id, conn_id)` (builds a CCXT client from stored+decrypted keys), minimum-withdrawal lookups.
 - `ExchangeClient.py` — thin CCXT operations: `get_open_orders`, `get_closed_orders`, `get_balance`, `withdraw`, `convert`, `get_market_price`.
 - Capability differences between exchanges are enforced in code (e.g. withdraw is Kraken-only); check the `supports_*` flags before acting rather than assuming.
+- Gemini has no market orders and no closed-orders list in ccxt: `convert()` routes it through `_ioc_convert` (immediate-or-cancel limit at `IOC_CONVERT_SLIPPAGE`), and `get_closed_orders(order_id=...)` falls back to `fetch_order`. Its transfers come from one combined feed (`transfer_history.source = 'combined'`) and its fills are walked per market by timestamp (`trade_history.paging = 'timestamp'`).
 
 **Automation worker** `automation/worker.py` — a daemon thread started with the app, polling every `POLL_INTERVAL = 60`s. Per active user it evaluates three trigger types — `order_filled` (via open/closed-order snapshot diffing stored in the DB), `balance_threshold`, `price_threshold` — and runs the `withdraw` or `convert_crypto` action. Key invariants when editing: it calls `mark_rule_triggered` **before** executing to prevent double-fires, writes a row to the automation log for every outcome (`success`/`error`/`skipped`), honors per-rule cooldowns and `max_executions`, and treats CCXT rate-limit / unavailable errors as retry-next-cycle. Execution can optionally send an email (`_notify_execution` → `helper/notifier.py`), which is fully best-effort and never allowed to break rule execution.
 

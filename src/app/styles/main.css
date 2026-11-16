@@ -692,6 +692,12 @@ body.theme-light {
   border: 1px solid rgba(0, 200, 5, 0.32);
 }
 
+.exchange-gemini {
+  background: rgba(0, 220, 250, 0.12);
+  color: #22d3ee;
+  border: 1px solid rgba(0, 220, 250, 0.32);
+}
+
 .exchange-binance {
   background: color-mix(in srgb, var(--warn) 15%, transparent);
   color: var(--warn);

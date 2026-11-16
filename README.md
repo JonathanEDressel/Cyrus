@@ -12,25 +12,27 @@ Cyrus is free for noncommercial use. If it saves you time, [sponsoring it on Git
 
 Cyrus talks to exchanges through [CCXT](https://github.com/ccxt/ccxt). Capabilities differ per exchange, and that determines which automations are available.
 
-| Feature | Kraken | Coinbase Advanced | Binance | Robinhood |
-|---|:---:|:---:|:---:|:---:|
-| View open orders | ✅ | ✅ | ✅ | 🧪 |
-| View account balances | ✅ | ✅ | ✅ | 🧪 |
-| Portfolio valuation & charts | ✅ | ✅ | ✅ | 🧪 |
-| Trigger: Order filled | ✅ | ✅ | ✅ | 🧪 |
-| Trigger: Balance threshold | ✅ | ✅ | ✅ | 🧪 |
-| Trigger: Price threshold | ✅ | ✅ | ✅ | 🧪 |
-| Action: Convert crypto | ✅ | ✅ | ✅ | 🧪 |
-| Action: Withdraw to address | ✅ | ❌ | ❌ | ❌ |
-| Whitelisted withdrawal addresses | ✅ | ❌ | ❌ | ❌ |
+| Feature | Kraken | Coinbase Advanced | Binance | Gemini | Robinhood |
+|---|:---:|:---:|:---:|:---:|:---:|
+| View open orders | ✅ | ✅ | ✅ | ✅ | 🧪 |
+| View account balances | ✅ | ✅ | ✅ | ✅ | 🧪 |
+| Portfolio valuation & charts | ✅ | ✅ | ✅ | ✅ | 🧪 |
+| Trigger: Order filled | ✅ | ✅ | ✅ | ✅ | 🧪 |
+| Trigger: Balance threshold | ✅ | ✅ | ✅ | ✅ | 🧪 |
+| Trigger: Price threshold | ✅ | ✅ | ✅ | ✅ | 🧪 |
+| Action: Convert crypto | ✅ | ✅ | ✅ | ✅ | 🧪 |
+| Action: Withdraw to address | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Whitelisted withdrawal addresses | ✅ | ❌ | ❌ | ❌ | ❌ |
 
 ✅ supported · ❌ not available · 🧪 experimental
 
-> **Withdrawals are Kraken-only.** Coinbase Advanced and Binance don't expose a withdrawal address book or crypto withdrawal endpoint through CCXT, so any withdraw-based rule is unavailable there. Convert actions work everywhere.
+> **Withdrawals are Kraken-only.** Coinbase Advanced, Binance and Gemini don't expose a withdrawal address book or crypto withdrawal endpoint through CCXT, so any withdraw-based rule is unavailable there. Convert actions work everywhere.
 >
 > **Coinbase Advanced (Beta)** — served through CCXT's `coinbase` class (the Advanced Trade API). Connect with keys from Coinbase Advanced, not the standard app.
 >
 > **Binance (Beta)** — no withdrawal whitelist API via CCXT.
+>
+> **Gemini (Beta)** — Gemini's API has no market orders, so convert actions place an immediate-or-cancel limit order priced up to 2% through the best bid/ask: it fills what the book offers within that band and cancels the rest. Create the key with the **Trader** role (Gemini's default). Sandbox keys from `exchange.sandbox.gemini.com` are supported.
 >
 > **Robinhood (Experimental)** — uses a direct API adapter rather than CCXT and is still in progress. Treat it as unfinished.
 
@@ -225,7 +227,7 @@ CYRUS_POLL_INTERVAL=60
 
 Grant the minimum your rules need. Convert actions need trade permission; withdraw actions additionally need withdraw permission **and** the destination address must already be whitelisted on the exchange. Cyrus cannot add addresses to a whitelist — it can only send to entries that already exist.
 
-**Transfer history needs a permission trading does not.** A key created for trading can read balances and place orders but still be refused funding history, because that sits behind a separate scope — *Query Funds* on Kraken, *Enable Reading* on Binance, transaction access on a Coinbase CDP key. Cyrus validates keys against a balance call, so this only surfaces the first time you open the Transfers page; when it does, the page names the missing permission and stops retrying until you re-validate. Robinhood exposes no transfer-history API at all.
+**Transfer history needs a permission trading does not.** A key created for trading can read balances and place orders but still be refused funding history, because that sits behind a separate scope — *Query Funds* on Kraken, *Enable Reading* on Binance, the *Trader* or *Auditor* role on Gemini, transaction access on a Coinbase CDP key. Cyrus validates keys against a balance call, so this only surfaces the first time you open the Transfers page; when it does, the page names the missing permission and stops retrying until you re-validate. Robinhood exposes no transfer-history API at all.
 
 ---
 

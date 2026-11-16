@@ -125,7 +125,7 @@ SUPPORTED_EXCHANGES: dict[str, dict] = {
         },
         # myTrades demands a symbol, and a startTime/endTime pair may span at
         # most 24 hours, so the sync walks each candidate symbol by fromId
-        # (trade id) instead of by time. See TradeSync._binance_symbols.
+        # (trade id) instead of by time. See TradeSync._candidate_symbols.
         'supports_trade_history': True,
         'trade_history': {
             'strategy': 'per_symbol',
@@ -137,6 +137,51 @@ SUPPORTED_EXCHANGES: dict[str, dict] = {
         'website': 'https://www.binance.com',
         'api_key_url': 'https://www.binance.com/en/my/settings/api-management',
         'guide_url': 'https://www.binance.com/en/support/faq/how-to-create-api-keys-on-binance-360002502072',
+    },
+    'gemini': {
+        'name': 'Gemini (Beta)',
+        'ccxt_id': 'gemini',
+        'requires_passphrase': False,
+        # Gemini can withdraw to approved addresses (Fund Manager role), but
+        # the auto-withdraw flow is built around Kraken's address book, so it
+        # stays convert-only for now.
+        'has_withdrawal_addresses': False,
+        'supports_withdraw': False,
+        # The API has no market orders. convert() places an immediate-or-cancel
+        # limit order priced through the book instead (see _ioc_convert).
+        'supports_rebalance': True,
+        # Private API allows 600 requests/minute, but order entry is advised
+        # at no more than 5/s, so 250ms leaves headroom.
+        'order_pacing_ms': 250,
+        'supports_transfer_history': True,
+        # /v1/transfers returns deposits AND withdrawals together, at most 50
+        # a call, with no end-time parameter. It is walked forward by
+        # timestamp: each page's newest row + 1ms is the next page's start.
+        'transfer_history': {
+            'source': 'combined',
+            'window_seconds': None,
+            'page_cap': 50,
+            'history_epoch': 1443657600,   # 2015-10-01, Gemini launch
+            'page_pacing_ms': 500,
+        },
+        # /v1/mytrades needs a symbol, so like Binance each candidate market
+        # is walked on its own, but paged by timestamp (Gemini's documented
+        # scheme: start at 0, then newest timestamp + 1) instead of trade id.
+        'supports_trade_history': True,
+        'trade_history': {
+            'strategy': 'per_symbol',
+            'paging': 'timestamp',
+            'quotes': ('USD', 'GUSD', 'USDC', 'USDT', 'BTC', 'ETH', 'EUR', 'GBP', 'SGD'),
+            'page_cap': 500,
+            'history_epoch': 1443657600,   # 2015-10-01
+            'page_pacing_ms': 300,
+        },
+        'has_sandbox': True,
+        'website': 'https://www.gemini.com',
+        'api_key_url': 'https://exchange.gemini.com/settings/api',
+        # The key needs the Trader role (Gemini's default): balances, orders
+        # and trade history. Auditor keys are read-only and can't trade.
+        'guide_url': 'https://developer.gemini.com/roles',
     },
     'robinhood': {
         'name': 'Robinhood (Beta)',
@@ -307,7 +352,8 @@ def get_trade_history_config(exchange_name: str) -> dict | None:
     """Fetch-strategy/pacing metadata for *exchange_name*'s fill history.
 
     ``strategy`` is ``'window'`` (one call returns every pair, walked forward
-    through time windows, paged by ``paging``), ``'per_symbol'`` (Binance — one walk per market, by trade id) or
+    through time windows, paged by ``paging``), ``'per_symbol'`` (Binance and
+    Gemini — one walk per market, by trade id or by timestamp per ``paging``) or
     ``'orders'`` (Robinhood — filled orders stand in for fills).
     """
     return SUPPORTED_EXCHANGES.get(exchange_name, {}).get('trade_history')

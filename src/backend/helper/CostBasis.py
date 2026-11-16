@@ -32,7 +32,7 @@ import copy
 #: plus the other fiat currencies the supported exchanges quote in.
 DOLLAR_ASSETS = frozenset({
     'USD', 'ZUSD', 'USDT', 'USDC', 'USDS', 'USDD', 'USDG', 'DAI', 'TUSD',
-    'PYUSD', 'FDUSD', 'BUSD', 'RLUSD', 'USDP',
+    'PYUSD', 'FDUSD', 'BUSD', 'RLUSD', 'USDP', 'GUSD',
 })
 OTHER_FIAT = frozenset({'EUR', 'ZEUR', 'GBP', 'ZGBP', 'CAD', 'ZCAD', 'AUD',
                         'JPY', 'ZJPY', 'CHF'})
