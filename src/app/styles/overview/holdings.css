@@ -26,6 +26,8 @@
   top: 0;
   z-index: 1;
   white-space: nowrap;
+  /* Opaque, or scrolled rows show through the header. */
+  background: var(--bg-secondary);
 }
 
 .holdings-page .data-table tbody td {
