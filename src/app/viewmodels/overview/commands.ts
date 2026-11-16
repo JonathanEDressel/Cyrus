@@ -2248,9 +2248,10 @@ class CommandsController {
     if (!chart) return;
     RuleFlow.render(chart, rules, {
       exchangeName: (id) => ExchangeStore.getExchangeName(id),
-      // Circles are the same rules as the table rows, so clicking one opens the
-      // same editor. Where a circle covers several rules, RuleFlow asks which.
-      onSelectRule: (rule) => this.editRule(rule),
+      // The details strip under the chart offers the same Edit and
+      // Pause/Resume as the table rows.
+      onEditRule: (rule) => this.editRule(rule),
+      onToggleRule: (rule) => this.toggleRule(Number(rule.id)),
     });
   }
 

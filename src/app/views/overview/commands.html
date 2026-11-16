@@ -127,14 +127,15 @@
 
     <!-- Flow view -->
     <div id="rules-flow-view" class="d-none">
-      <p class="flow-hint">Each circle is an asset; arrows show where your automations move funds. Hover a circle for details.</p>
+      <p class="flow-hint">Left to right: the coin that sends, the rule that moves it, and where the money ends up.</p>
       <div id="rules-flow-chart"></div>
-      <div class="flow-legend">
-        <span class="flow-legend-title">Legend</span>
-        <span class="flow-legend-item"><i class="fa-solid fa-circle rf-legend-source"></i> Source asset</span>
-        <span class="flow-legend-item"><i class="fa-solid fa-circle rf-legend-mid"></i> Intermediate</span>
-        <span class="flow-legend-item"><i class="fa-solid fa-circle rf-legend-terminal"></i> Final destination</span>
-        <span class="flow-legend-item"><i class="fa-solid fa-circle rf-legend-wallet"></i> Withdrawal wallet</span>
+      <div class="flow-legend rf-chart">
+        <span class="flow-legend-title">Triggers</span>
+        <span class="flow-legend-item"><span class="rf-legend-line rf-k-price"></span> Price target</span>
+        <span class="flow-legend-item"><span class="rf-legend-line rf-k-balance"></span> Balance builds up</span>
+        <span class="flow-legend-item"><span class="rf-legend-line rf-k-order"></span> Order fills</span>
+        <span class="flow-legend-item"><span class="rf-legend-line rf-k-alloc"></span> Allocation cap</span>
+        <span class="flow-legend-item"><span class="rf-legend-paused"></span> Paused</span>
       </div>
     </div>
 

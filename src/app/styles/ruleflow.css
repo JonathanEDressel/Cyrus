@@ -1,296 +1,301 @@
-/* ─── RuleFlow: asset-centric automations flow chart ──────────────── */
+/* ─── RuleFlow: automations as a left-to-right flow map ─────────────────────
+   Logic in services/ruleflow.ts. Sources on the left, a chip per rule, any
+   coin the money passes through, and where it ends up on the right. Lines and
+   chips take their colour from the rule's trigger type. */
 
 .rf-chart {
+  /* Trigger colours. Price uses the app accent; the others are picked to
+     differ in lightness as well as hue on both themes. */
+  --rf-price: var(--accent-cyan);
+  --rf-balance: #5AB8FF;
+  --rf-order: #F5A524;
+  --rf-alloc: #B79CFF;
   width: 100%;
-  padding: 0.5rem 0 0.5rem;
 }
 
-/* Each exchange gets a single panel holding all of its flows */
-.rf-exchange {
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid var(--border-primary);
-  border-radius: 12px;
-  padding: 1rem 1.25rem 1.25rem;
+body.theme-light .rf-chart {
+  --rf-balance: #1F6FB2;
+  --rf-order: #A35F00;
+  --rf-alloc: #6B4BC4;
 }
 
+.rf-k-price   { --rf-c: var(--rf-price); }
+.rf-k-balance { --rf-c: var(--rf-balance); }
+.rf-k-order   { --rf-c: var(--rf-order); }
+.rf-k-alloc   { --rf-c: var(--rf-alloc); }
+
+/* One block per exchange (titled when there's more than one), one map per set
+   of connected rules inside it. */
 .rf-exchange + .rf-exchange {
-  margin-top: 1.5rem;
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border-secondary);
 }
 
 .rf-exchange-title {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  margin-bottom: 0.5rem;
-  font-size: 0.85rem;
-  font-weight: 700;
-  letter-spacing: 0.3px;
+  margin: 0.25rem 0 0.25rem;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   color: var(--text-secondary);
 }
 
-.rf-exchange-title i {
-  color: var(--accent-cyan);
-  font-size: 0.9rem;
-}
+.rf-exchange-title i { color: var(--accent-cyan); }
 
-/* Lay the separate flows side by side; scroll horizontally if they overflow */
-.rf-components {
-  display: flex;
-  flex-direction: row;
-  flex-wrap: nowrap;
-  align-items: flex-start;
-  overflow-x: auto;
-  padding-bottom: 0.5rem;
-}
-
-/* Each flow sizes to its own content and never shrinks */
-.rf-component {
-  flex: 0 0 auto;
-}
-
-/* Plenty of space between adjacent flows, with a centered faint divider */
 .rf-component + .rf-component {
-  margin-left: 4.5rem;
-  padding-left: 4.5rem;
-  border-left: 1px dashed var(--border-primary);
+  border-top: 1px dashed var(--border-secondary);
 }
 
-.rf-rows {
+/* The map keeps its geometry; a narrow window scrolls it sideways. */
+.rf-scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.rf-graph {
   position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 3.25rem;
-  padding: 1.5rem 0.5rem 1.75rem;
 }
 
-.rf-row {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: 2.5rem;
-}
-
-/* Circle node */
-.rf-node {
-  position: relative;
-  z-index: 1;
-  width: 86px;
-  height: 86px;
-  border-radius: 50%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 0.15rem;
-  background: var(--bg-secondary);
-  border: 2px solid var(--border-primary);
-  cursor: default;
-  transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s;
-}
-
-.rf-node:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
-}
-
-/* A circle that opens an editor says so: pointer cursor, a lift, and an accent
-   ring — otherwise nothing distinguishes it from a decorative node. */
-.rf-node.rf-clickable {
-  cursor: pointer;
-}
-
-.rf-node.rf-clickable:hover {
-  border-color: var(--accent-purple-light);
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35),
-              0 0 0 3px color-mix(in srgb, var(--accent-purple) 22%, transparent);
-}
-
-.rf-node.rf-clickable:active {
-  transform: translateY(0);
-}
-
-.rf-node.rf-clickable:focus-visible {
-  outline: 2px solid var(--accent-cyan-light);
-  outline-offset: 3px;
-}
-
-.rf-node-icon {
-  font-size: 1.05rem;
-  line-height: 1;
-}
-
-.rf-node-label {
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.3px;
-  color: var(--text-primary);
-  max-width: 78px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.rf-node-amount {
-  font-size: 0.62rem;
-  font-weight: 700;
-  color: var(--accent-cyan);
-  max-width: 78px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  letter-spacing: 0.2px;
-  margin-top: 0.05rem;
-}
-
-/* Role colors */
-.rf-node-source   { border-color: var(--accent-cyan); }
-.rf-node-source   .rf-node-icon { color: var(--accent-cyan); }
-
-.rf-node-mid      { border-color: var(--accent-purple-light); }
-.rf-node-mid      .rf-node-icon { color: var(--accent-purple-light); }
-
-.rf-node-terminal { border-color: var(--pos); }
-.rf-node-terminal .rf-node-icon { color: var(--pos); }
-
-.rf-node-wallet   { border-color: var(--warn); }
-.rf-node-wallet   .rf-node-icon { color: var(--warn); }
-
-.rf-node.rf-paused {
-  opacity: 0.5;
-  border-style: dashed;
-}
-
-/* SVG arrow overlay */
 .rf-svg {
   position: absolute;
   inset: 0;
-  width: 100%;
-  height: 100%;
+  pointer-events: none;
   overflow: visible;
-  pointer-events: none;
-  z-index: 0;
 }
 
-.rf-arrow {
+/* ── Lines ──────────────────────────────────────────────────────────────── */
+
+.rf-edge {
   fill: none;
-  stroke: var(--accent-purple-light);
-  stroke-width: 2;
-  stroke-linejoin: round;
-  stroke-linecap: round;
-  opacity: 0.85;
-}
-
-.rf-arrow-paused {
-  stroke: var(--text-muted);
-  stroke-dasharray: 5 4;
+  stroke: var(--rf-c);
+  stroke-width: 1.8;
   opacity: 0.6;
+  transition: opacity 0.15s, stroke-width 0.15s;
 }
 
-/* On node hover: recolor the connected paths, fade the rest (no size change) */
-.rf-arrow-hl {
-  stroke: var(--accent-cyan);
-  opacity: 1;
+.rf-edge-paused {
+  stroke-dasharray: 6 5;
+  opacity: 0.4;
 }
 
-.rf-arrow-dim {
-  opacity: 0.12;
+.rf-port {
+  fill: var(--rf-c);
+  opacity: 0.75;
+  transition: opacity 0.15s;
 }
 
-/* Hover tooltip */
-.rf-tooltip {
-  position: fixed;
-  z-index: 1000;
-  max-width: 320px;
-  padding: 0.6rem 0.8rem;
-  background: var(--bg-tertiary, #1e293b);
+.rf-edge.is-hover { opacity: 1; stroke-width: 2.6; }
+
+.rf-has-sel .rf-edge,
+.rf-has-sel .rf-port { opacity: 0.18; }
+
+.rf-has-sel .rf-edge.is-hover { opacity: 0.7; }
+
+.rf-has-sel .rf-edge.is-sel,
+.rf-has-sel .rf-port.is-sel { opacity: 1; }
+
+.rf-edge.is-sel { stroke-width: 3; }
+
+/* ── Places (coins and withdrawal addresses) ───────────────────────────── */
+
+.rf-node {
+  position: absolute;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px;
+  background: var(--bg-tertiary);
   border: 1px solid var(--border-primary);
-  border-radius: 8px;
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
-  pointer-events: none;
+  border-radius: var(--radius);
+  transition: opacity 0.15s;
 }
 
-.rf-tooltip-line {
-  font-size: 0.82rem;
-  line-height: 1.5;
-  color: var(--text-secondary);
+.rf-node-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
 }
 
-.rf-tooltip-hint {
-  margin-top: 0.45rem;
-  padding-top: 0.4rem;
-  border-top: 1px solid var(--border-primary);
-  font-size: 0.72rem;
-  font-weight: 600;
-  letter-spacing: 0.3px;
-  color: var(--accent-purple-dim);
+.rf-node-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-/* ── Rule picker (a circle covering more than one automation) ──────────── */
+.rf-node-sub {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
 
-.rf-picker {
-  position: fixed;
-  z-index: 1100;
-  min-width: 260px;
-  max-width: 360px;
-  padding: 0.4rem;
+.rf-node-terminal {
+  align-items: flex-start;
+  padding-top: 10px;
+  border-color: color-mix(in srgb, var(--pos) 45%, var(--border-primary));
+}
+
+.rf-node-terminal .rf-node-name { font-size: 15px; }
+
+.rf-node-wallet {
+  border-color: color-mix(in srgb, var(--warn) 50%, var(--border-primary));
+}
+
+.rf-node-icon {
+  color: var(--warn);
+  font-size: 15px;
+  flex-shrink: 0;
+}
+
+.rf-has-sel .rf-node:not(.is-related) { opacity: 0.45; }
+
+/* ── Rule chips ─────────────────────────────────────────────────────────── */
+
+.rf-chip {
+  position: absolute;
+  width: 172px;
+  height: 28px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 9px;
   background: var(--bg-secondary);
   border: 1px solid var(--border-primary);
-  border-radius: 10px;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  border-radius: var(--radius);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, opacity 0.15s;
 }
 
-.rf-picker-title {
-  padding: 0.35rem 0.55rem 0.5rem;
-  font-size: 0.7rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.6px;
+.rf-chip-kind {
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--rf-c);
+}
+
+.rf-chip-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rf-chip:hover { border-color: var(--rf-c); }
+
+.rf-chip:focus-visible {
+  outline: 2px solid var(--accent-cyan-light);
+  outline-offset: 2px;
+}
+
+.rf-chip.is-paused {
+  border-style: dashed;
   color: var(--text-muted);
 }
 
-.rf-picker-item {
+.rf-chip.is-paused .rf-chip-kind { color: var(--text-muted); }
+
+.rf-chip.is-sel {
+  border-color: var(--rf-c);
+  background: color-mix(in srgb, var(--rf-c) 12%, var(--bg-secondary));
+  box-shadow: 0 0 0 1px var(--rf-c);
+}
+
+.rf-has-sel .rf-chip:not(.is-sel) { opacity: 0.7; }
+
+/* ── Details strip ──────────────────────────────────────────────────────── */
+
+.rf-detail {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+  margin-top: 10px;
+  padding: 12px 14px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-secondary);
+  border-radius: var(--radius);
+}
+
+.rf-detail-kind {
+  flex-shrink: 0;
+  padding: 4px 8px;
+  border: 1px solid var(--rf-c);
+  border-radius: var(--radius);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--rf-c);
+}
+
+.rf-detail-text {
+  flex: 1 1 340px;
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.15rem;
-  width: 100%;
-  padding: 0.5rem 0.55rem;
-  border: none;
-  border-radius: 8px;
-  background: transparent;
-  text-align: left;
-  cursor: pointer;
-  transition: background 0.15s;
+  gap: 2px;
 }
 
-.rf-picker-item:hover,
-.rf-picker-item:focus-visible {
-  background: var(--hover-overlay);
-  outline: none;
-}
-
-.rf-picker-item:focus-visible {
-  box-shadow: inset 0 0 0 2px var(--accent-cyan-light);
-}
-
-.rf-picker-name {
-  font-size: 0.85rem;
-  font-weight: 600;
+.rf-detail-text strong {
+  font-size: 14px;
   color: var(--text-primary);
 }
 
-.rf-picker-desc {
-  font-size: 0.74rem;
+.rf-detail-text > span {
+  font-size: 13px;
   line-height: 1.45;
   color: var(--text-tertiary);
 }
 
-.rf-tooltip-line + .rf-tooltip-line {
-  margin-top: 0.3rem;
-  padding-top: 0.3rem;
-  border-top: 1px solid var(--border-primary);
+.rf-detail-ex {
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+.rf-detail-meta {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.rf-detail-actions {
+  display: flex;
+  gap: 6px;
+}
+
+/* ── Legend (Automations Flow tab) ──────────────────────────────────────── */
+
+.rf-legend-line {
+  display: inline-block;
+  width: 18px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--rf-c);
+}
+
+.rf-legend-paused {
+  display: inline-block;
+  width: 18px;
+  border-top: 2px dashed var(--text-muted);
 }
 
 /* ── Tab strip (shared by Commands and Open Orders pages) ─────────── */
@@ -338,14 +343,20 @@
 
 .rf-empty p { margin: 0; font-size: 0.9rem; }
 
-/* Legend dots + hint (Automations Flow tab) */
+/* Hint above the chart (Automations Flow tab) */
 .flow-hint {
   margin: 0 0 0.25rem;
   font-size: 0.85rem;
   color: var(--text-muted);
 }
 
-.rf-legend-source   { color: var(--accent-cyan); }
-.rf-legend-mid      { color: var(--accent-purple-light); }
-.rf-legend-terminal { color: var(--pos); }
-.rf-legend-wallet   { color: var(--warn); }
+/* On the Overview the widget scrolls; keep the details strip in view. */
+.ov-page .rf-detail {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rf-edge, .rf-port, .rf-node, .rf-chip { transition: none; }
+}

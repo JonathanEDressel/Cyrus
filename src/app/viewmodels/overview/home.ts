@@ -856,7 +856,8 @@ class HomeController {
         exchangeName: (id) => ExchangeStore.getExchangeName(id),
         // Same affordance as the Automations page, but the editor lives there —
         // hand the rule over and let that page open it.
-        onSelectRule: (rule) => router.navigate('commands', { editRuleId: String(rule.id) }),
+        onEditRule: (rule) => router.navigate('commands', { editRuleId: String(rule.id) }),
+        editLabel: 'Open in Automations',
       });
     }
   }
