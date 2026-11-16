@@ -27,6 +27,7 @@
   --accent-soft: rgba(198, 244, 50, 0.10);
   --pos: #3DDC97;
   --neg: #FF6B5B;
+  --heart: #FF5C7A;
   --warn: #F2C94C;
   --scrollbar-track: #0B0D0E;
   --scrollbar-thumb: #2E3438;
@@ -73,6 +74,7 @@ body.theme-light {
   --accent-soft: rgba(77, 124, 15, 0.10);
   --pos: #15803D;
   --neg: #B91C1C;
+  --heart: #E11D48;
   --warn: #A16207;
   --scrollbar-track: #E7E9E4;
   --scrollbar-thumb: #C9CEC6;
@@ -714,12 +716,17 @@ body.theme-light {
 
 #app-content {
   min-height: 100vh;
+  /* The chrome padding counts toward the 100vh, so a short page doesn't
+     scroll just because of the top bar, footer and heart clearance. */
+  box-sizing: border-box;
 }
 
 .app-chrome:not(.d-none) ~ #app-content {
   margin-left: var(--rail-w);
   padding-top: var(--chrome-top);
-  padding-bottom: var(--footer-h);
+  /* Room for the footer plus the support heart floating above it, so the
+     end of every page can scroll clear of the button. */
+  padding-bottom: calc(var(--footer-h) + 64px);
   box-sizing: border-box;
 }
 
@@ -1020,49 +1027,89 @@ body.theme-light {
   color: var(--accent-cyan);
 }
 
-/* Lives in the top bar; the modal drops down beneath its button. */
+/* Support heart: fixed in the bottom-right corner, just above the footer.
+   The modal opens upward from it. */
 .donation-widget {
-  position: relative;
+  position: fixed;
+  right: 20px;
+  bottom: calc(var(--footer-h) + 16px);
   z-index: 1000;
 }
 
 .donation-toggle {
-  width: 32px;
-  height: 32px;
+  position: relative;
+  width: 44px;
+  height: 44px;
   box-sizing: border-box;
-  border-radius: var(--radius);
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border-primary);
-  color: var(--text-tertiary);
-  font-size: 12px;
+  border-radius: 50%;
+  background: var(--bg-secondary);
+  border: 1px solid color-mix(in srgb, var(--heart) 45%, var(--border-primary));
+  color: var(--heart);
+  font-size: 17px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
+  box-shadow: 0 6px 18px var(--shadow-heavy);
+  transition: border-color 0.2s, background-color 0.2s;
 }
 
-.donation-toggle:hover {
-  border-color: var(--text-dimmer);
-  color: #ff8fa3;
+.donation-toggle:hover,
+.donation-toggle:focus-visible {
+  border-color: var(--heart);
+  background: color-mix(in srgb, var(--heart) 12%, var(--bg-secondary));
+  outline: none;
 }
 
-/* Only beats on hover. A permanently-running transform animation on a fixed
-   overlay keeps a composited layer alive for the life of the app, and that is a
-   known way to end up with stale paint elsewhere on the page. */
+/* A soft ring that swells out of the button with each beat. */
+.donation-toggle::after {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: 50%;
+  border: 2px solid var(--heart);
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* The pulse comes in short bursts rather than a loop that never stops: src/
+   donation.js adds .is-beating for ~1.6s every few seconds, so the animated
+   layer only exists while it beats. A permanently-running transform on a fixed
+   overlay keeps a composited layer alive for the life of the app, which is a
+   known way to end up with stale paint elsewhere on the page (see repaint.ts).
+   Hovering beats continuously, as before. */
+.donation-widget.is-beating .donation-toggle i,
 .donation-toggle:hover i,
 .donation-toggle:focus-visible i {
   animation: heartbeat 1.5s ease-in-out infinite;
 }
 
+.donation-widget.is-beating .donation-toggle::after {
+  animation: heart-ring 1.5s ease-out;
+}
+
 @keyframes heartbeat {
   0%, 100% { transform: scale(1); }
-  10%, 30% { transform: scale(1.1); }
+  10%, 30% { transform: scale(1.22); }
   20%, 40% { transform: scale(1); }
+}
+
+@keyframes heart-ring {
+  0%   { opacity: 0.55; transform: scale(1); }
+  70%  { opacity: 0; transform: scale(1.6); }
+  100% { opacity: 0; transform: scale(1.6); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .donation-widget.is-beating .donation-toggle i,
+  .donation-toggle:hover i,
+  .donation-toggle:focus-visible i,
+  .donation-widget.is-beating .donation-toggle::after { animation: none; }
 }
 
 .donation-modal {
   position: absolute;
-  top: calc(100% + 8px);
+  bottom: calc(100% + 10px);
   right: 0;
   width: 380px;
   background: var(--bg-secondary);
@@ -1071,7 +1118,7 @@ body.theme-light {
   box-shadow: 0 16px 40px var(--shadow-heavy);
   overflow: hidden;
   animation: slideInUp 0.2s ease;
-  max-height: calc(100vh - var(--topbar-h) - 24px);
+  max-height: calc(100vh - var(--chrome-top) - var(--footer-h) - 90px);
   overflow-y: auto;
 }
 
@@ -1105,7 +1152,7 @@ body.theme-light {
 }
 
 .donation-header .me-2 {
-  color: var(--accent-cyan);
+  color: var(--heart);
 }
 
 .donation-close {
@@ -1255,19 +1302,12 @@ body.theme-light {
 
 @media (max-width: 480px) {
   .donation-widget {
-    bottom: 16px;
     right: 16px;
   }
-  
-  .donation-toggle {
-    width: 48px;
-    height: 48px;
-    font-size: 1.25rem;
-  }
-  
+
   .donation-modal {
     width: calc(100vw - 32px);
-    right: -8px;
+    right: 0;
   }
 }
 

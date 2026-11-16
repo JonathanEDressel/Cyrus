@@ -11,6 +11,25 @@
     modal?.classList.add('d-none');
   });
 
+  // Heartbeat in short bursts: .is-beating plays one double-beat (and a ring)
+  // every few seconds, then comes off so no animation is left running between
+  // beats (see the .donation-toggle comment in main.css for why that matters).
+  // Skipped while the window is hidden, the widget is off-screen or turned off,
+  // the modal is open, or the user prefers reduced motion.
+  const widget = document.getElementById('donation-widget');
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+  const BEAT_EVERY_MS = 6000;
+  const BEAT_FOR_MS = 1600;
+  function beat() {
+    if (!widget || document.hidden || reduceMotion.matches) return;
+    if (widget.getClientRects().length === 0) return;       // hidden (d-none / turned off)
+    if (modal && !modal.classList.contains('d-none')) return; // already open
+    widget.classList.add('is-beating');
+    setTimeout(() => widget.classList.remove('is-beating'), BEAT_FOR_MS);
+  }
+  setTimeout(beat, 2500);
+  setInterval(beat, BEAT_EVERY_MS);
+
   document.addEventListener('click', (e) => {
     const typeBtn = e.target.closest('.giving-type-btn');
     if (typeBtn) {

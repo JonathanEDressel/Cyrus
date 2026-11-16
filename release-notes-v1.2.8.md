@@ -46,6 +46,7 @@ Five new widgets:
 
 ## Also
 
+- The **Support Cyrus** heart now sits in the bottom-right corner, beating every few seconds. You can still hide it on the Profile page.
 - Updated to a current Electron (the framework Cyrus runs on), with the latest security fixes.
 - The Privacy page now gives the correct database location on both Windows and macOS.
 
