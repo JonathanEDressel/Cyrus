@@ -7,6 +7,8 @@ src/backend/logs/
 
 # Build output
 release/
+# Tutorial videos, copied in by scripts/bundle-tutorials.js (they live in the landing repo)
+src/tutorials/
 src/backend/build/
 src/backend/dist/
 *.spec

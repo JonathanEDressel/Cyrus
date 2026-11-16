@@ -65,6 +65,8 @@ class AiAssistant {
 
   static open(): void {
     if (!AiAssistant.panel) AiAssistant.build();
+    // The tutorial drawer uses the same slot.
+    if (typeof Tutorials !== 'undefined') Tutorials.close();
     // Cancel a close that's still mid-transition, or its timer would re-hide
     // the panel we're reopening.
     window.clearTimeout(AiAssistant.closeTimer);

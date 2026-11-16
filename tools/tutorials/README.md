@@ -44,10 +44,20 @@ node run.js overview taxes         # build those (out/<id>.mp4/.jpg/.vtt)
 node run.js                        # build everything
 node run.js --reassemble taxes     # re-mix and re-encode the last recording
 node run.js --index                # rebuild out/manifest.json from finished videos
-node publish.js                    # copy into ../../../Cyrus-Landing/tutorials
-                                   # and refresh the landing page playlist
+node publish.js                    # copy into ../../../Cyrus-Landing/tutorials,
+                                   # write its manifest.json and refresh the
+                                   # landing page playlist
 node explore.js holdings           # screenshots + selector list for a page
 ```
+
+## In the app
+
+The same videos play inside Cyrus, from the Tutorial button in each page header
+(`src/app/services/tutorials.ts`). `npm run dist` bundles them from the landing
+repo's `tutorials/` folder via `scripts/bundle-tutorials.js`, so after
+re-recording: `node publish.js`, commit and push the landing repo, then build.
+Which page shows which video is the `data-tutorial` attribute on that page's
+button.
 
 ## Writing a scene
 

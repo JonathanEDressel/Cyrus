@@ -12,6 +12,7 @@
     "watch": "tsc -w",
     "dev": "npm run build && electron . --dev",
     "pack": "electron-builder --dir",
+    "predist": "node scripts/bundle-tutorials.js",
     "dist": "electron-builder",
     "build:backend": "cd src/backend && ..\\..\\venv\\Scripts\\python.exe -m PyInstaller server.spec --noconfirm",
     "build:all": "npm run build && npm run build:backend && npm run dist"
@@ -28,6 +29,7 @@
       "src/donation.js",
       "src/app/**/*",
       "src/assets/**/*",
+      "src/tutorials/**/*",
       "!src/**/*.ts",
       "!src/backend/**/*"
     ],
@@ -44,6 +46,9 @@
         }
       ]
     },
+    "asarUnpack": [
+      "src/tutorials/*.mp4"
+    ],
     "afterPack": "scripts/mac-adhoc-sign.js",
     "mac": {
       "icon": "src/assets/mac/icon.png",

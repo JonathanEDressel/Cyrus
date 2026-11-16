@@ -101,6 +101,13 @@ jobs:
           npm ci
           npm run build
 
+      # The in-app tutorial videos live in the (public) landing repo, not here;
+      # bundle-tutorials.js copies them into src/tutorials/ for packaging.
+      - name: Bundle the tutorial videos
+        run: |
+          git clone --depth 1 https://github.com/JonathanEDressel/Cyrus-Landing.git "$RUNNER_TEMP/landing"
+          node scripts/bundle-tutorials.js "$RUNNER_TEMP/landing/tutorials"
+
       - name: Package (${{ matrix.arch }})
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'

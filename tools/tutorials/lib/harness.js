@@ -58,10 +58,20 @@ async function startStatic() {
     const url = decodeURIComponent(req.url.split('?')[0]);
     const file = path.normalize(path.join(REPO, url));
     if (!file.startsWith(REPO)) { res.writeHead(403); return res.end(); }
-    fs.readFile(file, (err, data) => {
-      if (err) { res.writeHead(404); return res.end(); }
-      res.writeHead(200, { 'Content-Type': MIME[path.extname(file).toLowerCase()] || 'application/octet-stream' });
-      res.end(data);
+    fs.stat(file, (err, st) => {
+      if (err || !st.isFile()) { res.writeHead(404); return res.end(); }
+      const type = MIME[path.extname(file).toLowerCase()] || 'application/octet-stream';
+      // Byte ranges, so <video> (the in-app tutorials) can seek.
+      const m = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range || '');
+      if (m) {
+        const start = m[1] ? Number(m[1]) : Math.max(0, st.size - Number(m[2]));
+        const end = m[1] && m[2] ? Math.min(Number(m[2]), st.size - 1) : st.size - 1;
+        res.writeHead(206, { 'Content-Type': type, 'Accept-Ranges': 'bytes',
+          'Content-Range': `bytes ${start}-${end}/${st.size}`, 'Content-Length': end - start + 1 });
+        return fs.createReadStream(file, { start, end }).pipe(res);
+      }
+      res.writeHead(200, { 'Content-Type': type, 'Accept-Ranges': 'bytes', 'Content-Length': st.size });
+      fs.createReadStream(file).pipe(res);
     });
   });
   await new Promise(r => server.listen(port, '127.0.0.1', r));

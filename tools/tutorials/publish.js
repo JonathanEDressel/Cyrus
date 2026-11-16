@@ -3,8 +3,10 @@
 //
 //   node publish.js [path/to/Cyrus-Landing]     (default: ../../../Cyrus-Landing)
 //
-// Copies out/<id>.{mp4,jpg,vtt} to <landing>/tutorials/ and rewrites the
-// block between /* TUTORIALS:DATA */ markers in <landing>/index.html.
+// Copies out/<id>.{mp4,jpg,vtt} to <landing>/tutorials/, writes the playlist
+// there as manifest.json (the app bundles that folder: scripts/bundle-tutorials.js)
+// and rewrites the block between /* TUTORIALS:DATA */ markers in
+// <landing>/index.html.
 
 const fs = require('fs');
 const path = require('path');
@@ -29,6 +31,7 @@ for (const e of entries) {
     keep.add(name);
   }
 }
+keep.add('manifest.json');
 // Drop videos for scenes that no longer exist.
 for (const f of fs.readdirSync(dest)) if (!keep.has(f)) fs.rmSync(path.join(dest, f));
 
@@ -36,6 +39,7 @@ const data = entries.map(e => ({
   id: e.id, title: e.title, summary: e.summary, seconds: e.seconds,
   chapters: e.chapters.map(c => ({ title: c.title, t: Math.round(c.t * 10) / 10 })),
 }));
+fs.writeFileSync(path.join(dest, 'manifest.json'), JSON.stringify(data, null, 1));
 const html = fs.readFileSync(indexPath, 'utf8');
 const re = /\/\* TUTORIALS:DATA \*\/[\s\S]*?\/\* \/TUTORIALS:DATA \*\//;
 if (!re.test(html)) throw new Error('TUTORIALS:DATA markers not found in index.html');
@@ -44,3 +48,4 @@ fs.writeFileSync(indexPath, html.replace(re, block));
 
 const total = entries.reduce((s, e) => s + fs.statSync(path.join(dest, `${e.id}.mp4`)).size, 0);
 console.log(`published ${entries.length} videos (${(total / 1e6).toFixed(0)} MB) to ${dest}`);
+console.log('The app picks them up on the next `npm run dist` (or run node scripts/bundle-tutorials.js).');
