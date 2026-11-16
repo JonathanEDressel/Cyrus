@@ -2,6 +2,7 @@ import { app, BrowserWindow, shell, ipcMain, Tray, Menu, nativeImage, dialog, No
 import * as path from 'path';
 import { spawn, execFileSync, ChildProcess } from 'child_process';
 import * as fs from 'fs';
+import { initUpdates } from './updater';
 
 const PREFERRED_PORT = 5000;
 const IS_MAC = process.platform === 'darwin';
@@ -556,6 +557,11 @@ if (!app.requestSingleInstanceLock()) {
     setTimeout(() => setBackendPort(PREFERRED_PORT), 20000);
     createTray();
     startTrayPolling();
+    initUpdates({
+      getWindow: () => mainWindow,
+      // Installing quits for real rather than hiding to the tray.
+      beforeInstall: () => { isQuitting = true; },
+    });
     const startHidden = process.argv.includes('--hidden');
     setTimeout(() => {
       startupWindowCreated = true;

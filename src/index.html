@@ -21,6 +21,7 @@
        in the sidebar and the drawer opens over any page. -->
   <link rel="stylesheet" href="app/styles/overview/assistant.css">
   <link rel="stylesheet" href="app/styles/tutorials.css">
+  <link rel="stylesheet" href="app/styles/updates.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <!-- The Terminal design layer. Kept last in <head>: the router moves it
        after every lazily-loaded page stylesheet (see Router.loadStyle). -->
@@ -72,6 +73,10 @@
         </a>
 
         <div class="topbar-actions">
+          <!-- Shown by services/updatenotice.ts while a newer release is available. -->
+          <button type="button" class="tb-btn update-pill d-none" id="update-pill">
+            <i class="fa-solid fa-circle-arrow-down" aria-hidden="true"></i><span id="update-pill-text">Update</span>
+          </button>
           <button type="button" class="tb-btn" data-ai-open aria-label="Open the assistant" title="Ask the assistant (Ctrl K)">
             <i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i><span>Ask</span><span class="kbd" aria-hidden="true">Ctrl K</span>
           </button>
@@ -410,6 +415,7 @@
   <script src="../dist/app/services/aihistory.js"></script>
   <script src="../dist/app/services/aiassistant.js"></script>
   <script src="../dist/app/services/tutorials.js"></script>
+  <script src="../dist/app/services/updatenotice.js"></script>
   <script src="../dist/app/services/demomode.js"></script>
   <script src="../dist/app/app.js"></script>
 </body>

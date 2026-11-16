@@ -1,0 +1,263 @@
+/* "Update available" modal and the top-bar Update pill. Logic in
+   services/updatenotice.ts; the check itself is in src/updater.ts. */
+
+/* ── Top-bar pill ──────────────────────────────────────────────────────── */
+
+.update-pill {
+  border-color: color-mix(in srgb, var(--accent-cyan) 55%, transparent);
+  background: var(--accent-soft);
+  color: var(--accent-cyan);
+}
+
+.update-pill i { color: var(--accent-cyan); }
+
+.update-pill:hover { border-color: var(--accent-cyan); }
+
+.update-pill.is-ready {
+  background: var(--accent-cyan);
+  border-color: var(--accent-cyan);
+  color: var(--accent-ink);
+}
+
+.update-pill.is-ready i { color: var(--accent-ink); }
+
+/* ── Modal ─────────────────────────────────────────────────────────────── */
+
+.upd-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1300; /* over the assistant and tutorial drawers */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(2, 6, 23, 0.6);
+}
+
+.upd-modal {
+  width: 520px;
+  max-width: 100%;
+  max-height: calc(100vh - 2rem);
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius);
+  box-shadow: 0 24px 60px var(--shadow-heavy);
+  overflow: hidden;
+}
+
+.upd-head {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.85rem 0.75rem 0.85rem 1rem;
+  border-bottom: 1px solid var(--border-secondary);
+}
+
+.upd-mark {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  border-radius: var(--radius);
+  background: var(--accent-soft);
+  border: 1px solid color-mix(in srgb, var(--accent-cyan) 35%, transparent);
+  color: var(--accent-cyan);
+  font-size: 13px;
+}
+
+.upd-head-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.upd-kicker {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent-cyan);
+}
+
+.upd-title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.3;
+}
+
+.upd-versions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  padding: 0.7rem 1rem;
+  border-bottom: 1px solid var(--border-secondary);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-primary);
+}
+
+.upd-ver {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.45rem;
+  padding: 3px 8px;
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius);
+  background: var(--bg-tertiary);
+}
+
+.upd-ver.is-new {
+  border-color: color-mix(in srgb, var(--accent-cyan) 45%, transparent);
+  background: var(--accent-soft);
+  color: var(--accent-cyan);
+}
+
+.upd-ver-label {
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.upd-ver-arrow {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.upd-date {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.upd-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0.85rem 1rem;
+}
+
+.upd-label {
+  margin: 0 0 0.5rem;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.upd-notes {
+  max-height: 260px;
+  overflow-y: auto;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--border-secondary);
+  border-radius: var(--radius);
+  background: var(--bg-primary);
+  font-size: 0.84rem;
+  line-height: 1.55;
+  color: var(--text-tertiary);
+}
+
+.upd-notes h4 {
+  margin: 0.9rem 0 0.35rem;
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.upd-notes h4:first-child { margin-top: 0; }
+.upd-notes p { margin: 0 0 0.55rem; }
+.upd-notes ul { margin: 0 0 0.55rem; padding-left: 1.1rem; }
+.upd-notes li { margin: 0.15rem 0; }
+.upd-notes li::marker { color: var(--accent-cyan); }
+.upd-notes strong { color: var(--text-primary); font-weight: 600; }
+
+.upd-notes code {
+  font-family: var(--font-mono);
+  font-size: 0.8em;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: var(--bg-tertiary);
+}
+
+.upd-progress {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0 1rem 0.85rem;
+}
+
+.upd-bar {
+  flex: 1;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--bg-tertiary);
+  overflow: hidden;
+}
+
+.upd-bar span {
+  display: block;
+  height: 100%;
+  width: 0;
+  border-radius: 999px;
+  background: var(--accent-cyan);
+  transition: width 0.3s ease;
+}
+
+.upd-progress-text {
+  min-width: 9.5rem;
+  text-align: right;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+
+.upd-error {
+  margin: 0 1rem 0.85rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--warn) 35%, transparent);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--warn) 8%, transparent);
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: var(--warn);
+}
+
+.upd-foot {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.8rem 1rem;
+  border-top: 1px solid var(--border-secondary);
+}
+
+.upd-hint {
+  flex: 1;
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+.upd-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.upd-actions .btn-primary,
+.upd-actions .btn-secondary { min-height: 34px; }
+
+@media (max-width: 560px) {
+  .upd-foot { flex-direction: column; align-items: stretch; }
+  .upd-actions { justify-content: flex-end; }
+  .upd-date { margin-left: 0; width: 100%; }
+}

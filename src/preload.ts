@@ -23,6 +23,18 @@ contextBridge.exposeInMainWorld('cyrus', {
     ipcRenderer.invoke('save-file', args),
   showItemInFolder: (filePath: string): Promise<boolean> =>
     ipcRenderer.invoke('show-item-in-folder', filePath),
+  // App updates (src/updater.ts). State is pushed on every change; the
+  // renderer also asks once on load in case the check ran before it existed.
+  updates: {
+    state: (): Promise<any> => ipcRenderer.invoke('update-state'),
+    check: (): Promise<any> => ipcRenderer.invoke('update-check'),
+    download: (): Promise<any> => ipcRenderer.invoke('update-download'),
+    install: (): Promise<void> => ipcRenderer.invoke('update-install'),
+    openDownload: (): Promise<void> => ipcRenderer.invoke('update-open'),
+    onChange: (cb: (state: any) => void): void => {
+      ipcRenderer.on('update-state', (_event, state) => cb(state));
+    },
+  },
 });
 
 contextBridge.exposeInMainWorld('api', {
