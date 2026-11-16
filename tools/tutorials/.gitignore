@@ -1,0 +1,6 @@
+node_modules/
+.venv/
+.cache/
+.work/
+.explore/
+out/

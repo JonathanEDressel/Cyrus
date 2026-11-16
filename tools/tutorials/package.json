@@ -1,0 +1,9 @@
+{
+  "name": "cyrus-tutorials",
+  "private": true,
+  "description": "Records the narrated per-page tutorial videos shown on the landing page.",
+  "type": "commonjs",
+  "dependencies": {
+    "playwright-core": "1.48.2"
+  }
+}
