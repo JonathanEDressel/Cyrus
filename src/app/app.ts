@@ -215,6 +215,9 @@ function applyTheme(theme: string): void {
     if (!tokenValid) {
       router.navigate('login');
     } else {
+      // A restored session: signed in, but not a new login.
+      UsageStats.signedIn(false);
+
       // Apply saved theme preference
       try {
         const user = await UserController.getProfile();

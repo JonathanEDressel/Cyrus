@@ -114,6 +114,29 @@
         </div>
       </div>
     </div>
+
+    <!-- Opt-in anonymous usage stats (services/usagestats.ts). Hidden until
+         the build has a collector configured. -->
+    <div class="profile-card d-none" id="usage-card">
+      <div class="card-head">
+        <i class="fa-solid fa-chart-simple"></i>
+        <h2>Anonymous usage stats</h2>
+      </div>
+      <div class="setting-toggle-row">
+        <div class="setting-toggle-info">
+          <span class="setting-toggle-title">Share anonymous usage stats</span>
+          <span class="setting-toggle-desc">Helps count how many copies of Cyrus are in use. Off unless you turn it on; turning it off deletes what was sent.</span>
+        </div>
+        <label class="toggle-switch">
+          <input type="checkbox" id="usage-toggle">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+      <details class="usage-details">
+        <summary>What's sent</summary>
+        <div id="usage-details-body"></div>
+      </details>
+    </div>
   </section>
 
   <!-- ══ Exchanges ═════════════════════════════════════════════════════════ -->

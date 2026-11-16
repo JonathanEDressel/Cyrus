@@ -35,6 +35,15 @@ contextBridge.exposeInMainWorld('cyrus', {
       ipcRenderer.on('update-state', (_event, state) => cb(state));
     },
   },
+  // Opt-in anonymous usage stats (src/usagestats.ts). The renderer only
+  // reports consent and whether someone is signed in; the main process
+  // decides what gets sent.
+  usage: {
+    state: (): Promise<any> => ipcRenderer.invoke('usage-state'),
+    setConsent: (granted: boolean): Promise<any> => ipcRenderer.invoke('usage-set-consent', granted),
+    setSignedIn: (signedIn: boolean, fresh: boolean): Promise<any> =>
+      ipcRenderer.invoke('usage-signed-in', { signedIn, fresh }),
+  },
 });
 
 contextBridge.exposeInMainWorld('api', {

@@ -70,7 +70,8 @@ Capability flags live in `src/backend/helper/ExchangeRegistry.py` and are enforc
 
 **Security**
 - Exchange API keys Fernet-encrypted at rest
-- Backend binds to loopback only; nothing is sent to a third-party server
+- Backend binds to loopback only; your data, keys and history stay on your machine
+- Optional, off-by-default anonymous usage count (random install ID, version, OS, window/tray and signed-in state, country); see the in-app Privacy page
 - Light and dark themes
 
 ---

@@ -772,3 +772,22 @@ body.theme-light .dupe-warning i { color: var(--warn); }
   .partner-nudge { flex-direction: column; align-items: flex-start; }
   .partner-nudge-cta { align-self: stretch; justify-content: center; }
 }
+
+/* ── Anonymous usage stats card ──────────────────────────────────────────
+   The list inside comes from UsageStats.detailsHtml(); its styles live with
+   the consent prompt in updates.css. */
+
+.usage-details {
+  margin-top: 0.8rem;
+  padding-top: 0.7rem;
+  border-top: 1px solid var(--border-secondary);
+}
+
+.usage-details summary {
+  cursor: pointer;
+  font-size: 0.82rem;
+  color: var(--accent-cyan);
+  margin-bottom: 0.2rem;
+}
+
+.usage-details[open] summary { margin-bottom: 0.6rem; }

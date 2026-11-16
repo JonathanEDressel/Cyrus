@@ -18,7 +18,36 @@ class ProfileController {
     this.loadConnections();
     this.loadSupportedExchanges();
     this.loadAiStatus();
+    this.loadUsageStats();
     this.attachEventListeners();
+  }
+
+  /** The opt-in usage-stats card; stays hidden when the build has no collector. */
+  private async loadUsageStats(): Promise<void> {
+    const state = await UsageStats.state();
+    const card = document.getElementById('usage-card');
+    const toggle = document.getElementById('usage-toggle') as HTMLInputElement | null;
+    const details = document.getElementById('usage-details-body');
+    if (!card || !toggle || !state.available) return;
+    if (details) details.innerHTML = UsageStats.detailsHtml();
+    toggle.checked = state.consent === 'granted';
+    card.classList.remove('d-none');
+
+    toggle.addEventListener('change', async () => {
+      const granted = toggle.checked;
+      toggle.disabled = true;
+      try {
+        await UsageStats.setConsent(granted);
+        this.showSuccess('usage', granted
+          ? 'Thanks — anonymous usage stats are on'
+          : 'Usage stats are off, and what was sent has been deleted');
+      } catch {
+        toggle.checked = !granted;
+        this.showError('usage', 'Could not change the usage stats setting');
+      } finally {
+        toggle.disabled = false;
+      }
+    });
   }
 
   /** Show one pane at a time. Deep-linkable via ?tab= on the route params, so

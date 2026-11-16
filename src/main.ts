@@ -3,6 +3,7 @@ import * as path from 'path';
 import { spawn, execFileSync, ChildProcess } from 'child_process';
 import * as fs from 'fs';
 import { initUpdates } from './updater';
+import { initUsageStats, usageStatsQuit } from './usagestats';
 
 const PREFERRED_PORT = 5000;
 const IS_MAC = process.platform === 'darwin';
@@ -562,6 +563,8 @@ if (!app.requestSingleInstanceLock()) {
       // Installing quits for real rather than hiding to the tray.
       beforeInstall: () => { isQuitting = true; },
     });
+    // Opt-in anonymous usage stats; does nothing until the user agrees.
+    initUsageStats({ getWindow: () => mainWindow });
     const startHidden = process.argv.includes('--hidden');
     setTimeout(() => {
       startupWindowCreated = true;
@@ -582,6 +585,7 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', () => {
   isQuitting = true;
+  usageStatsQuit();
   if (trayPollTimer) {
     clearInterval(trayPollTimer);
     trayPollTimer = null;

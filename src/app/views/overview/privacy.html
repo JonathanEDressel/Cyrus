@@ -1,7 +1,7 @@
 <div class="page-container">
   <div class="overview-header">
     <h1 class="page-title"><i class="fa-solid fa-shield-halved me-2"></i>Privacy Policy</h1>
-    <p class="page-subtitle">How Cyrus handles your data — last updated March 2026</p>
+    <p class="page-subtitle">How Cyrus handles your data — last updated November 2026</p>
   </div>
 
   <!-- Headline banner -->
@@ -9,7 +9,7 @@
     <div class="privacy-banner-icon"><i class="fa-solid fa-lock"></i></div>
     <div class="privacy-banner-body">
       <strong>Your data never leaves your device.</strong>
-      Cyrus is a fully local application. No information you enter, generate, or store within this app is ever transmitted to, collected by, or stored on any server controlled by the developers of this software.
+      Cyrus is a fully local application. No information you enter, generate, or store within this app is ever transmitted to, collected by, or stored on any server controlled by the developers of this software. The one exception is optional and off by default: if you turn on <strong>anonymous usage stats</strong>, Cyrus sends a small check-in that contains none of that information (see below).
     </div>
   </div>
 
@@ -51,16 +51,18 @@
       <div class="privacy-card-header">
         <i class="fa-solid fa-wifi privacy-card-icon"></i>
         <h2 class="privacy-card-title">Network Communications</h2>
-        <span class="privacy-tag privacy-tag-exchange"><i class="fa-solid fa-arrow-right-arrow-left me-2"></i> Exchange APIs Only</span>
+        <span class="privacy-tag privacy-tag-exchange"><i class="fa-solid fa-arrow-right-arrow-left me-2"></i> Complete List</span>
       </div>
-      <p class="privacy-card-body">The only outbound network requests Cyrus makes are direct calls to the official REST APIs of exchanges you have connected. These requests occur when you:</p>
+      <p class="privacy-card-body">These are the only services Cyrus talks to over the internet. The last three happen only if you turn them on.</p>
       <ul class="privacy-list">
-        <li><i class="fa-solid fa-arrow-right privacy-list-icon-sm"></i><span>Load or refresh your open orders</span></li>
-        <li><i class="fa-solid fa-arrow-right privacy-list-icon-sm"></i><span>Load or refresh your whitelisted withdrawal addresses</span></li>
-        <li><i class="fa-solid fa-arrow-right privacy-list-icon-sm"></i><span>Validate a new API key connection in Profile</span></li>
-        <li><i class="fa-solid fa-arrow-right privacy-list-icon-sm"></i><span>An automation rule fires and executes a trade action</span></li>
+        <li><i class="fa-solid fa-arrow-right privacy-list-icon-sm"></i><span><strong>Your exchanges</strong> — when you load balances, orders or transfers, validate an API key, or an automation rule runs. These calls go directly to the exchange's official API using your own keys; the Cyrus developers receive no copy of them or their responses.</span></li>
+        <li><i class="fa-solid fa-arrow-right privacy-list-icon-sm"></i><span><strong>CoinGecko</strong> — coin fundamentals (market cap, supply, all-time highs) on the Holdings page. Only coin names such as "bitcoin" are sent; never balances, amounts or account details.</span></li>
+        <li><i class="fa-solid fa-arrow-right privacy-list-icon-sm"></i><span><strong>GitHub</strong> — checks whether a newer version of Cyrus has been released, and downloads it if you choose to update. The check carries nothing about you.</span></li>
+        <li><i class="fa-solid fa-arrow-right privacy-list-icon-sm"></i><span><strong>Cloudflare's public CDN</strong> — loads the icon font when the app opens.</span></li>
+        <li><i class="fa-solid fa-arrow-right privacy-list-icon-sm"></i><span><strong>Anthropic</strong> — only if you add your own API key for the AI assistant: your question and a summary of your portfolio, billed to your Anthropic account.</span></li>
+        <li><i class="fa-solid fa-arrow-right privacy-list-icon-sm"></i><span><strong>Your email provider</strong> — only if you turn on email notifications or the monthly report, through the mail server you set up in Profile.</span></li>
+        <li><i class="fa-solid fa-arrow-right privacy-list-icon-sm"></i><span><strong>Cyrus usage stats</strong> — only if you opt in. Anonymous check-ins, described below.</span></li>
       </ul>
-      <p class="privacy-card-body mt-1">All such requests are made using your own API keys, authenticated directly with the exchange. The Cyrus developers receive no copy of these requests or their responses.</p>
     </div>
 
     <!-- 4. API key security -->
@@ -79,19 +81,28 @@
       </ul>
     </div>
 
-    <!-- 5. No analytics or telemetry -->
+    <!-- 5. Optional anonymous usage stats -->
     <div class="privacy-card">
       <div class="privacy-card-header">
         <i class="fa-solid fa-chart-bar privacy-card-icon"></i>
-        <h2 class="privacy-card-title">No Analytics or Telemetry</h2>
-        <span class="privacy-tag privacy-tag-none"><i class="fa-solid fa-ban me-2"></i> Zero Tracking</span>
+        <h2 class="privacy-card-title">Anonymous Usage Stats (Optional)</h2>
+        <span class="privacy-tag privacy-tag-secure"><i class="fa-solid fa-toggle-off me-2"></i> Off Unless You Opt In</span>
       </div>
-      <p class="privacy-card-body">Cyrus does not include any of the following:</p>
+      <p class="privacy-card-body">After you first sign in, Cyrus asks whether you'd like to share anonymous usage stats. Nothing is sent unless you say yes, and you can change your answer any time in <strong>Profile &rarr; Account</strong>. If you opt in, Cyrus sends a small check-in when it starts, when you sign in or out, every five minutes while it's running, and when it quits. Each check-in contains only:</p>
       <ul class="privacy-list">
-        <li><i class="fa-solid fa-xmark privacy-list-icon-none"></i><span>Usage analytics or event tracking</span></li>
+        <li><i class="fa-solid fa-circle-check privacy-list-icon"></i><span><strong>A random install ID</strong> — created on this device when you opt in. It isn't derived from your account, hardware or anything else, and it's discarded when you opt out, so a later opt-in can't be linked to the earlier one.</span></li>
+        <li><i class="fa-solid fa-circle-check privacy-list-icon"></i><span><strong>The Cyrus version</strong> and your operating system and processor type (e.g. Windows x64, macOS arm64).</span></li>
+        <li><i class="fa-solid fa-circle-check privacy-list-icon"></i><span><strong>Whether the window is open</strong> or Cyrus is running in the tray, and <strong>whether someone is signed in</strong>.</span></li>
+        <li><i class="fa-solid fa-circle-check privacy-list-icon"></i><span><strong>What prompted it</strong> — start, sign-in, sign-out, routine check-in, or quit.</span></li>
+        <li><i class="fa-solid fa-circle-check privacy-list-icon"></i><span><strong>Your country</strong> — not sent by Cyrus, but looked up by the server from the connection the check-in arrives on (e.g. "United States"). Only the country is kept: never your region, city, or IP address. If you use a VPN, it records the VPN's country.</span></li>
+      </ul>
+      <p class="privacy-card-body mt-1">It never includes your username, email address, balances, holdings, exchanges, API keys, orders, automation rules, or anything else you enter into Cyrus. The check-ins go to a small server run by the Cyrus developer on Cloudflare. That server can see your IP address in order to reply, to limit abuse, and to look up your country, but <strong>does not store it</strong>. Records are deleted automatically 90 days after an install was last seen, and turning the setting off deletes them immediately.</p>
+      <p class="privacy-card-body mt-1">Cyrus does not include any of the following, whether or not you opt in:</p>
+      <ul class="privacy-list">
+        <li><i class="fa-solid fa-xmark privacy-list-icon-none"></i><span>Event tracking of what you do inside the app</span></li>
         <li><i class="fa-solid fa-xmark privacy-list-icon-none"></i><span>Crash reporting or error telemetry sent to external services</span></li>
         <li><i class="fa-solid fa-xmark privacy-list-icon-none"></i><span>Advertising identifiers or fingerprinting</span></li>
-        <li><i class="fa-solid fa-xmark privacy-list-icon-none"></i><span>Background syncing of any kind</span></li>
+        <li><i class="fa-solid fa-xmark privacy-list-icon-none"></i><span>Syncing of your data to any server</span></li>
         <li><i class="fa-solid fa-xmark privacy-list-icon-none"></i><span>Third-party SDKs that collect or transmit personal information</span></li>
       </ul>
     </div>
@@ -107,7 +118,7 @@
       <ul class="privacy-list">
         <li><i class="fa-solid fa-circle-check privacy-list-icon"></i><span><strong>Delete a connection</strong> — removes that exchange's API keys from the database immediately via the Profile page.</span></li>
         <li><i class="fa-solid fa-circle-check privacy-list-icon"></i><span><strong>Delete all data</strong> — uninstalling the application and deleting <code>%APPDATA%\Cyrus</code> (Windows) or <code>~/Library/Application Support/Cyrus</code> (macOS) removes everything permanently.</span></li>
-        <li><i class="fa-solid fa-circle-check privacy-list-icon"></i><span><strong>Offline use</strong> — Cyrus works entirely without an internet connection except when explicitly querying your exchanges.</span></li>
+        <li><i class="fa-solid fa-circle-check privacy-list-icon"></i><span><strong>Offline use</strong> — your account, rules and history are stored locally and stay available without an internet connection; only the services listed above need one.</span></li>
       </ul>
     </div>
 

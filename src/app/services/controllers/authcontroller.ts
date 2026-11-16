@@ -14,6 +14,7 @@ class AuthController {
       ApiKeyState.setStatus('has_unvalidated');
     }
 
+    UsageStats.signedIn(true);
     return user;
   }
 
@@ -34,6 +35,7 @@ class AuthController {
     ApiKeyState.reset();
     localStorage.removeItem(AppConfig.TOKEN_KEY);
     localStorage.removeItem(AppConfig.USER_KEY);
+    UsageStats.signedOut();
   }
 
   static getToken(): string | null {
