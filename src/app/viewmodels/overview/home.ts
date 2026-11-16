@@ -34,6 +34,64 @@ interface CapRow {
   overBy: number | null;
 }
 
+/** Every widget the Overview can show. Each one's markup is a <template> in home.html. */
+const OVERVIEW_WIDGETS: DashWidgetDef[] = [
+  { type: 'stats', title: 'Headline numbers', icon: 'fa-gauge-high', template: 'tpl-widget-stats',
+    description: 'Portfolio value, 24h change, orders, automations and caps at a glance.',
+    defaultW: 12, minW: 4, bare: true },
+  { type: 'portfolio', title: 'Portfolio', icon: 'fa-chart-pie', template: 'tpl-widget-portfolio',
+    description: 'A doughnut of what you hold, by share of the total.',
+    defaultW: 6, minW: 3, minH: 220 },
+  { type: 'live-data', title: 'Live price chart', icon: 'fa-chart-line', template: 'tpl-widget-live-data',
+    description: 'A live chart for any pair you track, with time ranges.',
+    defaultW: 6, minW: 4, minH: 260 },
+  { type: 'holdings', title: 'Biggest holdings', icon: 'fa-coins', template: 'tpl-widget-holdings',
+    description: 'Your five largest positions with seven-day trend lines.',
+    defaultW: 6, minW: 3 },
+  { type: 'limits', title: 'Resting limit orders', icon: 'fa-arrow-right-arrow-left', template: 'tpl-widget-limits',
+    description: 'Buys against sells, and the newest orders waiting for their price.',
+    defaultW: 6, minW: 3 },
+  { type: 'caps', title: 'Allocation caps', icon: 'fa-scale-balanced', template: 'tpl-widget-caps',
+    description: 'How close each capped coin is to its limit.',
+    defaultW: 6, minW: 3 },
+  { type: 'activity', title: 'Recent activity', icon: 'fa-bolt', template: 'tpl-widget-activity',
+    description: 'The latest automation runs, and whether the engine is live.',
+    defaultW: 6, minW: 3 },
+  { type: 'flow', title: 'Flow', icon: 'fa-diagram-project', template: 'tpl-widget-flow',
+    description: 'Where your automations and open orders move funds.',
+    defaultW: 12, minW: 6, minH: 240 },
+  { type: 'movers', title: 'Top movers', icon: 'fa-arrow-trend-up', template: 'tpl-widget-movers',
+    description: 'Your holdings that rose or fell the most in the last day.',
+    defaultW: 4, minW: 3 },
+  { type: 'accounts', title: 'Accounts', icon: 'fa-building-columns', template: 'tpl-widget-accounts',
+    description: 'What each connected exchange account holds, and its open orders.',
+    defaultW: 4, minW: 3 },
+  { type: 'transfers', title: 'Recent transfers', icon: 'fa-right-left', template: 'tpl-widget-transfers',
+    description: 'Your latest deposits and withdrawals across exchanges.',
+    defaultW: 6, minW: 3 },
+  { type: 'actions', title: 'Quick actions', icon: 'fa-rocket', template: 'tpl-widget-actions',
+    description: 'One-click shortcuts to the things you do most.',
+    defaultW: 4, minW: 3 },
+  { type: 'notes', title: 'Notes', icon: 'fa-note-sticky', template: 'tpl-widget-notes',
+    description: 'A scratchpad for targets and reminders, saved with your layout.',
+    defaultW: 4, minW: 3, minH: 160 },
+];
+
+/** The Overview as it was before it could be customised. */
+const DEFAULT_OVERVIEW_LAYOUT: DashLayout = {
+  version: 1,
+  widgets: [
+    { type: 'stats', w: 12, h: null },
+    { type: 'portfolio', w: 6, h: null },
+    { type: 'live-data', w: 6, h: null },
+    { type: 'holdings', w: 6, h: null },
+    { type: 'limits', w: 6, h: null },
+    { type: 'caps', w: 6, h: null },
+    { type: 'activity', w: 6, h: null },
+    { type: 'flow', w: 12, h: null },
+  ],
+};
+
 class HomeController {
   private unsubscribe: (() => void) | null = null;
   private charts: Map<string, ChartInstance> = new Map();
@@ -63,15 +121,43 @@ class HomeController {
   private logsLoaded = false;
   private logsAt = 0;
   private worker: any = null;
+  private watchlistLoaded = false;
+  private transfers: TransferRow[] = [];
+  private transfersError = false;
+  private transfersSig = '';
+
+  // Customisable layout.
+  private grid: DashboardGrid | null = null;
+  private saveTimer: ReturnType<typeof setTimeout> | null = null;
+  private saveStateTimer: ReturnType<typeof setTimeout> | null = null;
+  private pendingLayout: DashLayout | null = null;
+  private hasPendingSave = false;
 
   constructor() {
-    this.init();
+    void this.init();
   }
 
-  private init(): void {
-    this.initCollapsibleSections();
-    this.bindFlowTabs();
-    this.attachEventListeners();
+  private async init(): Promise<void> {
+    document.getElementById('ov-refresh')?.addEventListener('click', () => this.refreshAll());
+    this.bindEditControls();
+
+    const gridEl = document.getElementById('ov-grid');
+    if (!gridEl) return;
+    const layout = await this.loadLayout();
+    // The page may have been left while the layout was loading.
+    if (!document.getElementById('ov-grid')) return;
+
+    this.grid = new DashboardGrid({
+      grid: gridEl,
+      catalog: OVERVIEW_WIDGETS,
+      layout,
+      onMount: (w, el) => this.mountWidget(w, el),
+      onUnmount: (w) => this.unmountWidget(w),
+      onResize: (w) => this.resizeWidget(w),
+      onChange: (next) => this.scheduleSave(next),
+    });
+    this.grid.render();
+
     this.loadDashboardData();
     // Portfolio value-over-time chart disabled for now.
     // this.initPortfolioHistory();
@@ -81,6 +167,7 @@ class HomeController {
       this.loadRules();
       this.loadHoldings();
       this.loadActivity();
+      if (this.grid?.has('transfers')) this.maybeReloadTransfers();
     });
 
     this.tickerTimer = setInterval(() => this.refreshAllTickers(), 5_000);
@@ -89,15 +176,18 @@ class HomeController {
     // Portfolio history chart disabled for now.
     // this.historyTimer = setInterval(() => this.pfHistory?.reload(), 5 * 60_000);
 
+    // The grid, not any one widget, marks the page: a widget can be removed.
     const observer = new MutationObserver(() => {
-      if (!document.getElementById('live-data-charts')) {
+      if (!document.getElementById('ov-grid')) {
         if (this.unsubscribe) this.unsubscribe();
         if (this.tickerTimer) { clearInterval(this.tickerTimer); this.tickerTimer = null; }
         if (this.chartTimer) { clearInterval(this.chartTimer); this.chartTimer = null; }
         if (this.holdingsTimer) { clearInterval(this.holdingsTimer); this.holdingsTimer = null; }
         if (this.historyTimer) { clearInterval(this.historyTimer); this.historyTimer = null; }
         if (this.pfHistory) { this.pfHistory.destroy(); this.pfHistory = null; }
+        void this.flushSave();
         this.destroyAllCharts();
+        document.removeEventListener('keydown', this.onKeydown);
         observer.disconnect();
       }
     });
@@ -105,8 +195,177 @@ class HomeController {
     if (content) observer.observe(content, { childList: true });
   }
 
+  // ── Layout: load, save, edit mode ───────────────────────────────
+
+  /** Local copy of the layout, per user, so a failed fetch still shows theirs. */
+  private layoutCacheKey(): string {
+    return `cyrus_overview_layout_${AuthController.getUser()?.id ?? 'anon'}`;
+  }
+
+  private async loadLayout(): Promise<DashLayout> {
+    const fallback = DashboardGrid.clone(DEFAULT_OVERVIEW_LAYOUT);
+    try {
+      const saved = await UserController.getDashboardLayout();
+      try { localStorage.setItem(this.layoutCacheKey(), JSON.stringify(saved)); } catch {}
+      return DashboardGrid.normalize(saved, OVERVIEW_WIDGETS, fallback);
+    } catch {
+      let cached: any = null;
+      try { cached = JSON.parse(localStorage.getItem(this.layoutCacheKey()) || 'null'); } catch {}
+      return DashboardGrid.normalize(cached, OVERVIEW_WIDGETS, fallback);
+    }
+  }
+
+  private scheduleSave(layout: DashLayout | null): void {
+    this.pendingLayout = layout;
+    this.hasPendingSave = true;
+    try { localStorage.setItem(this.layoutCacheKey(), JSON.stringify(layout)); } catch {}
+    this.setSaveState('Saving…');
+    if (this.saveTimer) clearTimeout(this.saveTimer);
+    this.saveTimer = setTimeout(() => { void this.flushSave(); }, 700);
+  }
+
+  private async flushSave(): Promise<void> {
+    if (this.saveTimer) { clearTimeout(this.saveTimer); this.saveTimer = null; }
+    if (!this.hasPendingSave) return;
+    const layout = this.pendingLayout;
+    this.hasPendingSave = false;
+    try {
+      await UserController.saveDashboardLayout(layout);
+      if (!this.hasPendingSave) this.setSaveState('Saved', true);
+    } catch {
+      this.setSaveState('Couldn’t save — kept on this device');
+    }
+  }
+
+  private setSaveState(text: string, fade = false): void {
+    const el = document.getElementById('dash-save-state');
+    if (!el) return;
+    el.textContent = text;
+    if (this.saveStateTimer) clearTimeout(this.saveStateTimer);
+    if (fade) this.saveStateTimer = setTimeout(() => { el.textContent = ''; }, 2500);
+  }
+
+  private bindEditControls(): void {
+    document.getElementById('dash-edit-btn')?.addEventListener('click', () => this.setEditing(true));
+    document.getElementById('dash-done-btn')?.addEventListener('click', () => this.setEditing(false));
+    document.getElementById('dash-add-btn')?.addEventListener('click', () => this.openPicker());
+    document.getElementById('dash-reset-btn')?.addEventListener('click', () => {
+      if (!this.grid) return;
+      if (!window.confirm('Reset the Overview to its default widgets and sizes? Your notes are cleared too.')) return;
+      this.grid.replace(DashboardGrid.clone(DEFAULT_OVERVIEW_LAYOUT));
+      // null tells the server "use the default", so later defaults apply too.
+      this.scheduleSave(null);
+    });
+    document.getElementById('dash-picker-close')?.addEventListener('click', () => this.closePicker());
+    document.getElementById('dash-picker')?.addEventListener('click', (e) => {
+      if ((e.target as HTMLElement).id === 'dash-picker') this.closePicker();
+    });
+    document.getElementById('dash-picker-list')?.addEventListener('click', (e) => {
+      const btn = (e.target as HTMLElement).closest<HTMLElement>('[data-add-widget]');
+      if (!btn || !this.grid) return;
+      const el = this.grid.add(btn.getAttribute('data-add-widget')!);
+      this.closePicker();
+      el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+    document.addEventListener('keydown', this.onKeydown);
+  }
+
+  private onKeydown = (e: KeyboardEvent): void => {
+    if (e.key !== 'Escape') return;
+    const picker = document.getElementById('dash-picker');
+    if (picker && !picker.classList.contains('d-none')) { this.closePicker(); return; }
+    if (this.grid?.isEditing()) this.setEditing(false);
+  };
+
+  private setEditing(on: boolean): void {
+    if (!this.grid) return;
+    this.grid.setEditing(on);
+    document.getElementById('dash-edit-tools')?.classList.toggle('d-none', !on);
+    document.getElementById('dash-edit-btn')?.classList.toggle('d-none', on);
+    document.getElementById('dash-edit-hint')?.classList.toggle('d-none', !on);
+    if (!on) {
+      this.closePicker();
+      void this.flushSave();
+      document.getElementById('dash-edit-btn')?.focus();
+    }
+  }
+
+  private openPicker(): void {
+    const list = document.getElementById('dash-picker-list');
+    if (!list || !this.grid) return;
+    list.innerHTML = OVERVIEW_WIDGETS.map((d) => {
+      const added = this.grid!.has(d.type);
+      return `<button type="button" class="dash-picker-item" ${added ? 'disabled' : `data-add-widget="${d.type}"`}>
+        <span class="dash-picker-icon"><i class="fa-solid ${d.icon}" aria-hidden="true"></i></span>
+        <span class="dash-picker-text">
+          <span class="dash-picker-name">${this.escapeHtml(d.title)}</span>
+          <span class="dash-picker-desc">${this.escapeHtml(d.description)}</span>
+        </span>
+        <span class="dash-picker-state">${added ? 'On the page' : '<i class="fa-solid fa-plus" aria-hidden="true"></i> Add'}</span>
+      </button>`;
+    }).join('');
+    document.getElementById('dash-picker')?.classList.remove('d-none');
+    list.querySelector<HTMLElement>('[data-add-widget]')?.focus();
+  }
+
+  private closePicker(): void {
+    document.getElementById('dash-picker')?.classList.add('d-none');
+  }
+
+  // ── Widgets: mount, unmount, resize ─────────────────────────────
+
+  /** Fill in and wire up a widget that was just stamped into the grid. */
+  private mountWidget(w: DashWidget, el: HTMLElement): void {
+    this.initCollapsibleSections(el);
+    switch (w.type) {
+      case 'stats': this.renderStats(); break;
+      case 'portfolio': this.renderPortfolioChart(); break;
+      case 'live-data':
+        this.bindLiveData();
+        this.populateSelector();
+        if (this.activeSymbol) void this.renderActiveChart();
+        else if (this.watchlistLoaded) this.showEmptyState();
+        break;
+      case 'holdings': this.renderHoldingsList(); break;
+      case 'limits': this.renderLimitOrders(); break;
+      case 'caps': this.renderCaps(); break;
+      case 'activity': this.renderActivity(); break;
+      case 'flow':
+        this.bindFlowTabs();
+        this.renderRuleFlow();
+        if (!ExchangeStore.error) {
+          const ordersChart = document.getElementById('overview-orders-chart');
+          if (ordersChart) OrderFlow.render(ordersChart, ExchangeStore.openOrders);
+        }
+        break;
+      case 'movers': this.renderMovers(); break;
+      case 'accounts': this.renderAccounts(); break;
+      case 'transfers': void this.loadTransfers(); break;
+      case 'notes': this.bindNotes(); break;
+    }
+  }
+
+  private unmountWidget(w: DashWidget): void {
+    if (w.type === 'live-data') this.destroyAllCharts();
+  }
+
+  private resizeWidget(w: DashWidget): void {
+    // The live chart follows its box through its own ResizeObserver and the
+    // doughnut is an SVG that scales; the flow graphs lay out by width.
+    if (w.type === 'flow') {
+      this.renderRuleFlow();
+      const ordersChart = document.getElementById('overview-orders-chart');
+      if (ordersChart && !ExchangeStore.error) OrderFlow.render(ordersChart, ExchangeStore.openOrders);
+    }
+  }
+
   private bindFlowTabs(): void {
-    document.getElementById('overview-flow-tab-strip')?.addEventListener('click', (e) => {
+    const strip = document.getElementById('overview-flow-tab-strip');
+    // A re-added widget starts from the markup's default; show the tab in use.
+    strip?.querySelectorAll('.rules-tab-btn').forEach(b =>
+      b.classList.toggle('active', b.getAttribute('data-tab') === this.flowTab));
+    this.applyFlowTab();
+    strip?.addEventListener('click', (e) => {
       const btn = (e.target as HTMLElement).closest('.rules-tab-btn') as HTMLElement | null;
       if (!btn) return;
       const tab = btn.getAttribute('data-tab') as 'automations' | 'orders';
@@ -114,20 +373,23 @@ class HomeController {
       this.flowTab = tab;
       document.querySelectorAll('#overview-flow-tab-strip .rules-tab-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
-      const flowChart = document.getElementById('overview-flow-chart');
-      const ordersChart = document.getElementById('overview-orders-chart');
-      const openLink = document.getElementById('overview-flow-open-link');
-      flowChart?.classList.toggle('d-none', tab !== 'automations');
-      ordersChart?.classList.toggle('d-none', tab !== 'orders');
-      if (openLink) openLink.setAttribute('data-route', tab === 'automations' ? 'commands' : 'openorders');
+      this.applyFlowTab();
       if (tab === 'orders') {
-        OrderFlow.render(ordersChart!, ExchangeStore.openOrders);
+        OrderFlow.render(document.getElementById('overview-orders-chart')!, ExchangeStore.openOrders);
       }
     });
   }
 
-  private initCollapsibleSections(): void {
-    document.querySelectorAll('.section-header[data-collapse]').forEach((header) => {
+  private applyFlowTab(): void {
+    const tab = this.flowTab;
+    document.getElementById('overview-flow-chart')?.classList.toggle('d-none', tab !== 'automations');
+    document.getElementById('overview-orders-chart')?.classList.toggle('d-none', tab !== 'orders');
+    document.getElementById('overview-flow-open-link')
+      ?.setAttribute('data-route', tab === 'automations' ? 'commands' : 'openorders');
+  }
+
+  private initCollapsibleSections(root: ParentNode): void {
+    root.querySelectorAll('.section-header[data-collapse]').forEach((header) => {
       const key = header.getAttribute('data-collapse')!;
       const section = header.closest('.overview-section') as HTMLElement | null;
       if (!section) return;
@@ -140,19 +402,14 @@ class HomeController {
       header.addEventListener('click', (e) => {
         // Buttons and the "Open" links inside the header do their own thing.
         if ((e.target as HTMLElement).closest('button, a')) return;
+        if (this.grid?.isEditing()) return;
         const isCollapsed = section.classList.toggle('collapsed');
         sessionStorage.setItem(`section-collapsed-${key}`, isCollapsed ? '1' : '0');
       });
     });
   }
 
-  private attachEventListeners(): void {
-    // Stat tiles and panel links navigate via their data-route attribute
-    // (handled globally by the router), so no per-card click wiring is needed.
-
-    document.getElementById('ov-refresh')?.addEventListener('click', () => this.refreshAll());
-
-    // Live Data: Add Crypto button
+  private bindLiveData(): void {
     document.getElementById('add-crypto-btn')?.addEventListener('click', () => {
       this.showAddCryptoModal();
     });
@@ -197,6 +454,7 @@ class HomeController {
         this.loadHoldings(true),
         this.loadRules(),
         this.loadActivity(true),
+        this.grid?.has('transfers') ? this.loadTransfers() : Promise.resolve(),
       ]);
     } finally {
       btn?.classList.remove('is-busy');
@@ -269,15 +527,20 @@ class HomeController {
 
   /** Everything that depends on the holdings payload. */
   private renderPortfolio(): void {
-    const chartEl = document.getElementById('portfolio-chart');
-    const positions: any[] = this.holdings?.positions || [];
-    if (chartEl) {
-      PortfolioChart.render(chartEl, positions, Number(this.holdings?.total_usd || 0));
-    }
+    this.renderPortfolioChart();
     this.renderHoldingsList();
+    this.renderMovers();
+    this.renderAccounts();
     this.renderCaps();
     this.renderStats();
     this.renderMeta();
+  }
+
+  private renderPortfolioChart(): void {
+    const chartEl = document.getElementById('portfolio-chart');
+    if (!chartEl || !this.holdings) return;
+    const positions: any[] = this.holdings.positions || [];
+    PortfolioChart.render(chartEl, positions, Number(this.holdings.total_usd || 0));
   }
 
   /** Total 24h move in dollars, and what that was as a percentage. */
@@ -580,25 +843,22 @@ class HomeController {
       this.rulesError = true;
     }
 
-    const isAll = ExchangeStore.isAllMode();
-    const activeId = ExchangeStore.activeMode;
-    const scoped = isAll
-      ? this.rules
-      : this.rules.filter((r: any) => r.trigger_exchange_id === activeId);
+    this.renderRuleFlow();
+    this.renderCaps();
+    this.renderActivity();
+    this.renderStats();
+  }
 
+  private renderRuleFlow(): void {
     const flowChart = document.getElementById('overview-flow-chart');
     if (flowChart) {
-      RuleFlow.render(flowChart, scoped, {
+      RuleFlow.render(flowChart, this.scopedRules(), {
         exchangeName: (id) => ExchangeStore.getExchangeName(id),
         // Same affordance as the Automations page, but the editor lives there —
         // hand the rule over and let that page open it.
         onSelectRule: (rule) => router.navigate('commands', { editRuleId: String(rule.id) }),
       });
     }
-
-    this.renderCaps();
-    this.renderActivity();
-    this.renderStats();
   }
 
   /** Rules in scope for the selected exchange. */
@@ -798,6 +1058,7 @@ class HomeController {
       const resp = await WatchlistData.getWatchlist(token);
       const items: any[] = resp.data || [];
       this.watchlistSymbols = items.map((i: any) => i.symbol);
+      this.watchlistLoaded = true;
 
       if (this.watchlistSymbols.length === 0) {
         this.activeSymbol = null;
@@ -896,7 +1157,7 @@ class HomeController {
     const textColor    = theme.text;
     const chart = LightweightCharts.createChart(chartEl, {
       width: chartEl.clientWidth,
-      height: 280,
+      height: chartEl.clientHeight || 280,
       layout: {
         background: { type: 'solid', color: 'transparent' },
         textColor,
@@ -953,7 +1214,7 @@ class HomeController {
       if (this.charts.get(symbol) !== inst) return;
       if (chartEl.clientWidth > 0) {
         try {
-          chart.applyOptions({ width: chartEl.clientWidth });
+          chart.applyOptions({ width: chartEl.clientWidth, height: chartEl.clientHeight || 280 });
           chart.timeScale().fitContent();
         } catch { /* disposed */ }
       }
@@ -1198,8 +1459,168 @@ class HomeController {
     }
 
     this.renderLimitOrders();
+    this.renderAccounts();
     this.renderStats();
     this.renderMeta();
+  }
+
+  // ── Extra widgets: movers, accounts, transfers, notes ───────────
+
+  /** Biggest 24h moves among what you hold, up and down. */
+  private renderMovers(): void {
+    const host = document.getElementById('ov-movers-list');
+    if (!host || !this.holdings) return;
+
+    const priced = (this.holdings.positions || [])
+      .filter((p: any) => !p.is_cash && p.info?.change_24h_pct != null);
+    if (priced.length === 0) {
+      host.innerHTML = this.holdingsError
+        ? '<p class="ov-empty"><i class="fa-solid fa-triangle-exclamation"></i>Could not value your holdings right now.</p>'
+        : '<p class="ov-empty"><i class="fa-solid fa-arrow-trend-up"></i>No price moves to show yet.</p>';
+      return;
+    }
+
+    const byChange = priced.slice().sort((a: any, b: any) =>
+      this.toNumber(b.info.change_24h_pct) - this.toNumber(a.info.change_24h_pct));
+    const up = byChange.filter((p: any) => this.toNumber(p.info.change_24h_pct) > 0).slice(0, 3);
+    const down = byChange.filter((p: any) => this.toNumber(p.info.change_24h_pct) < 0).reverse().slice(0, 3);
+
+    const row = (p: any) => {
+      const change = this.toNumber(p.info.change_24h_pct);
+      const usd = p.value_change_24h_usd;
+      return `<div class="ov-row ov-mover">
+        <span class="ov-hold-name">
+          <span class="ov-badge">${this.escapeHtml(p.asset)}</span>
+          <span>${this.escapeHtml(p.info.name || '')}</span>
+        </span>
+        <span class="ov-num">
+          <span class="${this.tone(change)}">${this.fmtPct(change)}</span>
+          <span class="ov-sub">${usd != null ? `${usd >= 0 ? '+' : '−'}${this.fmtUsd(Math.abs(usd))}` : ''}</span>
+        </span>
+      </div>`;
+    };
+    const group = (label: string, list: any[]) => list.length
+      ? `<div class="ov-group-label">${label}</div>${list.map(row).join('')}` : '';
+
+    host.innerHTML = group('Up', up) + group('Down', down)
+      || '<p class="ov-empty"><i class="fa-solid fa-minus"></i>Nothing moved in the last day.</p>';
+  }
+
+  /** What each connected exchange account holds, and its share of the total. */
+  private renderAccounts(): void {
+    const host = document.getElementById('ov-accounts-list');
+    if (!host) return;
+
+    const conns = ExchangeStore.connections;
+    const chip = document.getElementById('ov-accounts-chip');
+    if (chip) {
+      chip.textContent = conns.length ? String(conns.length) : '';
+      chip.classList.toggle('d-none', conns.length === 0);
+    }
+    if (conns.length === 0) {
+      host.innerHTML = '<p class="ov-empty"><i class="fa-solid fa-plug"></i>'
+        + 'No exchanges connected. <a href="#" data-route="profile">Connect one</a></p>';
+      return;
+    }
+    if (!this.holdings) return;
+
+    const { total } = this.connectionWeights();
+    const grand = Array.from(total.values()).reduce((s, v) => s + v, 0);
+    const orders = new Map<number, number>();
+    for (const o of ExchangeStore.openOrders) {
+      if (o.connectionId != null) orders.set(o.connectionId, (orders.get(o.connectionId) || 0) + 1);
+    }
+    const scoped = ExchangeStore.isAllMode()
+      ? conns
+      : conns.filter(c => c.id === ExchangeStore.activeMode);
+
+    const rows = scoped
+      .map(c => ({ c, value: total.get(c.id) ?? null }))
+      .sort((a, b) => (b.value ?? -1) - (a.value ?? -1))
+      .map(({ c, value }) => {
+        const share = value != null && grand > 0 ? (value / grand) * 100 : null;
+        const count = orders.get(c.id) || 0;
+        return `<div class="ov-row ov-account">
+          <span class="ov-account-name">
+            <span class="ov-badge">${this.escapeHtml(c.exchange_name)}</span>
+            <span>${this.escapeHtml(ExchangeStore.getExchangeName(c.id))}</span>
+          </span>
+          <span class="ov-cap-bar" title="${this.escapeAttr(share != null ? `${this.fmtPct(share, false)} of everything you hold` : 'Not valued')}">
+            <span class="ov-cap-fill" style="width:${(share ?? 0).toFixed(1)}%"></span>
+          </span>
+          <span class="ov-num">
+            ${value != null ? this.fmtUsd(value) : '—'}
+            <span class="ov-sub">${share != null ? this.fmtPct(share, false) : ''}${count ? ` · ${count} order${count === 1 ? '' : 's'}` : ''}</span>
+          </span>
+        </div>`;
+      }).join('');
+
+    host.innerHTML = rows;
+  }
+
+  /** The last few deposits and withdrawals, from Cyrus's local transfer history. */
+  private async loadTransfers(): Promise<void> {
+    const host = document.getElementById('ov-transfers-list');
+    if (!host) return;
+    const connId: number | 'all' = ExchangeStore.isAllMode() || typeof ExchangeStore.activeMode !== 'number'
+      ? 'all'
+      : ExchangeStore.activeMode;
+    this.transfersSig = String(ExchangeStore.activeMode);
+    try {
+      const page = await TransferController.getTransfers({ connId, limit: 6 });
+      this.transfers = page.items || [];
+      this.transfersError = false;
+    } catch {
+      this.transfersError = true;
+    }
+    this.renderTransfers();
+  }
+
+  private renderTransfers(): void {
+    const host = document.getElementById('ov-transfers-list');
+    if (!host) return;
+    if (this.transfersError && this.transfers.length === 0) {
+      host.innerHTML = '<p class="ov-empty"><i class="fa-solid fa-triangle-exclamation"></i>Could not load your transfers right now.</p>';
+      return;
+    }
+    if (this.transfers.length === 0) {
+      host.innerHTML = '<p class="ov-empty"><i class="fa-solid fa-right-left"></i>'
+        + 'No transfers recorded yet. <a href="#" data-route="transfers">Sync history</a></p>';
+      return;
+    }
+    host.innerHTML = this.transfers.map((t) => {
+      const inbound = t.kind === 'deposit';
+      return `<div class="ov-row ov-transfer">
+        <span class="ov-transfer-dir ${inbound ? 'ov-up' : 'ov-down'}" title="${inbound ? 'Deposit' : 'Withdrawal'}">
+          <i class="fa-solid ${inbound ? 'fa-arrow-down' : 'fa-arrow-up'}" aria-hidden="true"></i>
+        </span>
+        <span class="ov-transfer-body">
+          <span><span class="ov-badge">${this.escapeHtml(t.asset)}</span>
+            ${inbound ? '+' : '−'}${this.escapeHtml(this.fmtAmount(this.toNumber(t.amount)))}</span>
+          <span class="ov-sub">${inbound ? 'into' : 'out of'} ${this.escapeHtml(t.exchange_label || t.exchange_name)}${t.status ? ` · ${this.escapeHtml(t.status)}` : ''}</span>
+        </span>
+        <span class="ov-num">
+          ${t.usd_value != null ? this.fmtUsd(t.usd_value) : ''}
+          <span class="ov-sub">${this.relTime(t.occurred_at * 1000)}</span>
+        </span>
+      </div>`;
+    }).join('');
+  }
+
+  /** A free-text note, saved inside the layout document. */
+  private bindNotes(): void {
+    const area = document.getElementById('ov-notes') as HTMLTextAreaElement | null;
+    if (!area || !this.grid) return;
+    area.value = String(this.grid.config('notes').text || '');
+    area.addEventListener('input', () => {
+      this.grid?.updateConfig('notes', { text: area.value.slice(0, 4000) });
+    });
+  }
+
+  /** Transfers only change with the exchange selection; skip order-poll ticks. */
+  private maybeReloadTransfers(): void {
+    if (String(ExchangeStore.activeMode) === this.transfersSig) return;
+    void this.loadTransfers();
   }
 
   // ── Formatting ──────────────────────────────────────────────────

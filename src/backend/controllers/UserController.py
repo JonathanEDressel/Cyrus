@@ -1,3 +1,5 @@
+import json
+
 from flask import Blueprint, request
 from controllers.UserDbContext import UserDbContext
 from controllers.AuthDbContext import AuthDbContext
@@ -247,6 +249,50 @@ def update_donation_modal():
         return success_response(data=user.to_dict(), message="Donation modal preference saved")
     except Exception as e:
         return handle_error(e)
+
+# The layout is the client's own document — the server only checks its shape
+# and size, so a new widget type never needs a backend change.
+MAX_DASHBOARD_LAYOUT_BYTES = 64 * 1024
+
+
+@user_bp.route('/dashboard-layout', methods=['GET'])
+@token_required
+def get_dashboard_layout():
+    try:
+        raw = UserDbContext.get_dashboard_layout(request.user_id)
+        layout = None
+        if raw:
+            try:
+                layout = json.loads(raw)
+            except ValueError:
+                layout = None  # unreadable — the client falls back to its default
+        return success_response(data={'layout': layout})
+    except Exception as e:
+        return handle_error(e)
+
+
+@user_bp.route('/dashboard-layout', methods=['PUT'])
+@token_required
+def update_dashboard_layout():
+    try:
+        data = request.get_json()
+        if data is None or 'layout' not in data:
+            return bad_request("layout is required")
+        layout = data['layout']
+        if layout is None:
+            # Reset to the default layout.
+            UserDbContext.update_dashboard_layout(request.user_id, None)
+            return success_response(data={'layout': None}, message="Layout reset")
+        if not isinstance(layout, dict) or not isinstance(layout.get('widgets'), list):
+            return bad_request("layout must be an object with a widgets list")
+        encoded = json.dumps(layout, separators=(',', ':'))
+        if len(encoded.encode('utf-8')) > MAX_DASHBOARD_LAYOUT_BYTES:
+            return bad_request("layout is too large")
+        UserDbContext.update_dashboard_layout(request.user_id, encoded)
+        return success_response(data={'layout': layout}, message="Layout saved")
+    except Exception as e:
+        return handle_error(e)
+
 
 @user_bp.route('/update-theme', methods=['PUT'])
 @token_required

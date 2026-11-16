@@ -91,6 +91,20 @@ class UserController {
     return response.result;
   }
 
+  /** The saved Overview layout, or null when the user never customised it. */
+  static async getDashboardLayout(): Promise<any | null> {
+    const token = AuthController.getToken();
+    if (!token) throw new Error('Not authenticated');
+    const response = await UserData.getDashboardLayout(token);
+    return response.data?.layout ?? null;
+  }
+
+  static async saveDashboardLayout(layout: any | null): Promise<void> {
+    const token = AuthController.getToken();
+    if (!token) throw new Error('Not authenticated');
+    await UserData.saveDashboardLayout(layout, token);
+  }
+
   static async updateTheme(theme: string): Promise<void> {
     const token = AuthController.getToken();
     if (!token) throw new Error('Not authenticated');

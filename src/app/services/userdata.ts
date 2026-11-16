@@ -74,6 +74,15 @@ class UserData {
     );
   }
 
+  static async getDashboardLayout(token: string): Promise<ApiResponse<{ layout: any | null }>> {
+    return DataAccess.get(`${AppConfig.API_BASE}/user/dashboard-layout`, token);
+  }
+
+  /** `null` resets the Overview page to its default layout. */
+  static async saveDashboardLayout(layout: any | null, token: string): Promise<ApiResponse<{ layout: any | null }>> {
+    return DataAccess.put(`${AppConfig.API_BASE}/user/dashboard-layout`, { layout }, token);
+  }
+
   static async updateTheme(theme: string, token: string): Promise<ApiResponse<UserModel>> {
     return DataAccess.put(
       `${AppConfig.API_BASE}/user/update-theme`,

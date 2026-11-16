@@ -228,6 +228,13 @@ def run_column_migrations():
             conn.commit()
             print("[MIGRATION] Added anthropic_key_encrypted column to users")
 
+        # The Overview page's customised layout (which widgets, their order and
+        # size), as a JSON document. NULL means "use the default layout".
+        if not _has_column(conn, 'users', 'dashboard_layout'):
+            conn.execute('ALTER TABLE users ADD COLUMN dashboard_layout TEXT')
+            conn.commit()
+            print("[MIGRATION] Added dashboard_layout column to users")
+
         # Portfolio balancer (trigger_type = 'allocation_threshold'). The cap and
         # the rebalance-down-to target are stored as separate percentages: acting
         # exactly down to the cap would re-fire on the next tick, so a rule needs

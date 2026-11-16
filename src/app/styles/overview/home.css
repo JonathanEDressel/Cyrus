@@ -1153,3 +1153,476 @@ body.theme-light .ov-down { color: var(--neg); }
 body.theme-light .ov-warn { color: var(--warn); }
 body.theme-light .ov-meta-warn { color: var(--warn); }
 body.theme-light .ov-cap-over .ov-cap-fill { background: var(--warn); }
+
+/* ══ Customisable layout ═══════════════════════════════════════════════════ */
+
+.dash-grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 1.25rem;
+  align-items: stretch;
+  container-type: inline-size;
+}
+
+.dash-widget {
+  grid-column: span var(--w, 12);
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+/* Too narrow for side-by-side widgets: stack them. */
+@container (max-width: 760px) {
+  .dash-widget { grid-column: span 12; }
+}
+
+.dash-widget-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.dash-widget-body > .overview-section {
+  flex: 1;
+  min-height: 0;
+  margin-bottom: 0;
+}
+
+.dash-widget-body > .ov-stats {
+  margin-bottom: 0;
+}
+
+/* A fixed height: the content scrolls inside it. */
+.dash-widget.has-h .dash-widget-body > .ov-card,
+.dash-widget.has-h .dash-widget-body > .ov-stats {
+  overflow: auto;
+}
+
+/* A collapsed panel shouldn't hold its fixed height open. */
+.dash-widget.has-h:has(.overview-section.collapsed) {
+  height: auto !important;
+}
+
+/* The live chart and the doughnut grow into a fixed-height widget. */
+.dash-widget.has-h #live-data-charts,
+.dash-widget.has-h #live-data-charts .chart-card {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.dash-widget.has-h .live-data-panel {
+  overflow: hidden;
+}
+
+.dash-widget.has-h .chart-container {
+  flex: 1;
+  height: auto;
+  min-height: 140px;
+}
+
+.dash-widget.has-h #portfolio-chart {
+  min-height: 0;
+}
+
+.dash-widget.has-h #portfolio-chart .pf-svg {
+  max-height: 100%;
+}
+
+/* ── Edit mode ── */
+
+.dash-edit-bar {
+  display: none;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 4px 3px 2px;
+  margin-bottom: 6px;
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius);
+  background: var(--bg-tertiary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.dash-grid.is-editing .dash-edit-bar {
+  display: flex;
+}
+
+.dash-grid.is-editing .dash-widget {
+  outline: 1px dashed color-mix(in srgb, var(--accent-cyan) 55%, transparent);
+  outline-offset: 4px;
+}
+
+/* While arranging, the widgets themselves take no clicks, so a stray click
+   can neither navigate away nor fire an action. */
+.dash-grid.is-editing .dash-widget-body {
+  pointer-events: none;
+  user-select: none;
+}
+
+.dash-edit-title {
+  flex: 1;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dash-edit-title i { color: var(--accent-cyan); }
+
+.dash-edit-size {
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.dash-edit-actions {
+  display: inline-flex;
+  gap: 2px;
+}
+
+.dash-edit-bar button {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.dash-edit-bar button:hover,
+.dash-edit-bar button:focus-visible {
+  border-color: var(--border-primary);
+  color: var(--text-primary);
+}
+
+.dash-edit-bar .dash-grip { cursor: grab; }
+.dash-edit-bar .dash-grip:active { cursor: grabbing; }
+.dash-edit-bar .dash-remove:hover { color: var(--neg); }
+
+.dash-resize {
+  display: none;
+  position: absolute;
+  right: -5px;
+  bottom: -5px;
+  width: 16px;
+  height: 16px;
+  cursor: nwse-resize;
+  touch-action: none;
+  background: linear-gradient(135deg, transparent 50%, var(--accent-cyan) 50%);
+  border-bottom-right-radius: var(--radius);
+}
+
+.dash-grid.is-editing .dash-resize { display: block; }
+
+.dash-widget.is-dragging { opacity: 0.45; }
+
+.dash-grid.is-reordering,
+.dash-grid.is-reordering * {
+  cursor: grabbing !important;
+  user-select: none;
+}
+
+.dash-grid.is-editing .dash-edit-bar { user-select: none; }
+
+.dash-edit-bar .dash-grip { touch-action: none; }
+.dash-widget.is-resizing { outline-style: solid !important; }
+
+/* ── Header tools ── */
+
+.dash-tool-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.dash-tool-btn:hover,
+.dash-tool-btn:focus-visible {
+  border-color: var(--accent-cyan);
+  color: var(--text-primary);
+}
+
+.dash-tool-btn.dash-tool-primary {
+  background: var(--accent-cyan);
+  border-color: var(--accent-cyan);
+  color: var(--accent-ink);
+}
+
+.dash-edit-tools {
+  display: inline-flex;
+  gap: 6px;
+}
+
+.dash-save-state {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.dash-edit-hint {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: -0.25rem 0 1.1rem;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.dash-edit-hint > i:first-child { color: var(--accent-cyan); }
+
+/* ── Widget picker ── */
+
+.dash-picker {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.dash-picker-panel {
+  width: min(560px, 100%);
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius);
+  background: var(--bg-secondary);
+}
+
+.dash-picker-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border-primary);
+}
+
+.dash-picker-head h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.dash-picker-close {
+  border: none;
+  background: none;
+  color: var(--text-secondary);
+  font-size: 15px;
+  cursor: pointer;
+}
+
+.dash-picker-list {
+  overflow: auto;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.dash-picker-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px;
+  text-align: left;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.dash-picker-item:not(:disabled):hover,
+.dash-picker-item:not(:disabled):focus-visible {
+  border-color: var(--accent-cyan);
+  background: color-mix(in srgb, var(--accent-cyan) 6%, transparent);
+  outline: none;
+}
+
+.dash-picker-item:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.dash-picker-icon {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius);
+  color: var(--accent-cyan);
+}
+
+.dash-picker-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.dash-picker-name {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.dash-picker-desc {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.dash-picker-state {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--text-muted);
+}
+
+.dash-picker-item:not(:disabled) .dash-picker-state { color: var(--accent-cyan); }
+
+/* ── New widgets ── */
+
+.ov-group-label {
+  padding: 0.45rem 0 0.15rem;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.ov-list > .ov-group-label + .ov-row { border-top: none; }
+
+.ov-mover {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.ov-account {
+  grid-template-columns: minmax(0, 1.2fr) minmax(40px, 1fr) auto;
+}
+
+.ov-account-name {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.ov-account-name .ov-badge { text-transform: uppercase; }
+
+.ov-transfer {
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+}
+
+.ov-transfer-dir {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 1px solid currentColor;
+  border-radius: var(--radius);
+  font-size: 10px;
+}
+
+.ov-transfer-body {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ov-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 6px;
+}
+
+.ov-action {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 10px;
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 0.82rem;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.ov-action i { width: 16px; text-align: center; color: var(--accent-cyan); }
+
+.ov-action:hover,
+.ov-action:focus-visible {
+  border-color: var(--accent-cyan);
+  color: var(--text-primary);
+  outline: none;
+}
+
+.ov-notes-card .ov-notes {
+  flex: 1;
+  box-sizing: border-box;
+  /* Auto, not 100%: the card's own rules give it a margin, and a stretched
+     flex item fills what's left after it. */
+  width: auto;
+  align-self: stretch;
+  min-height: 120px;
+  resize: none;
+  padding: 8px 10px;
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius);
+  background: var(--input-bg, var(--bg-primary));
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.ov-notes-card .ov-notes:focus {
+  outline: none;
+  border-color: var(--accent-cyan);
+}

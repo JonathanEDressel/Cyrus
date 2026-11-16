@@ -7,16 +7,54 @@
     </div>
     <div class="ov-header-side">
       <span class="ov-meta" id="ov-meta"></span>
+      <span class="dash-save-state" id="dash-save-state" aria-live="polite"></span>
+      <div class="dash-edit-tools d-none" id="dash-edit-tools">
+        <button type="button" class="dash-tool-btn" id="dash-add-btn">
+          <i class="fa-solid fa-plus" aria-hidden="true"></i>Add widget
+        </button>
+        <button type="button" class="dash-tool-btn" id="dash-reset-btn" title="Go back to the default Overview layout">
+          <i class="fa-solid fa-rotate-left" aria-hidden="true"></i>Reset
+        </button>
+        <button type="button" class="dash-tool-btn dash-tool-primary" id="dash-done-btn">
+          <i class="fa-solid fa-check" aria-hidden="true"></i>Done
+        </button>
+      </div>
+      <button type="button" class="dash-tool-btn" id="dash-edit-btn" title="Move, resize, add and remove widgets">
+        <i class="fa-solid fa-sliders" aria-hidden="true"></i>Customize
+      </button>
       <button class="ov-refresh-btn" id="ov-refresh" title="Refresh everything on this page">
         <i class="fa-solid fa-rotate"></i>
       </button>
     </div>
   </div>
 
-  <!-- Headline numbers. Every tile links to the page it summarises. -->
-  <div class="ov-stats" id="ov-stats"></div>
+  <p class="dash-edit-hint d-none" id="dash-edit-hint">
+    <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
+    Drag <i class="fa-solid fa-grip-vertical" aria-hidden="true"></i> to move a widget, drag its bottom-right corner to resize it.
+    Changes save as you go.
+  </p>
 
-  <div class="overview-split">
+  <div class="dash-grid" id="ov-grid"></div>
+
+  <!-- Widget picker -->
+  <div class="dash-picker d-none" id="dash-picker" role="dialog" aria-modal="true" aria-labelledby="dash-picker-title">
+    <div class="dash-picker-panel">
+      <div class="dash-picker-head">
+        <h3 id="dash-picker-title">Add a widget</h3>
+        <button type="button" class="dash-picker-close" id="dash-picker-close" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="dash-picker-list" id="dash-picker-list"></div>
+    </div>
+  </div>
+
+  <!-- ═══ Widget templates — stamped into the grid by DashboardGrid ═══ -->
+
+  <!-- Headline numbers. Every tile links to the page it summarises. -->
+  <template id="tpl-widget-stats">
+    <div class="ov-stats" id="ov-stats"></div>
+  </template>
+
+  <template id="tpl-widget-portfolio">
     <div class="overview-section ov-card portfolio-panel">
       <div class="section-header" data-collapse="portfolio">
         <div class="section-header-left">
@@ -26,11 +64,11 @@
         <a href="#" class="btn-link-sm" data-route="holdings">Holdings <i class="fa-solid fa-arrow-right"></i></a>
       </div>
       <div id="portfolio-chart"></div>
-      <!-- Portfolio value-over-time chart (disabled for now) -->
-      <!-- <div id="portfolio-history"></div> -->
     </div>
+  </template>
 
-    <div class="overview-section ov-card" data-section="live-data">
+  <template id="tpl-widget-live-data">
+    <div class="overview-section ov-card live-data-panel" data-section="live-data">
       <div class="section-header">
         <div class="section-header-left">
           <h2 class="section-title">Live Data</h2>
@@ -60,9 +98,9 @@
         </div>
       </div>
     </div>
-  </div>
+  </template>
 
-  <div class="overview-split">
+  <template id="tpl-widget-holdings">
     <div class="overview-section ov-card">
       <div class="section-header" data-collapse="holdings">
         <div class="section-header-left">
@@ -76,7 +114,9 @@
         <p class="ov-loading">Valuing your holdings…</p>
       </div>
     </div>
+  </template>
 
+  <template id="tpl-widget-limits">
     <div class="overview-section ov-card">
       <div class="section-header" data-collapse="limits">
         <div class="section-header-left">
@@ -90,9 +130,9 @@
         <p class="ov-loading">Loading orders…</p>
       </div>
     </div>
-  </div>
+  </template>
 
-  <div class="overview-split">
+  <template id="tpl-widget-caps">
     <div class="overview-section ov-card">
       <div class="section-header" data-collapse="caps">
         <div class="section-header-left">
@@ -106,7 +146,9 @@
         <p class="ov-loading">Loading caps…</p>
       </div>
     </div>
+  </template>
 
+  <template id="tpl-widget-activity">
     <div class="overview-section ov-card">
       <div class="section-header" data-collapse="activity">
         <div class="section-header-left">
@@ -120,24 +162,104 @@
         <p class="ov-loading">Loading activity…</p>
       </div>
     </div>
-  </div>
+  </template>
 
-  <div class="overview-section ov-card" id="overview-flow-section">
-    <div class="section-header" data-collapse="flow">
-      <div class="section-header-left">
-        <i class="fa-solid fa-chevron-down collapse-chevron"></i>
-        <h2 class="section-title">Flow</h2>
-        <div class="orders-tab-strip" id="overview-flow-tab-strip">
-          <button class="rules-tab-btn active" data-tab="automations">Automations</button>
-          <button class="rules-tab-btn" data-tab="orders">Open Orders</button>
+  <template id="tpl-widget-flow">
+    <div class="overview-section ov-card" id="overview-flow-section">
+      <div class="section-header" data-collapse="flow">
+        <div class="section-header-left">
+          <i class="fa-solid fa-chevron-down collapse-chevron"></i>
+          <h2 class="section-title">Flow</h2>
+          <div class="orders-tab-strip" id="overview-flow-tab-strip">
+            <button class="rules-tab-btn active" data-tab="automations">Automations</button>
+            <button class="rules-tab-btn" data-tab="orders">Open Orders</button>
+          </div>
+        </div>
+        <a href="#" class="btn-link-sm" id="overview-flow-open-link" data-route="commands">Open <i class="fa-solid fa-arrow-right"></i></a>
+      </div>
+      <div class="flow-scroll-wrap">
+        <div id="overview-flow-chart"></div>
+        <div id="overview-orders-chart" class="d-none"></div>
+      </div>
+    </div>
+  </template>
+
+  <template id="tpl-widget-movers">
+    <div class="overview-section ov-card">
+      <div class="section-header" data-collapse="movers">
+        <div class="section-header-left">
+          <i class="fa-solid fa-chevron-down collapse-chevron"></i>
+          <h2 class="section-title">Top Movers</h2>
+          <span class="ov-chip">24h</span>
+        </div>
+        <a href="#" class="btn-link-sm" data-route="holdings">Open <i class="fa-solid fa-arrow-right"></i></a>
+      </div>
+      <div class="ov-list" id="ov-movers-list">
+        <p class="ov-loading">Valuing your holdings…</p>
+      </div>
+    </div>
+  </template>
+
+  <template id="tpl-widget-accounts">
+    <div class="overview-section ov-card">
+      <div class="section-header" data-collapse="accounts">
+        <div class="section-header-left">
+          <i class="fa-solid fa-chevron-down collapse-chevron"></i>
+          <h2 class="section-title">Accounts</h2>
+          <span class="ov-chip d-none" id="ov-accounts-chip"></span>
+        </div>
+        <a href="#" class="btn-link-sm" data-route="profile">Manage <i class="fa-solid fa-arrow-right"></i></a>
+      </div>
+      <div class="ov-list" id="ov-accounts-list">
+        <p class="ov-loading">Valuing your accounts…</p>
+      </div>
+    </div>
+  </template>
+
+  <template id="tpl-widget-transfers">
+    <div class="overview-section ov-card">
+      <div class="section-header" data-collapse="transfers">
+        <div class="section-header-left">
+          <i class="fa-solid fa-chevron-down collapse-chevron"></i>
+          <h2 class="section-title">Recent Transfers</h2>
+        </div>
+        <a href="#" class="btn-link-sm" data-route="transfers">Open <i class="fa-solid fa-arrow-right"></i></a>
+      </div>
+      <div class="ov-list" id="ov-transfers-list">
+        <p class="ov-loading">Loading transfers…</p>
+      </div>
+    </div>
+  </template>
+
+  <template id="tpl-widget-actions">
+    <div class="overview-section ov-card">
+      <div class="section-header">
+        <div class="section-header-left">
+          <h2 class="section-title">Quick Actions</h2>
         </div>
       </div>
-      <a href="#" class="btn-link-sm" id="overview-flow-open-link" data-route="commands">Open <i class="fa-solid fa-arrow-right"></i></a>
+      <div class="ov-actions">
+        <a href="#" class="ov-action" data-route="limitorders"><i class="fa-solid fa-layer-group"></i><span>Place limit orders</span></a>
+        <a href="#" class="ov-action" data-route="commands"><i class="fa-solid fa-bolt"></i><span>Build an automation</span></a>
+        <a href="#" class="ov-action" data-route="rebalancer"><i class="fa-solid fa-scale-balanced"></i><span>Set allocation caps</span></a>
+        <a href="#" class="ov-action" data-route="transfers"><i class="fa-solid fa-right-left"></i><span>Check transfers</span></a>
+        <a href="#" class="ov-action" data-route="taxes"><i class="fa-solid fa-file-invoice-dollar"></i><span>Review taxes</span></a>
+        <button type="button" class="ov-action" data-ai-open><i class="fa-solid fa-wand-magic-sparkles"></i><span>Ask the assistant</span></button>
+      </div>
     </div>
-    <div class="flow-scroll-wrap">
-      <div id="overview-flow-chart"></div>
-      <div id="overview-orders-chart" class="d-none"></div>
+  </template>
+
+  <template id="tpl-widget-notes">
+    <div class="overview-section ov-card ov-notes-card">
+      <div class="section-header">
+        <div class="section-header-left">
+          <h2 class="section-title">Notes</h2>
+        </div>
+      </div>
+      <textarea class="ov-notes" id="ov-notes" maxlength="4000" spellcheck="true"
+                placeholder="Targets, reminders, what you're watching… Saved with your layout."
+                aria-label="Notes"></textarea>
     </div>
-  </div>
+  </template>
 
 </div>

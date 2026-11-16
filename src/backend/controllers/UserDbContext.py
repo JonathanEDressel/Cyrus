@@ -58,6 +58,19 @@ class UserDbContext:
         return True
 
     @staticmethod
+    def get_dashboard_layout(user_id: int) -> Optional[str]:
+        row = execute_query_one('SELECT dashboard_layout FROM users WHERE id = ?', (user_id,))
+        return row.get('dashboard_layout') if row else None
+
+    @staticmethod
+    def update_dashboard_layout(user_id: int, layout_json: Optional[str]) -> bool:
+        execute_non_query(
+            'UPDATE users SET dashboard_layout = ? WHERE id = ?',
+            (layout_json, user_id)
+        )
+        return True
+
+    @staticmethod
     def update_theme(user_id: int, theme: str) -> bool:
         execute_non_query(
             'UPDATE users SET theme = ? WHERE id = ?',
