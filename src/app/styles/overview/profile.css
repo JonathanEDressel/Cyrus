@@ -234,6 +234,41 @@ body.theme-light .profile-chip-warn { color: var(--warn); }
 .profile-card .form-group { margin-bottom: 0.85rem; }
 .profile-card .form-group:last-of-type { margin-bottom: 0; }
 
+/* login.css (global via main.css) styles .form-check as a large selectable
+   card with a near-white checked background — unreadable here. The sandbox
+   option is a plain checkbox with its label beside it. */
+.profile-card .form-check {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0;
+}
+
+.profile-card .form-check-input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  padding: 0;
+  flex-shrink: 0;
+  accent-color: var(--accent-cyan);
+  cursor: pointer;
+}
+
+.profile-card .form-check-label,
+.profile-card .form-check-label:hover,
+.profile-card .form-check-input:checked + .form-check-label {
+  display: inline;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 500;
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--text-secondary);
+}
+
 .form-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
