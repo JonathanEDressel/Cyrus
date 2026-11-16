@@ -1,6 +1,6 @@
 ## New: Cyrus for Mac
 
-Cyrus now runs on macOS 12 or later, on both Apple Silicon and Intel Macs. Pick the download that matches your Mac:
+Cyrus now runs on macOS 13 (Ventura) or later, on both Apple Silicon and Intel Macs. Pick the download that matches your Mac:
 
 - **Apple Silicon (M1 and later):** `Cyrus-1.2.8-arm64.dmg`
 - **Intel:** `Cyrus-1.2.8-x64.dmg`

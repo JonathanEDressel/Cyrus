@@ -90,7 +90,7 @@ jobs:
             sleep 1
           done
           cat "$TMP/out.log"
-          PORT=$(grep -o 'CYRUS_PORT=[0-9]*' "$TMP/out.log" | head -1 | cut -d= -f2)
+          PORT=$(grep -o 'CYRUS_PORT=[0-9]*' "$TMP/out.log" | head -1 | cut -d= -f2 || true)
           test -n "$PORT"
           curl -fsS "http://127.0.0.1:$PORT/api/health"
           echo
@@ -132,7 +132,7 @@ jobs:
           "$APP/Contents/MacOS/Cyrus" > app.log 2>&1 &
           OK=0
           for i in $(seq 1 90); do
-            PORT=$(grep -o 'Resolved API port: [0-9]*' app.log 2>/dev/null | head -1 | grep -o '[0-9]*$')
+            PORT=$(grep -o 'Resolved API port: [0-9]*' app.log 2>/dev/null | head -1 | grep -o '[0-9]*$' || true)
             if [ -n "$PORT" ] && curl -fsS "http://127.0.0.1:$PORT/api/health" > health.json 2>/dev/null; then OK=1; break; fi
             sleep 1
           done
