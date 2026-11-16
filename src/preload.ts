@@ -1,6 +1,9 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
 contextBridge.exposeInMainWorld('cyrus', {
+  // 'win32' | 'darwin' | … — lets the UI show platform-appropriate hints
+  // (⌘K on macOS, Ctrl K elsewhere).
+  platform: process.platform,
   getBackendPort: (): Promise<number> => ipcRenderer.invoke('get-backend-port'),
   // Screenshot a region of the window (CSS-px rect) — used to capture charts
   // for the monthly report with full fidelity (fonts/icons/CSS). Returns a PNG

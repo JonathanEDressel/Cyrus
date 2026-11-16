@@ -10,6 +10,8 @@ release/
 src/backend/build/
 src/backend/dist/
 *.spec
+# The backend build spec is portable and CI builds the macOS backend from it.
+!src/backend/server.spec
 
 ./venv/
 

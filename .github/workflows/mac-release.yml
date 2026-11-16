@@ -1,0 +1,162 @@
+# Builds the macOS app (Apple Silicon + Intel) and attaches the .dmg files to
+# a GitHub release.
+#
+# Normal flow: the Windows installer is built locally and published with
+# `gh release create vX.Y.Z ...`. Publishing the release triggers this
+# workflow, which builds both Mac versions from that tag and uploads
+# Cyrus-X.Y.Z-arm64.dmg and Cyrus-X.Y.Z-x64.dmg to the same release.
+#
+# Run it by hand (Actions → macOS release → Run workflow) to test a build
+# without touching a release (upload unticked), or to rebuild and replace the
+# Mac files on an existing release (upload ticked).
+#
+# Signing: builds are ad-hoc signed (scripts/mac-adhoc-sign.js), so users get
+# a one-time "Open Anyway" step. To sign and notarize properly later, enrol in
+# the Apple Developer Program, add the secrets named below, uncomment the env
+# lines in the "Package" step, and in package.json set mac.identity to your
+# "Developer ID Application" name, mac.hardenedRuntime to true and
+# mac.notarize to true.
+name: macOS release
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Tag (or branch) to build, e.g. v1.2.8
+        required: true
+        default: main
+      upload:
+        description: Upload the .dmg files to the release for this tag
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: mac-release-${{ github.event.release.tag_name || inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: macOS ${{ matrix.arch }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm64
+            runner: macos-15
+          - arch: x64
+            runner: macos-15-intel
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    env:
+      TAG: ${{ github.event.release.tag_name || inputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Build the backend (PyInstaller)
+        working-directory: src/backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pyinstaller
+          python -m PyInstaller server.spec --noconfirm
+          ls -la dist/CyrusServer
+          test -x dist/CyrusServer/CyrusServer
+          # TLS certificates for the frozen Python (see Server.py)
+          find dist/CyrusServer -name cacert.pem | grep -q . || { echo "certifi bundle missing"; exit 1; }
+
+      - name: Smoke-test the backend
+        run: |
+          TMP=$(mktemp -d)
+          DATABASE_PATH="$TMP/ci.db" SECRET_KEY=ci-only API_PORT=5055 \
+            ./src/backend/dist/CyrusServer/CyrusServer > "$TMP/out.log" 2>&1 &
+          PID=$!
+          for i in $(seq 1 90); do
+            grep -q 'CYRUS_PORT=' "$TMP/out.log" && break
+            sleep 1
+          done
+          cat "$TMP/out.log"
+          PORT=$(grep -o 'CYRUS_PORT=[0-9]*' "$TMP/out.log" | head -1 | cut -d= -f2)
+          test -n "$PORT"
+          curl -fsS "http://127.0.0.1:$PORT/api/health"
+          echo
+          kill "$PID" || true
+
+      - name: Build the frontend
+        run: |
+          npm ci
+          npm run build
+
+      - name: Package (${{ matrix.arch }})
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          # For real signing + notarization later (see the note at the top):
+          # CSC_LINK: ${{ secrets.MAC_CERT_P12_BASE64 }}
+          # CSC_KEY_PASSWORD: ${{ secrets.MAC_CERT_PASSWORD }}
+          # APPLE_ID: ${{ secrets.APPLE_ID }}
+          # APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          # APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          # hdiutil occasionally fails with "Resource busy" on hosted runners;
+          # one retry clears it.
+          npx electron-builder --mac --${{ matrix.arch }} --publish never \
+            || { echo "Retrying package step"; sleep 10; npx electron-builder --mac --${{ matrix.arch }} --publish never; }
+          ls -la release
+
+      - name: Smoke-test the packaged app
+        run: |
+          APP=$(ls -d release/mac*/Cyrus.app | head -1)
+          echo "App: $APP"
+          codesign --verify --deep --strict --verbose=2 "$APP"
+          echo "Architectures: $(lipo -archs "$APP/Contents/MacOS/Cyrus")"
+          echo "Minimum macOS: $(/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' "$APP/Contents/Info.plist")"
+          test -x "$APP/Contents/Resources/backend/CyrusServer/CyrusServer"
+
+          # Launch the real app and wait for the backend it spawns to answer.
+          # Port 5000 is often held by macOS's AirPlay Receiver, in which case
+          # the backend picks another port — so read the one the app resolved.
+          "$APP/Contents/MacOS/Cyrus" > app.log 2>&1 &
+          OK=0
+          for i in $(seq 1 90); do
+            PORT=$(grep -o 'Resolved API port: [0-9]*' app.log 2>/dev/null | head -1 | grep -o '[0-9]*$')
+            if [ -n "$PORT" ] && curl -fsS "http://127.0.0.1:$PORT/api/health" > health.json 2>/dev/null; then OK=1; break; fi
+            sleep 1
+          done
+          cat app.log || true
+          if [ "$OK" != 1 ]; then echo "Packaged app's backend never answered"; exit 1; fi
+          echo "Health: $(cat health.json)"
+
+          # Quitting the app must take the backend with it (parent watchdog).
+          pkill -x Cyrus || true
+          for i in $(seq 1 30); do
+            pgrep -x CyrusServer > /dev/null || break
+            sleep 1
+          done
+          if pgrep -x CyrusServer > /dev/null; then echo "Backend outlived the app"; exit 1; fi
+          echo "Backend stopped with the app"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Cyrus-mac-${{ matrix.arch }}
+          path: release/Cyrus-*.dmg
+          if-no-files-found: error
+
+      - name: Attach to the release
+        if: github.event_name == 'release' || inputs.upload
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$TAG" release/Cyrus-*.dmg --clobber

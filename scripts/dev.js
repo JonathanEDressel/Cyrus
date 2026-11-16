@@ -26,9 +26,12 @@ function log(msg) {
 }
 
 function findPython() {
+  // Windows venvs keep the interpreter in Scripts\, macOS/Linux ones in bin/.
   const candidates = [
     path.join(BACKEND_DIR, 'venv', 'Scripts', 'python.exe'),
     path.join(ROOT, 'venv', 'Scripts', 'python.exe'),
+    path.join(BACKEND_DIR, 'venv', 'bin', 'python3'),
+    path.join(ROOT, 'venv', 'bin', 'python3'),
   ];
   return candidates.find((p) => fs.existsSync(p));
 }

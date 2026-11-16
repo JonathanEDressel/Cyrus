@@ -1,6 +1,6 @@
 /**
  * The Terminal design's top bar: the holdings price ticker, the automation
- * worker pill and the page search ("/" focuses it). Ctrl K stays the
+ * worker pill and the page search ("/" focuses it). Ctrl K (⌘K on macOS) stays the
  * assistant's shortcut, handled in aiassistant.ts.
  *
  * Loaded once from index.html after router.js. Nothing here fetches unless the
@@ -48,10 +48,22 @@ class TopBar {
   private static active = 0;
 
   static init(): void {
+    TopBar.applyPlatformHints();
     TopBar.bindSearch();
     TopBar.bindShortcuts();
     // One cheap tick decides whether anything is due; fetches stay rare.
     window.setInterval(() => TopBar.tick(), 10000);
+  }
+
+  /** Shortcut hints say ⌘K on macOS; the handler already accepts ⌘ and Ctrl. */
+  private static applyPlatformHints(): void {
+    const bridge = (window as any).cyrus;
+    if (!bridge || bridge.platform !== 'darwin') return;
+    document.querySelectorAll<HTMLElement>('[data-ai-open]').forEach(btn => {
+      if (btn.title) btn.title = btn.title.replace('Ctrl K', '⌘K');
+      const kbd = btn.querySelector('.kbd');
+      if (kbd) kbd.textContent = '⌘K';
+    });
   }
 
   /** The router opened a page with chrome: refresh whatever is stale. */

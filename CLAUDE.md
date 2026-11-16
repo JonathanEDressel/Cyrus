@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-Cyrus is a Windows desktop app for automating crypto trades/transfers across exchanges (Kraken, Coinbase Advanced, Binance) via [CCXT](https://github.com/ccxt/ccxt). It is an **Electron frontend (TypeScript, no framework, no bundler)** talking over HTTP to a **local Python Flask backend** backed by **SQLite**. In a packaged install the Electron main process spawns the backend as a bundled `.exe`; in dev you run the two halves in separate terminals.
+Cyrus is a desktop app (Windows and macOS) for automating crypto trades/transfers across exchanges (Kraken, Coinbase Advanced, Binance) via [CCXT](https://github.com/ccxt/ccxt). It is an **Electron frontend (TypeScript, no framework, no bundler)** talking over HTTP to a **local Python Flask backend** backed by **SQLite**. In a packaged install the Electron main process spawns the backend as a bundled PyInstaller binary (`CyrusServer.exe` on Windows, `CyrusServer/CyrusServer` folder build on macOS); in dev you run the two halves in separate terminals.
 
 ## Commands
 
@@ -23,14 +23,17 @@ Backend (run from `src/backend/`, with the venv activated):
 
 There is **no test suite** and **no linter configured**. To sanity-check backend edits, byte-compile the touched files: `venv\Scripts\python.exe -m py_compile <files...>`. There is no equivalent for the frontend beyond `tsc` succeeding.
 
-### Building the Windows installer
+### Building the installers
+Windows is built locally; macOS is built in CI.
 1. `npm run build`
-2. In `src/backend/` with venv active: `pyinstaller server.spec` (produces `src/backend/dist/CyrusServer.exe`). Always use the venv's own `pyinstaller` so it resolves `ccxt` etc.
+2. In `src/backend/`: `..\..\venv\Scripts\python.exe -m PyInstaller server.spec --noconfirm` (produces `src/backend/dist/CyrusServer.exe`). Use `python -m PyInstaller` from the venv, **not** `venv\Scripts\pyinstaller.exe` — that launcher points at a stale interpreter without `anthropic`. `server.spec` (tracked, portable) aborts if a required package is missing.
 3. `npm version X.X.X`
 4. `npm run dist` (electron-builder → `release/Cyrus Setup X.X.X.exe`)
-5. `gh release create vX.X.X "release/Cyrus Setup X.X.X.exe" --title "vX.X.X" --notes "..."`
+5. `git push --follow-tags`, then `gh release create vX.X.X "release/Cyrus Setup X.X.X.exe" --title "vX.X.X" --notes-file release-notes-vX.X.X.md`
 
-`package.json` `build.extraResources` copies `CyrusServer.exe` into the installer, so step 2 must run before step 4.
+`package.json` `build.win.extraResources` copies `CyrusServer.exe` into the installer, so step 2 must run before step 4.
+
+**macOS** is built by `.github/workflows/mac-release.yml`, triggered by publishing the release in step 5 (or by hand from the Actions tab). On `macos-15` (arm64) and `macos-15-intel` (x64) runners it builds the backend from the same `server.spec` (folder build on darwin), packages a `.dmg` per arch (`build.mac`), smoke-tests the backend and the packaged app, and uploads `Cyrus-X.X.X-<arch>.dmg` to the release. Builds are ad-hoc signed by the `afterPack` hook `scripts/mac-adhoc-sign.js` (no Apple Developer ID yet), so users approve the first open via System Settings → Privacy & Security → Open Anyway.
 
 ## Frontend architecture — read this before editing `src/app/`
 
@@ -72,10 +75,11 @@ The same loop also sends the **monthly report** email (`_send_due_reports` → `
 
 ## Cross-cutting things that bite
 
-- **The SQLite file is `kraking.db`, not `cyrus.db`** (legacy name; the README says cyrus.db but the code doesn't). In a packaged install it lives at `%APPDATA%\Cyrus\kraking.db`; in dev it defaults to `src/backend/kraking.db`. Path comes from `DATABASE_PATH`.
+- **The SQLite file is `kraking.db`, not `cyrus.db`** (legacy name; the README says cyrus.db but the code doesn't). In a packaged install it lives in Electron's `userData` folder — `%APPDATA%\Cyrus\kraking.db` on Windows, `~/Library/Application Support/Cyrus/kraking.db` on macOS; in dev it defaults to `src/backend/kraking.db`. Path comes from `DATABASE_PATH`.
 - **Dynamic backend port.** The backend may not be on 5000 (it falls back to an OS port if 5000 is taken). It prints `CYRUS_PORT=<n>`; `main.ts` parses that line from stdout and exposes it over the `get-backend-port` IPC channel; the renderer's `AppConfig.init()` resolves `API_BASE` from it before any request. Keep the `CYRUS_PORT=` stdout format stable, and don't hardcode `:5000` in new frontend code — use `AppConfig.API_BASE`.
 - **Electron security model:** `contextIsolation: true`, `nodeIntegration: false`. The renderer only gets what `preload.ts` exposes on `window.cyrus` (`getBackendPort`, `captureRegion`). Add new privileged capabilities by adding an `ipcMain.handle` in `main.ts` and a matching bridge method in `preload.ts` — never by enabling node integration.
 - **API key encryption:** exchange keys are Fernet-encrypted at rest with a key derived (SHA-256) from Flask `SECRET_KEY`. `helper/Security.py` also holds password hashing (bcrypt) and JWT. Changing `SECRET_KEY` invalidates all stored exchange keys and issued tokens.
 - **Schema changes** go through `helper/MigrateDatabase.py` (`run_migrations` / `run_column_migrations`), which run on every startup — add idempotent migrations there rather than editing `SetupDatabase.py` for existing installs.
 - `capture-region` IPC + `html-to-image` exist to snapshot on-screen charts for the monthly report, but are **currently parked**: the report email contains no chart images, and the capture helpers in `services/monthlyreport.ts` have no caller. They're kept because they're the working half of putting chart images back — note that they only work while a window is open, whereas the report itself is now sent by the backend worker.
+- **Platform differences live in `src/main.ts`** (`IS_MAC`): backend path, stale-process sweep (`taskkill` vs `pkill`), tray icon (`icon.ico` vs `trayTemplate.png` menu-bar template), balloon vs `Notification`, login item, the Dock `activate` handler, and an app menu on macOS (its Edit menu is what makes ⌘C/⌘V work). The renderer can read `window.cyrus.platform` (e.g. ⌘K vs Ctrl K hints). The frozen backend on macOS points `SSL_CERT_FILE` at certifi (`Server.py`). Keep Electron at ≥ 38.2: older builds cause system-wide lag on macOS 26.
 - `.env` (git-ignored) holds `SECRET_KEY`, `API_PORT`, optional `DATABASE_PATH`.

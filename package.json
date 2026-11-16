@@ -13,7 +13,7 @@
     "dev": "npm run build && electron . --dev",
     "pack": "electron-builder --dir",
     "dist": "electron-builder",
-    "build:backend": "cd src/backend && call ..\\..\\venv\\Scripts\\activate && pyinstaller --onefile --name CyrusServer Server.py",
+    "build:backend": "cd src/backend && ..\\..\\venv\\Scripts\\python.exe -m PyInstaller server.spec --noconfirm",
     "build:all": "npm run build && npm run build:backend && npm run dist"
   },
   "build": {
@@ -31,18 +31,38 @@
       "!src/**/*.ts",
       "!src/backend/**/*"
     ],
-    "extraResources": [
-      {
-        "from": "src/backend/dist/CyrusServer.exe",
-        "to": "backend/CyrusServer.exe"
-      }
-    ],
     "win": {
       "icon": "src/assets/icon.ico",
       "signAndEditExecutable": false,
       "target": [
         "nsis"
+      ],
+      "extraResources": [
+        {
+          "from": "src/backend/dist/CyrusServer.exe",
+          "to": "backend/CyrusServer.exe"
+        }
       ]
+    },
+    "afterPack": "scripts/mac-adhoc-sign.js",
+    "mac": {
+      "icon": "src/assets/mac/icon.png",
+      "category": "public.app-category.finance",
+      "target": [
+        "dmg"
+      ],
+      "identity": null,
+      "hardenedRuntime": false,
+      "artifactName": "Cyrus-${version}-${arch}.${ext}",
+      "extraResources": [
+        {
+          "from": "src/backend/dist/CyrusServer",
+          "to": "backend/CyrusServer"
+        }
+      ]
+    },
+    "dmg": {
+      "title": "Cyrus ${version}"
     },
     "nsis": {
       "oneClick": false,
@@ -56,7 +76,7 @@
   },
   "devDependencies": {
     "@types/node": "^20.11.0",
-    "electron": "^28.2.0",
+    "electron": "44.11.3",
     "electron-builder": "^24.13.3",
     "typescript": "^5.3.3"
   },

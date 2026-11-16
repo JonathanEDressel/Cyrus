@@ -1,7 +1,7 @@
 /**
  * DemoMode — a hidden "show me dummy data" switch for screenshots / demos.
  *
- * Triggered by Ctrl+Shift+double-left-click on the sidebar logo (wired at the
+ * Triggered by Ctrl+Shift+double-left-click (⌘+Shift on macOS) on the sidebar logo (wired at the
  * bottom of this file). When enabled, the data-source methods that feed every
  * page are swapped for versions that return ONE internally-consistent fake
  * dataset, so the numbers line up across the whole app:
@@ -1639,7 +1639,8 @@ class DemoMode {
     logo.style.userSelect = 'none';
     logo.addEventListener('dblclick', (e) => {
       const ev = e as MouseEvent;
-      if (ev.button === 0 && ev.ctrlKey && ev.shiftKey) {
+      // ⌘ on macOS, where Ctrl+click is a right-click.
+      if (ev.button === 0 && (ev.ctrlKey || ev.metaKey) && ev.shiftKey) {
         e.preventDefault();
         DemoMode.toggle();
       }

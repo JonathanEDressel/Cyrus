@@ -1,5 +1,18 @@
 import os
 import socket
+import sys
+
+# A frozen (PyInstaller) Python on macOS has no CA store of its own, so any
+# stdlib ssl default context (urllib, e.g. the CoinGecko price lookups) would
+# fail certificate checks. Point it at certifi's bundle before anything opens
+# a connection. Windows reads the system store and needs nothing.
+if getattr(sys, 'frozen', False) and sys.platform == 'darwin':
+    try:
+        import certifi
+        os.environ.setdefault('SSL_CERT_FILE', certifi.where())
+    except Exception:
+        pass
+
 from flask import Flask
 from dotenv import load_dotenv
 from Extensions import cors

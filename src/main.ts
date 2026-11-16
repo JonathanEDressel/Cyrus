@@ -1,9 +1,10 @@
-import { app, BrowserWindow, shell, ipcMain, Tray, Menu, nativeImage, dialog } from 'electron';
+import { app, BrowserWindow, shell, ipcMain, Tray, Menu, nativeImage, dialog, Notification } from 'electron';
 import * as path from 'path';
 import { spawn, execFileSync, ChildProcess } from 'child_process';
 import * as fs from 'fs';
 
 const PREFERRED_PORT = 5000;
+const IS_MAC = process.platform === 'darwin';
 
 let mainWindow: BrowserWindow | null = null;
 let backendProcess: ChildProcess | null = null;
@@ -15,6 +16,9 @@ let isQuitting = false;
 let workerState = 'unknown';
 let trayPollTimer: NodeJS.Timeout | null = null;
 let toldUserAboutTray = false;
+// The first window is opened on a short delay after launch (see 'ready');
+// until then a Dock click mustn't open a second one.
+let startupWindowCreated = false;
 
 // The backend binds to PREFERRED_PORT when free, otherwise an OS-assigned
 // port, then prints `CYRUS_PORT=<n>`. The renderer asks for the resolved port
@@ -38,8 +42,28 @@ function getBackendPath(): string {
   
   if (isDev) {
     return '';
+  } else if (IS_MAC) {
+    // macOS ships the backend as a PyInstaller folder build (faster start,
+    // and the layout notarization needs), so the binary sits inside it.
+    return path.join(process.resourcesPath, 'backend', 'CyrusServer', 'CyrusServer');
   } else {
     return path.join(process.resourcesPath, 'backend', 'CyrusServer.exe');
+  }
+}
+
+/**
+ * macOS: an app downloaded from the internet carries a quarantine flag, and
+ * Gatekeeper can still block the bundled backend after the user has approved
+ * the app itself. Clear it on our own backend folder. Best-effort — it fails
+ * harmlessly when the bundle isn't writable.
+ */
+function clearBackendQuarantine(): void {
+  if (!IS_MAC || !app.isPackaged) return;
+  try {
+    execFileSync('xattr', ['-dr', 'com.apple.quarantine', path.join(process.resourcesPath, 'backend')],
+      { stdio: 'ignore' });
+  } catch {
+    // Not quarantined, or not ours to change.
   }
 }
 
@@ -61,9 +85,13 @@ function getDbPath(): string {
  * out from under the developer would be hostile.
  */
 function killStaleBackends(): void {
-  if (!app.isPackaged || process.platform !== 'win32') return;
+  if (!app.isPackaged) return;
   try {
-    execFileSync('taskkill', ['/F', '/T', '/IM', 'CyrusServer.exe'], { stdio: 'ignore' });
+    if (process.platform === 'win32') {
+      execFileSync('taskkill', ['/F', '/T', '/IM', 'CyrusServer.exe'], { stdio: 'ignore' });
+    } else {
+      execFileSync('pkill', ['-x', 'CyrusServer'], { stdio: 'ignore' });
+    }
     console.log('[BACKEND] Cleaned up stale CyrusServer process(es)');
   } catch {
     // Non-zero exit just means there was nothing to kill.
@@ -103,6 +131,7 @@ function startBackend() {
   
   // Clear out any orphan still holding the port before claiming it ourselves.
   killStaleBackends();
+  clearBackendQuarantine();
 
   const env = {
     ...process.env,
@@ -305,7 +334,22 @@ function iconPath(): string {
   return path.join(__dirname, '../src/assets/icon.ico');
 }
 
+/** The tray icon. macOS can't read .ico, and its menu bar wants a monochrome
+ *  "template" image (the *Template.png name tells Electron to tint it to the
+ *  menu bar; trayTemplate@2x.png is picked up automatically on Retina). */
+function trayIconPath(): string {
+  return IS_MAC
+    ? path.join(__dirname, '../src/assets/trayTemplate.png')
+    : iconPath();
+}
+
 function setAutoStart(enabled: boolean): void {
+  if (IS_MAC) {
+    // path/args are Windows-only, and macOS no longer supports starting
+    // hidden, so a login launch on Mac simply opens the window.
+    app.setLoginItemSettings({ openAtLogin: enabled });
+    return;
+  }
   // '--hidden' lets a login-launched instance boot straight to the tray rather
   // than throwing a window in the user's face at every sign-in.
   app.setLoginItemSettings({
@@ -363,14 +407,18 @@ function createTray(): void {
   // starting. Electron throws on Tray() with an empty image, so bail instead —
   // the app still works, it just loses close-to-tray (see the close handler).
   try {
-    const image = nativeImage.createFromPath(iconPath());
+    const image = nativeImage.createFromPath(trayIconPath());
     if (image.isEmpty()) {
-      console.error('[TRAY] Icon not found at', iconPath(), '- tray disabled');
+      console.error('[TRAY] Icon not found at', trayIconPath(), '- tray disabled');
       return;
     }
     tray = new Tray(image);
-    tray.on('click', () => showMainWindow());
-    tray.on('double-click', () => showMainWindow());
+    // On macOS a click opens the menu (which has "Open Cyrus"); binding click
+    // there would also pop the window every time the menu is opened.
+    if (!IS_MAC) {
+      tray.on('click', () => showMainWindow());
+      tray.on('double-click', () => showMainWindow());
+    }
     refreshTray();
   } catch (err) {
     console.error('[TRAY] Could not create tray icon:', err);
@@ -405,6 +453,14 @@ function notifyHiddenToTray(): void {
   if (toldUserAboutTray || !tray) return;
   toldUserAboutTray = true;
   try {
+    if (IS_MAC) {
+      // Balloons are Windows-only; a regular notification does the same job.
+      new Notification({
+        title: 'Cyrus is still running',
+        body: 'Your automations keep running in the background. Quit from the Cyrus icon in the menu bar to stop them.',
+      }).show();
+      return;
+    }
     tray.displayBalloon({
       title: 'Cyrus is still running',
       content: 'Your automations keep running in the background. Quit from the tray icon to stop them.',
@@ -493,6 +549,7 @@ if (!app.requestSingleInstanceLock()) {
   app.on('second-instance', () => showMainWindow());
 
   app.on('ready', () => {
+    installMacMenu();
     startBackend();
     // Last-resort fallback: if the backend never announces a port (and never
     // exits), don't leave the renderer hanging — fall back to the preferred port.
@@ -500,7 +557,10 @@ if (!app.requestSingleInstanceLock()) {
     createTray();
     startTrayPolling();
     const startHidden = process.argv.includes('--hidden');
-    setTimeout(() => createWindow(startHidden), 2000);
+    setTimeout(() => {
+      startupWindowCreated = true;
+      if (!mainWindow) createWindow(startHidden);
+    }, 2000);
   });
 }
 
@@ -542,8 +602,42 @@ app.on('before-quit', () => {
   }
 });
 
+// macOS: clicking the Dock icon. The window is usually hidden rather than
+// destroyed (close-to-tray), so show it — showMainWindow recreates it if not.
 app.on('activate', () => {
-  if (mainWindow === null) {
-    createWindow();
-  }
+  if (startupWindowCreated) showMainWindow();
 });
+
+/**
+ * macOS keeps an app-level menu bar even when the window has none, and
+ * Electron's default one ships DevTools. Replace it with the essentials — the
+ * Edit menu is what makes ⌘C / ⌘V / ⌘A / ⌘Z work in text fields.
+ */
+function installMacMenu(): void {
+  if (!IS_MAC) return;
+  const template: Electron.MenuItemConstructorOptions[] = [
+    {
+      label: app.name,
+      submenu: [
+        { role: 'about' },
+        { type: 'separator' },
+        { role: 'hide' },
+        { role: 'hideOthers' },
+        { role: 'unhide' },
+        { type: 'separator' },
+        {
+          label: 'Quit Cyrus (stops automations)',
+          accelerator: 'Command+Q',
+          click: () => {
+            isQuitting = true;
+            app.quit();
+          },
+        },
+      ],
+    },
+    { role: 'editMenu' },
+    ...(!app.isPackaged ? [{ role: 'viewMenu' } as Electron.MenuItemConstructorOptions] : []),
+    { role: 'windowMenu' },
+  ];
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+}

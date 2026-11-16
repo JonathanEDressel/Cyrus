@@ -1,6 +1,6 @@
 # Cyrus
 
-A Windows desktop app for automating and monitoring cryptocurrency trading across multiple exchanges. Electron + TypeScript frontend, local Python Flask backend, SQLite storage. Your API keys never leave your machine.
+A desktop app for Windows and macOS for automating and monitoring cryptocurrency trading across multiple exchanges. Electron + TypeScript frontend, local Python Flask backend, SQLite storage. Your API keys never leave your machine.
 
 [![Sponsor JonathanEDressel](https://img.shields.io/badge/Sponsor-JonathanEDressel-ea4aaa?logo=githubsponsors&logoColor=white)](https://github.com/sponsors/JonathanEDressel)
 
@@ -62,9 +62,9 @@ Capability flags live in `src/backend/helper/ExchangeRegistry.py` and are enforc
 
 **Reliability**
 - Live engine heartbeat on the Automations page — shows when rules were last checked, so a stalled worker can't hide
-- Runs in the system tray; closing the window keeps automations going
+- Runs in the system tray (menu bar on macOS); closing the window keeps automations going
 - Optional start-at-login
-- Rotating log file at `%APPDATA%\Cyrus\logs\cyrus.log`
+- Rotating log file at `%APPDATA%\Cyrus\logs\cyrus.log` (macOS: `~/Library/Application Support/Cyrus/logs/cyrus.log`)
 
 **Security**
 - Exchange API keys Fernet-encrypted at rest
@@ -105,8 +105,11 @@ SQLite ships with Python; there's no separate database to install.
 ## Install (end users)
 
 1. Click **Releases** on the right of this page
-2. Download `Cyrus.Setup.X.X.X.exe`
-3. Run it and follow the installer
+2. Download the file for your computer:
+   - **Windows:** `Cyrus.Setup.X.X.X.exe` — run it and follow the installer
+   - **Mac with Apple Silicon (M1 and later):** `Cyrus-X.X.X-arm64.dmg`
+   - **Intel Mac:** `Cyrus-X.X.X-x64.dmg`
+3. **Mac:** open the `.dmg` and drag Cyrus into Applications. The first time you open it, macOS blocks it because it isn't signed with an Apple Developer ID — click **Done**, then go to **System Settings → Privacy & Security**, scroll down and click **Open Anyway**. You only do this once.
 
 ---
 
@@ -133,10 +136,10 @@ python3 -m venv venv
 source venv/bin/activate
 
 pip install -r requirements.txt
-pip install pyinstaller     # needed later to build the installer
+pip install pyinstaller     # needed later to build the installer (Windows)
 ```
 
-> Install PyInstaller **inside the Cyrus venv**, not globally — otherwise it won't resolve `ccxt` and friends when you build.
+> Install PyInstaller **inside the Cyrus venv**, not globally, and run it as `python -m PyInstaller` — otherwise it won't resolve `ccxt`, `anthropic` and friends when you build.
 
 Start it:
 
@@ -275,42 +278,52 @@ Cyrus/
 
 ---
 
-## Building the Windows installer
+## Building the installers
+
+Windows is built locally; macOS is built by GitHub Actions (PyInstaller and the
+`.dmg` tooling only run on a Mac), triggered by publishing the release.
 
 ```bash
 # 1. Compile TypeScript
 npm run build
 
-# 2. Build the backend executable (from the Cyrus venv)
+# 2. Build the backend executable — through the venv's python, not the
+#    pyinstaller.exe launcher (which can point at a stale interpreter)
 cd src/backend
-venv\Scripts\activate
-pyinstaller server.spec
-deactivate
+..\..\venv\Scripts\python.exe -m PyInstaller server.spec --noconfirm
 cd ../..
 
 # 3. Bump the version
 npm version X.X.X
 
-# 4. Build the installer -> release/Cyrus Setup X.X.X.exe
+# 4. Build the Windows installer -> release/Cyrus Setup X.X.X.exe
 npm run dist
 
-# 5. Publish
-gh release create vX.X.X "release/Cyrus Setup X.X.X.exe" --title "vX.X.X" --notes "Your notes"
+# 5. Push the commit + tag, then publish
+git push --follow-tags
+gh release create vX.X.X "release/Cyrus Setup X.X.X.exe" --title "vX.X.X" --notes-file release-notes-vX.X.X.md
 ```
 
-Step 2 must run before step 4 — `build.extraResources` copies `src/backend/dist/CyrusServer.exe` into the installer. Always use the venv's own `pyinstaller` so it resolves `ccxt`.
+Step 2 must run before step 4 — `win.extraResources` copies `src/backend/dist/CyrusServer.exe` into the installer. `server.spec` refuses to build if the interpreter running it lacks a required package.
+
+Publishing the release (step 5) starts **`.github/workflows/mac-release.yml`**, which builds Apple Silicon and Intel versions from the tag, smoke-tests them (the backend answers, the packaged app spawns it, quitting stops it) and attaches `Cyrus-X.X.X-arm64.dmg` and `Cyrus-X.X.X-x64.dmg` to the same release about 15 minutes later. Check the run is green before announcing. To test a Mac build without a release, run the workflow by hand from the Actions tab (leave *upload* unticked); tick it to rebuild and replace the Mac files on an existing release.
 
 ### What ships
 
-A self-contained installer: the Electron app, the compiled Flask backend, and all dependencies. End users need neither Python nor Node.
+Self-contained installers: the Electron app, the compiled Flask backend, and all dependencies. End users need neither Python nor Node.
 
-On first launch Electron starts the bundled backend, which creates its database at `%APPDATA%\Cyrus\kraking.db` and logs to `%APPDATA%\Cyrus\logs\cyrus.log`. Neither is removed by uninstalling or updating.
+- **Windows:** NSIS installer; the backend is a single `CyrusServer.exe`.
+- **macOS:** a `.dmg` per architecture; the backend is a PyInstaller folder build at `Cyrus.app/Contents/Resources/backend/CyrusServer/`.
 
-Closing the window minimises to the tray so automations keep running; quitting from the tray stops the backend too.
+On first launch Electron starts the bundled backend, which creates its database (`kraking.db`) and a `logs/cyrus.log` in the app's data folder — `%APPDATA%\Cyrus` on Windows, `~/Library/Application Support/Cyrus` on macOS. Neither is removed by uninstalling or updating.
+
+Closing the window keeps Cyrus running in the tray (Windows) or menu bar (macOS) so automations keep going; quitting from there — or ⌘Q on a Mac — stops the backend too.
 
 ### Code signing
 
 Unsigned builds trigger a "Windows protected your PC" SmartScreen warning on first install (users can click *More info → Run anyway*). A code signing certificate removes it.
+
+Mac builds are ad-hoc signed (`scripts/mac-adhoc-sign.js`), not signed with an Apple Developer ID, so the first open is blocked once: users click **Done**, then **System Settings → Privacy & Security → Open Anyway**. (Terminal alternative: `xattr -dr com.apple.quarantine /Applications/Cyrus.app`.) To remove that step, join the Apple Developer Program and follow the signing note at the top of `mac-release.yml`.
 
 ---
 
@@ -338,9 +351,9 @@ If the engine is running but a specific rule never fires, open the **Log** tab �
 
 **`ModuleNotFoundError: No module named 'flask'`** — activate the venv, then `pip install -r requirements.txt`.
 
-**Port 5000 already in use** — the backend falls back to an OS-assigned port automatically and reports it via `CYRUS_PORT=`. If a previous `CyrusServer.exe` is still holding the port, packaged builds now clear it on launch; in dev, stop your other backend first.
+**Port 5000 already in use** — the backend falls back to an OS-assigned port automatically and reports it via `CYRUS_PORT=`. If a previous `CyrusServer` is still holding the port, packaged builds now clear it on launch; in dev, stop your other backend first.
 
-**Nothing in the console after `CYRUS_PORT=`** — expected when launched by Electron. Output is redirected to `%APPDATA%\Cyrus\logs\cyrus.log` so a full stdout pipe can never block the worker. Running from a terminal keeps console output.
+**Nothing in the console after `CYRUS_PORT=`** — expected when launched by Electron. Output is redirected to `logs/cyrus.log` in the app's data folder so a full stdout pipe can never block the worker. Running from a terminal keeps console output.
 
 ### Frontend
 
@@ -352,7 +365,7 @@ If the engine is running but a specific rule never fires, open the **Log** tab �
 
 ### Database
 
-Located at `%APPDATA%\Cyrus\kraking.db` when packaged, `src/backend/kraking.db` in dev. (Legacy filename — it is not `cyrus.db`.)
+Located at `%APPDATA%\Cyrus\kraking.db` (Windows) or `~/Library/Application Support/Cyrus/kraking.db` (macOS) when packaged, `src/backend/kraking.db` in dev. (Legacy filename — it is not `cyrus.db`.)
 
 **Locked / permission errors** — make sure only one backend is running, and that antivirus isn't holding the file.
 
@@ -376,6 +389,7 @@ All routes require `Authorization: Bearer <token>` except `/api/health` and the 
 - `PUT /api/user/update-username` · `update-password` · `update-theme`
 - `PUT /api/user/update-notifications` · `update-email-notifications` · `update-donation-modal`
 - `POST /api/user/test-email`
+- `GET /api/user/dashboard-layout` · `PUT /api/user/dashboard-layout` (the customised Overview; `null` resets)
 
 ### Exchange connections
 - `GET /api/exchanges/supported` — capability flags per exchange
