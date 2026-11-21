@@ -1,7 +1,9 @@
-/* ─── RuleFlow: automations as a left-to-right flow map ─────────────────────
-   Logic in services/ruleflow.ts. Sources on the left, a chip per rule, any
-   coin the money passes through, and where it ends up on the right. Lines and
-   chips take their colour from the rule's trigger type. */
+/* ─── FlowMap: the left-to-right flow map ───────────────────────────────────
+   Logic in services/flowmap.ts, shared by the Automations chart (ruleflow.ts)
+   and the Open Orders chart (orderflow.ts). Sources on the left, a chip per
+   rule or order, any coin the money passes through, and where it ends up on
+   the right. Lines and chips take their colour from an rf-k-* class: a rule's
+   trigger type, or an order's side. */
 
 .rf-chart {
   /* Trigger colours. Price uses the app accent; the others are picked to
@@ -23,6 +25,10 @@ body.theme-light .rf-chart {
 .rf-k-balance { --rf-c: var(--rf-balance); }
 .rf-k-order   { --rf-c: var(--rf-order); }
 .rf-k-alloc   { --rf-c: var(--rf-alloc); }
+
+/* Orders: the same green and red as the side column in the orders table. */
+.rf-k-buy     { --rf-c: var(--pos); }
+.rf-k-sell    { --rf-c: var(--neg); }
 
 /* One block per exchange (titled when there's more than one), one map per set
    of connected rules inside it. */
@@ -51,10 +57,26 @@ body.theme-light .rf-chart {
   border-top: 1px dashed var(--border-secondary);
 }
 
-/* The map keeps its geometry; a narrow window scrolls it sideways. */
-.rf-scroll {
-  overflow-x: auto;
-  overflow-y: hidden;
+/* The map keeps its geometry and sits in a viewport you can drag around
+   (services/flowmap.ts). On full pages it's capped to the screen so the zoom
+   bar and details strip stay in view; the Overview widget has its own box. */
+.rf-viewport {
+  overflow: auto;
+  scrollbar-gutter: stable;
+  max-height: max(320px, calc(100vh - 320px));
+  cursor: grab;
+  user-select: none;
+}
+
+.ov-page .rf-viewport { max-height: none; }
+
+.rf-dragging .rf-viewport,
+.rf-dragging .rf-viewport * { cursor: grabbing; }
+
+/* As wide as the widest map, so the dividers span all of it. */
+.rf-canvas {
+  width: max-content;
+  min-width: 100%;
 }
 
 .rf-graph {
@@ -66,6 +88,73 @@ body.theme-light .rf-chart {
   inset: 0;
   pointer-events: none;
   overflow: visible;
+}
+
+/* ── Zoom controls (top right, above the map) ───────────────────────────── */
+
+/* Stays in view while the page scrolls past the chart: sticky just under the
+   fixed top bar (on the Overview, at the top of the widget's own scroll box).
+   The row itself lets clicks through to the map; only the buttons take them. */
+.rf-toolbar {
+  position: sticky;
+  top: calc(var(--chrome-top, 0px) + 8px);
+  z-index: 3;
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 4px;
+  pointer-events: none;
+}
+
+.ov-page .rf-toolbar { top: 0; }
+
+.rf-toolbar .rf-zoom {
+  pointer-events: auto;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+}
+
+.rf-zoom {
+  display: inline-flex;
+  align-items: stretch;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.rf-zoom button {
+  min-width: 26px;
+  height: 24px;
+  padding: 0 6px;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 10px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.rf-zoom .rf-zoom-level {
+  min-width: 46px;
+  border-left: 1px solid var(--border-primary);
+  border-right: 1px solid var(--border-primary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.rf-zoom button:hover:not(:disabled) {
+  background: var(--hover-overlay);
+  color: var(--text-primary);
+}
+
+.rf-zoom button:focus-visible {
+  outline: 2px solid var(--accent-cyan-light);
+  outline-offset: -2px;
+}
+
+.rf-zoom button:disabled {
+  opacity: 0.35;
+  cursor: default;
 }
 
 /* ── Lines ──────────────────────────────────────────────────────────────── */
@@ -282,7 +371,7 @@ body.theme-light .rf-chart {
   gap: 6px;
 }
 
-/* ── Legend (Automations Flow tab) ──────────────────────────────────────── */
+/* ── Legend swatches ──────────────────────────────────────── */
 
 .rf-legend-line {
   display: inline-block;
@@ -343,10 +432,37 @@ body.theme-light .rf-chart {
 
 .rf-empty p { margin: 0; font-size: 0.9rem; }
 
-/* Hint above the chart (Automations Flow tab) */
+/* Hint above the chart (Automations and Open Orders Flow tabs) */
 .flow-hint {
   margin: 0 0 0.25rem;
   font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+/* Legend under the chart (Automations and Open Orders Flow tabs) */
+.flow-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1.25rem;
+  padding: 0.7rem 0.25rem;
+  border-top: 1px solid var(--border-primary);
+  margin-top: 0.5rem;
+}
+
+.flow-legend-title {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+.flow-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.76rem;
   color: var(--text-muted);
 }
 
