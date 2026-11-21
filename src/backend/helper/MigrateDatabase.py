@@ -1,5 +1,6 @@
-import sqlite3
 from flask import current_app
+
+from helper import DbCrypto
 
 
 def run_migrations():
@@ -15,8 +16,8 @@ def run_migrations():
     Safe to run repeatedly — every step is guarded.
     """
     db_path = current_app.config['DATABASE_PATH']
-    conn = sqlite3.connect(db_path, check_same_thread=False)
-    conn.row_factory = sqlite3.Row
+    conn = DbCrypto.connect(db_path, current_app.config['SECRET_KEY'], check_same_thread=False)
+    conn.row_factory = DbCrypto.Row
     conn.execute('PRAGMA foreign_keys = OFF')  # disable during migration
     conn.execute('PRAGMA journal_mode = WAL')
 
@@ -155,8 +156,8 @@ def run_column_migrations():
     """
     from flask import current_app
     db_path = current_app.config['DATABASE_PATH']
-    conn = sqlite3.connect(db_path, check_same_thread=False)
-    conn.row_factory = sqlite3.Row
+    conn = DbCrypto.connect(db_path, current_app.config['SECRET_KEY'], check_same_thread=False)
+    conn.row_factory = DbCrypto.Row
     try:
         if not _has_column(conn, 'automation_rules', 'convert_to_asset'):
             conn.execute('ALTER TABLE automation_rules ADD COLUMN convert_to_asset TEXT')

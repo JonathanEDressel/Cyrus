@@ -1,7 +1,8 @@
-import { app, BrowserWindow, shell, ipcMain, Tray, Menu, nativeImage, dialog, Notification } from 'electron';
+import { app, BrowserWindow, shell, ipcMain, Tray, Menu, nativeImage, dialog, Notification, safeStorage } from 'electron';
 import * as path from 'path';
 import { spawn, execFileSync, ChildProcess } from 'child_process';
 import * as fs from 'fs';
+import { randomBytes } from 'crypto';
 import { initUpdates } from './updater';
 import { initUsageStats, usageStatsQuit } from './usagestats';
 
@@ -74,6 +75,95 @@ function getDbPath(): string {
   return path.join(userDataPath, 'kraking.db');
 }
 
+// The SECRET_KEY every packaged install ran with before 1.5.0 (and the
+// backend's own fallback). Passed to the backend so it can move stored secrets
+// off it; never used as a key again.
+const LEGACY_SECRET_KEYS = ['your-secret-key-here-change-in-production', 'change-this-to-a-random-secret-key'];
+
+/**
+ * This install's SECRET_KEY: 32 random bytes, made on first run and kept in
+ * userData/cyrus-secret.json encrypted by the OS (DPAPI on Windows, the
+ * Keychain on macOS) through safeStorage. It encrypts the database
+ * (SQLCipher), the stored exchange keys, and signs login tokens — so a copy of
+ * the data folder is unreadable on another computer or Windows account.
+ *
+ * Throws when the file exists but can't be unlocked (macOS keychain access
+ * refused, say). It is never silently replaced: a new key would lock the
+ * database for good.
+ */
+function loadSecretKey(): string {
+  const file = path.join(app.getPath('userData'), 'cyrus-secret.json');
+  if (fs.existsSync(file)) {
+    const stored = JSON.parse(fs.readFileSync(file, 'utf8'));
+    if (stored && stored.protected) {
+      return safeStorage.decryptString(Buffer.from(String(stored.data), 'base64'));
+    }
+    if (stored && typeof stored.data === 'string' && stored.data) return stored.data;
+    throw new Error('The key file is damaged.');
+  }
+  const key = randomBytes(32).toString('base64url');
+  const record = safeStorage.isEncryptionAvailable()
+    ? { v: 1, protected: true, data: safeStorage.encryptString(key).toString('base64') }
+    : { v: 1, protected: false, data: key };
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, JSON.stringify(record), { mode: 0o600 });
+  return key;
+}
+
+/** loadSecretKey with a way out: retry (e.g. after allowing keychain access) or quit. */
+function obtainSecretKey(): string | null {
+  for (;;) {
+    try {
+      return loadSecretKey();
+    } catch (err) {
+      console.error('[SECURITY] Could not unlock the install key:', err);
+      const choice = dialog.showMessageBoxSync({
+        type: 'error',
+        title: 'Cyrus can\'t unlock its data',
+        message: 'Cyrus couldn\'t unlock the key that protects its data.',
+        detail: IS_MAC
+          ? 'macOS asks before an app can use its keychain item. Choose Try Again and click Always Allow when macOS asks.'
+          : 'Windows protects this key for your user account. Try again, or contact support if this keeps happening.',
+        buttons: ['Try Again', 'Quit'],
+        defaultId: 0,
+        cancelId: 1,
+      });
+      if (choice !== 0) return null;
+    }
+  }
+}
+
+/**
+ * The backend reported the database is encrypted with a different key (the
+ * data folder came from another computer or account, or the key file was
+ * removed). The file is left alone; the user can quit or set it aside.
+ */
+function handleLockedDatabase(dbPath: string): void {
+  const choice = dialog.showMessageBoxSync({
+    type: 'warning',
+    title: 'Cyrus can\'t open its database',
+    message: 'Cyrus can\'t unlock its database on this computer.',
+    detail: 'It was encrypted with a key this computer doesn\'t have, which happens when Cyrus\'s data '
+      + 'folder is copied from another computer or Windows account. Nothing has been changed.\n\n'
+      + 'Start fresh to set that file aside (kept beside the new one, renamed) and begin with an '
+      + 'empty database, then reconnect your exchanges.',
+    buttons: ['Quit', 'Start Fresh'],
+    defaultId: 0,
+    cancelId: 0,
+  });
+  if (choice !== 1) {
+    isQuitting = true;
+    app.quit();
+    return;
+  }
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  for (const suffix of ['', '-wal', '-shm']) {
+    const from = dbPath + suffix;
+    if (fs.existsSync(from)) fs.renameSync(from, `${dbPath}.locked-${stamp}${suffix}`);
+  }
+  startBackend();
+}
+
 /**
  * Kill any CyrusServer.exe left behind by a previous run.
  *
@@ -135,10 +225,20 @@ function startBackend() {
   killStaleBackends();
   clearBackendQuarantine();
 
+  const secretKey = obtainSecretKey();
+  if (!secretKey) {
+    isQuitting = true;
+    app.quit();
+    return;
+  }
+  const legacyKeys = [...LEGACY_SECRET_KEYS];
+  if (process.env.SECRET_KEY && process.env.SECRET_KEY !== secretKey) legacyKeys.push(process.env.SECRET_KEY);
+
   const env = {
     ...process.env,
     DATABASE_PATH: dbPath,
-    SECRET_KEY: process.env.SECRET_KEY || 'your-secret-key-here-change-in-production',
+    SECRET_KEY: secretKey,
+    CYRUS_LEGACY_SECRET_KEYS: JSON.stringify(legacyKeys),
     API_PORT: String(PREFERRED_PORT),
     // The backend watches this PID and exits when we do, so a crash on our side
     // can't leave a stale server squatting on the port.
@@ -157,6 +257,7 @@ function startBackend() {
   // in the middle of the number (e.g. "CYRUS_PORT=512" then "34\n") would match
   // "\d+" = 512 and lock in a wrong, dead port permanently.
   let stdoutBuffer = '';
+  let databaseLocked = false;
   backendProcess.stdout?.on('data', (data) => {
     const text = data.toString();
     console.log(`[BACKEND] ${text}`);
@@ -169,6 +270,7 @@ function startBackend() {
       if (match) {
         setBackendPort(parseInt(match[1], 10));
       }
+      if (line.startsWith('CYRUS_DB_LOCKED')) databaseLocked = true;
     }
   });
 
@@ -179,6 +281,10 @@ function startBackend() {
   backendProcess.on('close', (code) => {
     console.log(`[BACKEND] Process exited with code ${code}`);
     backendProcess = null;
+    if (databaseLocked && !isQuitting) {
+      handleLockedDatabase(dbPath);
+      return;
+    }
     // If it died before announcing a port, unblock the renderer.
     setBackendPort(PREFERRED_PORT);
   });
@@ -541,6 +647,12 @@ function createWindow(startHidden = false) {
     mainWindow = null;
   });
 }
+
+// Windows names a notification (tray balloons included) after the sender's
+// AppUserModelID. Without one it falls back to "Electron"; this is the appId
+// the installer gives the Start Menu shortcut, which maps it to "Cyrus" and
+// the Cyrus icon. A dev run with no installed copy may show the raw id.
+if (process.platform === 'win32') app.setAppUserModelId('com.cyrus.app');
 
 // A second launch would spawn a second backend — and killStaleBackends() would
 // take out the first one's, stopping automations. Focus the running instance

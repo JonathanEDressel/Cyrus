@@ -12,29 +12,40 @@ Cyrus is free for noncommercial use. If it saves you time, [sponsoring it on Git
 
 Cyrus talks to exchanges through [CCXT](https://github.com/ccxt/ccxt). Capabilities differ per exchange, and that determines which automations are available.
 
-| Feature | Kraken | Coinbase Advanced | Binance | Gemini | Robinhood |
-|---|:---:|:---:|:---:|:---:|:---:|
-| View open orders | ✅ | ✅ | ✅ | ✅ | 🧪 |
-| View account balances | ✅ | ✅ | ✅ | ✅ | 🧪 |
-| Portfolio valuation & charts | ✅ | ✅ | ✅ | ✅ | 🧪 |
-| Trigger: Order filled | ✅ | ✅ | ✅ | ✅ | 🧪 |
-| Trigger: Balance threshold | ✅ | ✅ | ✅ | ✅ | 🧪 |
-| Trigger: Price threshold | ✅ | ✅ | ✅ | ✅ | 🧪 |
-| Action: Convert crypto | ✅ | ✅ | ✅ | ✅ | 🧪 |
-| Action: Withdraw to address | ✅ | ❌ | ❌ | ❌ | ❌ |
-| Whitelisted withdrawal addresses | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Feature | Kraken | Coinbase Advanced | Binance | Gemini | Robinhood | OKX | KuCoin | Crypto.com | Gate.io |
+|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| View open orders | ✅ | ✅ | ✅ | ✅ | ✅ | 🧪 | 🧪 | 🧪 | 🧪 |
+| View account balances | ✅ | ✅ | ✅ | ✅ | ✅ | 🧪 | 🧪 | 🧪 | 🧪 |
+| Portfolio valuation & charts | ✅ | ✅ | ✅ | ✅ | ✅ | 🧪 | 🧪 | 🧪 | 🧪 |
+| Trigger: Order filled | ✅ | ✅ | ✅ | ✅ | ✅ | 🧪 | 🧪 | 🧪 | 🧪 |
+| Trigger: Balance threshold | ✅ | ✅ | ✅ | ✅ | ✅ | 🧪 | 🧪 | 🧪 | 🧪 |
+| Trigger: Price threshold | ✅ | ✅ | ✅ | ✅ | ✅ | 🧪 | 🧪 | 🧪 | 🧪 |
+| Action: Convert crypto | ✅ | ✅ | ✅ | ✅ | ✅ | 🧪 | 🧪 | 🧪 | 🧪 |
+| Limit orders & rebalancing | ✅ | ✅ | ✅ | ✅ | ✅ | 🧪 | 🧪 | 🧪 | 🧪 |
+| Trade history (taxes) | ✅ | ✅ | ✅ | ✅ | ✅ | 3 mo | ❌ | 6 mo | 🧪 |
+| Transfer history | ✅ | ✅ | ✅ | ✅ | ❌ | 🧪 | ❌ | 🧪 | 🧪 |
+| Action: Withdraw to address | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| Whitelisted withdrawal addresses | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
 
-✅ supported · ❌ not available · 🧪 experimental
+✅ supported · ❌ not available · 🧪 beta
 
-> **Withdrawals are Kraken-only.** Coinbase Advanced, Binance and Gemini don't expose a withdrawal address book or crypto withdrawal endpoint through CCXT, so any withdraw-based rule is unavailable there. Convert actions work everywhere.
+> **Withdrawals are Kraken-only.** The other exchanges don't expose a withdrawal address book or crypto withdrawal endpoint Cyrus can use, so any withdraw-based rule is unavailable there. Convert actions work everywhere.
 >
-> **Coinbase Advanced (Beta)** — served through CCXT's `coinbase` class (the Advanced Trade API). Connect with keys from Coinbase Advanced, not the standard app.
+> **Coinbase Advanced** — served through CCXT's `coinbase` class (the Advanced Trade API). Connect with keys from Coinbase Advanced, not the standard app.
 >
-> **Binance (Beta)** — no withdrawal whitelist API via CCXT.
+> **Binance** — no withdrawal whitelist API via CCXT.
 >
 > **Gemini (Beta)** — Gemini's API has no market orders, so convert actions place an immediate-or-cancel limit order priced up to 2% through the best bid/ask: it fills what the book offers within that band and cancels the rest. Create the key with the **Trader** role (Gemini's default). Sandbox keys from `exchange.sandbox.gemini.com` are supported.
 >
-> **Robinhood (Experimental)** — uses a direct API adapter rather than CCXT and is still in progress. Treat it as unfinished.
+> **Robinhood** — uses a direct API adapter rather than CCXT; you generate an Ed25519 keypair (Profile offers a generator) and register the public half with Robinhood.
+>
+> **OKX (Beta)** — needs the passphrase you chose when creating the key (Read + Trade permissions). OKX only gives apps the last three months of fills, so older purchases are added by hand on the Taxes page. Demo-trading keys work with Sandbox.
+>
+> **KuCoin (Beta)** — needs the key's passphrase (General + Trade permissions). Only coins in the **Trading** account are visible and tradable. Trade and transfer history aren't imported yet. Most KuCoin accounts are "high-frequency" accounts, which only list open orders one market at a time; Cyrus asks KuCoin which markets have open orders and checks those.
+>
+> **Crypto.com Exchange (Beta)** — keys from the Crypto.com **Exchange** (exchange.crypto.com), not the Crypto.com App, which has no API. Cyrus reads the last six months of trades, a day at a time.
+>
+> **Gate.io (Beta)** — spot only; trade and transfer history are walked 30 days at a time.
 
 Capability flags live in `src/backend/helper/ExchangeRegistry.py` and are enforced in code — the automation wizard flags unsupported combinations as you build a rule, and the backend rejects them on save regardless.
 
@@ -69,7 +80,7 @@ Capability flags live in `src/backend/helper/ExchangeRegistry.py` and are enforc
 - Rotating log file at `%APPDATA%\Cyrus\logs\cyrus.log` (macOS: `~/Library/Application Support/Cyrus/logs/cyrus.log`)
 
 **Security**
-- Exchange API keys Fernet-encrypted at rest
+- Encrypted database (SQLCipher, AES-256) with a per-install key held by the OS; exchange API keys additionally Fernet-encrypted
 - Backend binds to loopback only; your data, keys and history stay on your machine
 - Optional, off-by-default anonymous usage count (random install ID, version, OS, window/tray and signed-in state, country); see the in-app Privacy page
 - Light and dark themes
@@ -204,7 +215,9 @@ CYRUS_POLL_INTERVAL=60
 
 `CYRUS_PARENT_PID` is set automatically by Electron — the backend watches that process and exits when it does, so a crashed app can't leave an orphaned server holding port 5000.
 
-> **Changing `SECRET_KEY` invalidates every stored exchange key and every issued token.** The encryption key is derived from it. Set it once, then leave it alone.
+> **Changing `SECRET_KEY` invalidates every stored exchange key and every issued token, and locks the database** (its SQLCipher key is derived from it). Set it once, then leave it alone. A packaged install doesn't use `.env` at all: it makes its own random key (see Security notes).
+>
+> The dev database is encrypted too. To open it in an SQLite browser, start the backend once with `CYRUS_DB_ENCRYPTION=off` on a fresh database (an already-encrypted file stays encrypted). Packaged builds ignore that setting.
 
 ### Notes for contributors
 
@@ -442,7 +455,9 @@ All routes require `Authorization: Bearer <token>` except `/api/health` and the 
 
 ## Security notes
 
-- **Exchange API keys are Fernet-encrypted** (AES-128) at rest. The key is derived via SHA-256 from the Flask `SECRET_KEY`; keys are decrypted only when making an exchange call.
+- **The database is encrypted on disk** with SQLCipher (AES-256, every page), `helper/DbCrypto.py`. An older plain database is converted on first start and verified before the plain file is removed.
+- **Each install has its own random `SECRET_KEY`**, made on first run and stored in `userData/cyrus-secret.json` encrypted by the OS through Electron's `safeStorage` (DPAPI on Windows, the Keychain on macOS) — `loadSecretKey` in `src/main.ts`. It keys the database, the stored secrets and login tokens, so a copied data folder can't be read on another computer or account. (Before 1.5.0 every install shared one placeholder key; `helper/SecretRekey.py` moves existing secrets off it on upgrade.)
+- **Exchange API keys are also Fernet-encrypted** (AES-128 + HMAC) inside the database, with a key derived via SHA-256 from `SECRET_KEY`; they're decrypted only when making an exchange call.
 - **Passwords** are bcrypt-hashed. **JWTs** expire after 30 days.
 - **All SQL is parameterised.**
 - **The backend binds to `127.0.0.1` only** — it is never reachable from the network. Note that CORS is currently permissive (`origins: "*"`) for `/api/*`; every endpoint except `/api/health` still requires a valid token, and the renderer's CSP restricts it to `connect-src 'self' http://127.0.0.1:*`.

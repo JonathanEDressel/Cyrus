@@ -25,11 +25,12 @@
       <p class="privacy-card-body">The following information is written to a SQLite database that lives entirely on your machine. Nothing listed here is sent anywhere.</p>
       <ul class="privacy-list">
         <li><i class="fa-solid fa-circle-check privacy-list-icon"></i><span><strong>Account credentials</strong> — your username and a bcrypt-hashed copy of your password. Your plaintext password is never stored.</span></li>
-        <li><i class="fa-solid fa-circle-check privacy-list-icon"></i><span><strong>Exchange API keys</strong> — your connect API key and secret. These are encrypted at rest using AES-256 and decrypted only when Cyrus needs to contact your exchange.</span></li>
+        <li><i class="fa-solid fa-circle-check privacy-list-icon"></i><span><strong>Exchange API keys</strong> — your connect API key and secret. These are encrypted again inside the encrypted database and decrypted only when Cyrus needs to contact your exchange.</span></li>
         <li><i class="fa-solid fa-circle-check privacy-list-icon"></i><span><strong>Exchange connections</strong> — the name, label, and status of each exchange account you add.</span></li>
         <li><i class="fa-solid fa-circle-check privacy-list-icon"></i><span><strong>Automation rules</strong> — trigger conditions, action parameters, and execution logs for any custom commands you create.</span></li>
         <li><i class="fa-solid fa-circle-check privacy-list-icon"></i><span><strong>Session tokens</strong> — short-lived JWT tokens kept in memory for the duration of your session; they are not persisted to disk.</span></li>
       </ul>
+      <p class="privacy-card-body"><strong>The whole database is encrypted</strong> (SQLCipher, AES-256). Its key is unique to your install and protected by Windows or macOS for your user account, so a copy of the file is unreadable on another computer or account — including to anyone who copies it from your PC.</p>
       <p class="privacy-filepath"><i class="fa-solid fa-folder-open me-2"></i>Database location: <code>%APPDATA%\Cyrus\kraking.db</code> on Windows, <code>~/Library/Application Support/Cyrus/kraking.db</code> on macOS</p>
     </div>
 
@@ -74,7 +75,7 @@
       </div>
       <p class="privacy-card-body">Exchange API keys are sensitive credentials. Cyrus handles them with the following protections:</p>
       <ul class="privacy-list">
-        <li><i class="fa-solid fa-lock privacy-list-icon"></i><span>Keys are <strong>encrypted with AES-256</strong> before being written to the local database.</span></li>
+        <li><i class="fa-solid fa-lock privacy-list-icon"></i><span>Keys are <strong>encrypted</strong> (Fernet: AES with an HMAC) before being written to the database, which is itself <strong>encrypted with AES-256</strong> using a key only your user account on this computer can unlock.</span></li>
         <li><i class="fa-solid fa-lock privacy-list-icon"></i><span>Keys are decrypted in memory only at the moment a request to your exchange is made, then discarded.</span></li>
         <li><i class="fa-solid fa-lock privacy-list-icon"></i><span>Keys are <strong>never logged, displayed in plaintext after submission, or transmitted</strong> to any party other than your chosen exchange.</span></li>
         <li><i class="fa-solid fa-lock privacy-list-icon"></i><span>It is strongly recommended to create API keys with the <strong>minimum required permissions</strong> (read-only) and to restrict them to your IP address in your exchange's API settings.</span></li>

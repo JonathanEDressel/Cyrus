@@ -27,7 +27,7 @@ Read-only: it opens the database, runs SELECTs, and writes nothing.
 
 import argparse
 import os
-import sqlite3
+
 import sys
 from collections import Counter
 
@@ -93,8 +93,14 @@ def main() -> int:
         print('Pass --db, or set DATABASE_PATH.')
         return 1
 
-    conn = sqlite3.connect(f'file:{db_path}?mode=ro', uri=True)
-    conn.row_factory = sqlite3.Row
+    # The database is encrypted (SQLCipher). A dev database opens with the
+    # SECRET_KEY in .env; an installed copy's key is held by the OS, so run
+    # this against a dev database (or one created with CYRUS_DB_ENCRYPTION=off).
+    from dotenv import load_dotenv
+    from helper import DbCrypto
+    load_dotenv()
+    conn = DbCrypto.connect(f'file:{db_path}?mode=ro', os.getenv('SECRET_KEY', ''), uri=True)
+    conn.row_factory = DbCrypto.Row
 
     try:
         exists = conn.execute(

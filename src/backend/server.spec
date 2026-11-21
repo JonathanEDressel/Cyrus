@@ -19,7 +19,7 @@ import importlib.util
 IS_MAC = sys.platform == 'darwin'
 
 _REQUIRED = ['flask', 'flask_cors', 'ccxt', 'anthropic', 'pydantic', 'bcrypt',
-             'cryptography', 'jwt', 'dotenv', 'certifi', 'nacl']
+             'cryptography', 'jwt', 'dotenv', 'certifi', 'nacl', 'sqlcipher3']
 _missing = [m for m in _REQUIRED if importlib.util.find_spec(m) is None]
 if _missing:
     raise SystemExit(
@@ -64,6 +64,11 @@ a = Analysis(
         'cryptography.fernet',
         'cryptography.hazmat.primitives.kdf.pbkdf2',
         'jwt',
+        # SQLCipher (encrypted database): the extension module carries
+        # SQLCipher and its crypto statically.
+        'sqlcipher3',
+        'sqlcipher3.dbapi2',
+        'sqlcipher3._sqlite3',
         # dotenv
         'dotenv',
         # Anthropic SDK (portfolio assistant) and the transport stack it pulls
