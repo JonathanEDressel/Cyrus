@@ -487,13 +487,46 @@ body.theme-light {
   color: var(--text-muted);
 }
 
+.ticker-port {
+  flex-shrink: 0;
+}
+
+/* The holdings. When they don't fit they scroll past as a loop (topbar.ts
+   setupMarquee repeats them once and sets the distance and duration). */
 .ticker-items {
   flex: 1;
   min-width: 0;
-  display: flex;
-  gap: 22px;
   overflow: hidden;
   -webkit-mask-image: linear-gradient(90deg, #000 94%, transparent);
+          mask-image: linear-gradient(90deg, #000 94%, transparent);
+}
+
+.ticker-track {
+  display: flex;
+  gap: 22px;
+  width: max-content;
+}
+
+.ticker-items.is-scrolling {
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 4%, #000 94%, transparent);
+          mask-image: linear-gradient(90deg, transparent, #000 4%, #000 94%, transparent);
+}
+
+.ticker-items.is-scrolling .ticker-track {
+  animation: ticker-scroll var(--ticker-dur, 30s) linear infinite;
+}
+
+.ticker-items.is-scrolling:hover .ticker-track {
+  animation-play-state: paused;
+}
+
+@keyframes ticker-scroll {
+  from { transform: translateX(0); }
+  to   { transform: translateX(calc(-1 * var(--ticker-shift, 0px))); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ticker-items.is-scrolling .ticker-track { animation: none; }
 }
 
 .ticker-item b {
@@ -702,6 +735,30 @@ body.theme-light {
   background: color-mix(in srgb, var(--warn) 15%, transparent);
   color: var(--warn);
   border: 1px solid color-mix(in srgb, var(--warn) 30%, transparent);
+}
+
+.exchange-okx {
+  background: color-mix(in srgb, var(--text-primary) 8%, transparent);
+  color: var(--text-primary);
+  border: 1px solid color-mix(in srgb, var(--text-primary) 28%, transparent);
+}
+
+.exchange-cryptocom {
+  background: rgba(16, 125, 220, 0.14);
+  color: #4FA3F7;
+  border: 1px solid rgba(16, 125, 220, 0.34);
+}
+
+.exchange-gate {
+  background: rgba(35, 84, 230, 0.14);
+  color: #7C9BFF;
+  border: 1px solid rgba(35, 84, 230, 0.34);
+}
+
+.exchange-kucoin {
+  background: rgba(35, 175, 145, 0.14);
+  color: #23AF91;
+  border: 1px solid rgba(35, 175, 145, 0.32);
 }
 
 .header-user-btn {

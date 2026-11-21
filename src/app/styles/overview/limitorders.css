@@ -1788,6 +1788,10 @@ body.theme-light .limit-flow-chart {
 .limit-flow-col[data-exchange="binance"]          { --flow-hue: 234, 179, 8; }
 .limit-flow-col[data-exchange="robinhood"]        { --flow-hue: 34, 197, 94; }
 .limit-flow-col[data-exchange="gemini"]           { --flow-hue: 6, 182, 212; }
+.limit-flow-col[data-exchange="okx"]              { --flow-hue: 148, 163, 184; }
+.limit-flow-col[data-exchange="cryptocom"]        { --flow-hue: 16, 125, 220; }
+.limit-flow-col[data-exchange="gate"]             { --flow-hue: 99, 125, 255; }
+.limit-flow-col[data-exchange="kucoin"]           { --flow-hue: 35, 175, 145; }
 
 /* Which venue a column belongs to, under its quote. Shown only when more than
  * one exchange is present — otherwise every bar would repeat the same word. */
@@ -1825,6 +1829,10 @@ body.theme-light .limit-flow-chart {
 .limit-flow-key[data-exchange="binance"]          { --flow-hue: 234, 179, 8; }
 .limit-flow-key[data-exchange="robinhood"]        { --flow-hue: 34, 197, 94; }
 .limit-flow-key[data-exchange="gemini"]           { --flow-hue: 6, 182, 212; }
+.limit-flow-key[data-exchange="okx"]              { --flow-hue: 148, 163, 184; }
+.limit-flow-key[data-exchange="cryptocom"]        { --flow-hue: 16, 125, 220; }
+.limit-flow-key[data-exchange="gate"]             { --flow-hue: 99, 125, 255; }
+.limit-flow-key[data-exchange="kucoin"]           { --flow-hue: 35, 175, 145; }
 
 .limit-flow-key i {
   width: 12px;

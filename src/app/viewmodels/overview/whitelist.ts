@@ -34,13 +34,17 @@ class WhitelistController {
       const conn = !isAll && typeof ExchangeStore.activeMode === 'number'
         ? ExchangeStore.connections.find(c => c.id === ExchangeStore.activeMode)
         : undefined;
-      const noAddressExchanges = ['coinbase', 'binance', 'gemini'];
+      const noAddressExchanges = ['coinbase', 'binance', 'gemini', 'okx', 'kucoin', 'cryptocom', 'gate'];
       const isUnsupported = !!conn && noAddressExchanges.includes(conn.exchange_name);
       if (isUnsupported && conn) {
         const exchangeInfo: Record<string, { name: string; reason: string }> = {
           coinbase: { name: 'Coinbase Advanced', reason: 'Coinbase does not expose an address book API for CDP API keys.' },
           binance:  { name: 'Binance',           reason: 'Binance does not expose an address whitelist API via CCXT.' },
           gemini:   { name: 'Gemini',            reason: 'Automated withdrawals are not enabled for Gemini in Cyrus yet.' },
+          okx:      { name: 'OKX',               reason: 'Automated withdrawals are not enabled for OKX in Cyrus yet.' },
+          kucoin:   { name: 'KuCoin',            reason: 'Automated withdrawals are not enabled for KuCoin in Cyrus yet.' },
+          cryptocom:{ name: 'Crypto.com',        reason: 'Automated withdrawals are not enabled for Crypto.com in Cyrus yet.' },
+          gate:     { name: 'Gate.io',           reason: 'Automated withdrawals are not enabled for Gate.io in Cyrus yet.' },
         };
         const info = exchangeInfo[conn.exchange_name]
           ?? { name: conn.exchange_name, reason: 'This exchange does not expose a withdrawal address API.' };

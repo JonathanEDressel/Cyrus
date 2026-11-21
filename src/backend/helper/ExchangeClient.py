@@ -19,11 +19,14 @@ import ccxt
 # ---------------------------------------------------------------------------
 
 def create_exchange(exchange_name: str, api_key: str, private_key: str,
-                    passphrase: str | None = None, sandbox: bool = False) -> ccxt.Exchange:
+                    passphrase: str | None = None, sandbox: bool = False,
+                    options: dict | None = None) -> ccxt.Exchange:
     """Instantiate a CCXT exchange object with credentials.
 
     ``exchange_name`` must match a key in ``ccxt.exchanges``
-    (e.g. ``'kraken'``, ``'coinbase'``, ``'binance'``).
+    (e.g. ``'kraken'``, ``'coinbase'``, ``'binance'``). ``options`` are ccxt
+    options from the registry's ``ccxt_options`` (spot-only market loading
+    for Gate.io, for example).
     """
     exchange_class = getattr(ccxt, exchange_name, None)
     if exchange_class is None:
@@ -40,6 +43,8 @@ def create_exchange(exchange_name: str, api_key: str, private_key: str,
     }
     if passphrase:
         config['password'] = passphrase
+    if options:
+        config['options'] = dict(options)
 
     exchange = exchange_class(config)
     if sandbox:
@@ -56,8 +61,34 @@ def create_exchange(exchange_name: str, api_key: str, private_key: str,
 # ---------------------------------------------------------------------------
 
 def get_open_orders(exchange: ccxt.Exchange, symbol: str | None = None) -> list[dict]:
-    """Return a list of open orders in CCXT unified format."""
+    """Return a list of open orders in CCXT unified format.
+
+    KuCoin's "high-frequency" spot accounts (where KuCoin has moved most users)
+    only list open orders one market at a time, and ccxt raises
+    ``ArgumentsRequired`` when asked for all of them. KuCoin does say which
+    markets have an open order, so those are asked about one by one.
+    """
+    if symbol is None and getattr(exchange, 'id', None) == 'kucoin':
+        try:
+            return exchange.fetch_open_orders(None)
+        except ccxt.ArgumentsRequired:
+            return _kucoin_hf_open_orders(exchange)
     return exchange.fetch_open_orders(symbol)
+
+
+def _kucoin_hf_open_orders(exchange) -> list[dict]:
+    """Every open order on a KuCoin HF account, market by market."""
+    exchange.load_markets()
+    response = exchange.private_get_hf_orders_active_symbols({'tradeType': 'TRADE'}) or {}
+    data = response.get('data') or {}
+    market_ids = data.get('symbols') if isinstance(data, dict) else data
+    orders: list[dict] = []
+    for market_id in market_ids or []:
+        market = exchange.safe_market(market_id)
+        unified = market.get('symbol') if market else None
+        if unified and unified in exchange.markets:
+            orders.extend(exchange.fetch_open_orders(unified) or [])
+    return orders
 
 
 def get_closed_orders(exchange: ccxt.Exchange, symbol: str | None = None,
@@ -256,7 +287,7 @@ def is_spot_market(market: dict) -> bool:
 #: Exchanges whose ccxt driver we have verified maps ``params['postOnly']``:
 #: Kraken -> ``oflags=post``, Coinbase -> ``post_only``, Binance -> LIMIT_MAKER,
 #: Gemini -> ``options: ['maker-or-cancel']``.
-_POST_ONLY_EXCHANGES = ('kraken', 'coinbase', 'binance', 'gemini')
+_POST_ONLY_EXCHANGES = ('kraken', 'coinbase', 'binance', 'gemini', 'okx', 'kucoin', 'cryptocom', 'gate')
 
 
 def supports_post_only(exchange) -> bool:
@@ -296,6 +327,9 @@ def get_available_balance(exchange: ccxt.Exchange) -> dict[str, float]:
       * Kraken   — ``free = balance - hold_trade``, so resting orders are out.
       * Coinbase — ``free = available_balance``, ``used = hold``.
       * Binance  — ``free`` / ``locked`` straight from the account endpoint.
+      * OKX / KuCoin / Crypto.com / Gate.io — ``free`` is the available
+        balance of the trading (OKX, KuCoin "trade") or spot account. Coins
+        parked in a funding/main account aren't tradable and aren't shown.
       * Robinhood — via ``fetch_available_balance`` on the adapter, which also
         folds in cash buying power (``/holdings/`` is crypto-only).
 
@@ -729,7 +763,7 @@ def convert(exchange: ccxt.Exchange, from_asset: str, to_asset: str,
 
     if sell_symbol in exchange.markets:
         market = exchange.markets[sell_symbol]
-        min_amount = market.get('limits', {}).get('amount', {}).get('min', 0)
+        min_amount = _min_order_amount(exchange, market)
 
         if min_amount and amount < min_amount:
             raise ValueError(
@@ -758,14 +792,66 @@ def convert(exchange: ccxt.Exchange, from_asset: str, to_asset: str,
         if exchange.id == 'kraken':
             params['cost'] = amount
             return exchange.create_order(buy_symbol, 'market', 'buy', None, None, params)
-        else:
-            params['quoteOrderQty'] = amount
-            return exchange.create_order(buy_symbol, 'market', 'buy', None, None, params)
+        if exchange.id == 'cryptocom':
+            return _cryptocom_market_buy_cost(exchange, buy_symbol, amount)
+        if exchange.id in _COST_MARKET_BUY_EXCHANGES:
+            # ccxt's unified "spend this much quote" call: Coinbase sends
+            # quote_size, OKX tgtCcy quote_ccy, KuCoin funds, Gate amount in
+            # quote. (Coinbase used to get quoteOrderQty, which it ignores, so
+            # a quote-to-coin convert there raised before 1.5.0.)
+            return exchange.create_market_buy_order_with_cost(buy_symbol, amount)
+        params['quoteOrderQty'] = amount
+        return exchange.create_order(buy_symbol, 'market', 'buy', None, None, params)
 
     raise ValueError(
         f"No trading pair found for {from_asset}/{to_asset} or "
         f"{to_asset}/{from_asset} on {exchange.id}"
     )
+
+
+def _min_order_amount(exchange, market: dict) -> float:
+    """Smallest base amount an order can have.
+
+    ``limits.amount.min`` when the exchange publishes one; otherwise the
+    amount step (Crypto.com publishes only that), so a dust-sized convert gets
+    Cyrus's plain "below the minimum" message instead of ccxt's precision error.
+    """
+    minimum = (market.get('limits') or {}).get('amount', {}).get('min')
+    if minimum:
+        return float(minimum)
+    step = (market.get('precision') or {}).get('amount')
+    if step and getattr(exchange, 'precisionMode', None) == ccxt.TICK_SIZE:
+        try:
+            return float(step)
+        except (TypeError, ValueError):
+            return 0
+    return 0
+
+
+def _cryptocom_market_buy_cost(exchange, symbol: str, cost: float) -> dict:
+    """A Crypto.com market buy that spends *cost* of the quote currency.
+
+    Crypto.com sizes a MARKET BUY by ``notional`` (quote), but ccxt's
+    create_order only ever sends ``quantity`` (base) and drops a ``cost``
+    param, which would send an order with no size at all. So this one order
+    is built here, exactly as the API documents it.
+    """
+    market = exchange.market(symbol)
+    request = {
+        'instrument_name': market['id'],
+        'side': 'BUY',
+        'type': 'MARKET',
+        'notional': exchange.cost_to_precision(symbol, cost),
+        'spot_margin': 'SPOT',
+    }
+    response = exchange.v1PrivatePostPrivateCreateOrder(request) or {}
+    return exchange.parse_order(response.get('result') or {}, market)
+
+
+#: Exchanges whose quote-sized market buy goes through ccxt's
+#: ``create_market_buy_order_with_cost`` (each verified to send the amount as
+#: quote currency, not base).
+_COST_MARKET_BUY_EXCHANGES = ('coinbase', 'okx', 'kucoin', 'gate')
 
 
 #: How far through the touch an immediate-or-cancel convert is priced. It is a

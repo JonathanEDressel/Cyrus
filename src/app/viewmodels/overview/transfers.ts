@@ -560,10 +560,13 @@ class TransfersController {
 
     const blocked: string[] = [];
     const unsupported: string[] = [];
+    // Exchanges that do have a transfer API, which Cyrus doesn't read yet.
+    const notYet: string[] = [];
+    const NOT_YET = ['kucoin'];
     for (const conn of status.connections) {
       const name = conn.label || conn.exchange;
       if (!conn.supported) {
-        unsupported.push(name);
+        (NOT_YET.indexOf(conn.exchange) !== -1 ? notYet : unsupported).push(name);
         continue;
       }
       for (const kindStatus of Object.values(conn.kinds)) {
@@ -577,9 +580,14 @@ class TransfersController {
     this.toggleNotice('transfers-permission', 'transfers-permission-message', blocked.join(' '));
     this.toggleNotice(
       'transfers-unsupported', 'transfers-unsupported-message',
-      unsupported.length
-        ? `${unsupported.join(', ')} ${unsupported.length === 1 ? 'does' : 'do'} not offer a transfer-history API, so nothing from ${unsupported.length === 1 ? 'it' : 'them'} appears here.`
-        : ''
+      [
+        unsupported.length
+          ? `${unsupported.join(', ')} ${unsupported.length === 1 ? 'does' : 'do'} not offer a transfer-history API, so nothing from ${unsupported.length === 1 ? 'it' : 'them'} appears here.`
+          : '',
+        notYet.length
+          ? `Cyrus doesn't import transfer history from ${notYet.join(', ')} yet.`
+          : '',
+      ].filter(Boolean).join(' ')
     );
   }
 

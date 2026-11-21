@@ -53,7 +53,7 @@ const AFFILIATES: Affiliate[] = [
     why: `The easiest place to start if you're new to this. Cyrus supports Coinbase Advanced for
           <strong>price and balance triggers and convert actions</strong> &mdash; so take-profit and
           swap-on-threshold rules work fine. Auto-withdraw rules don't, because Coinbase's API doesn't
-          expose a withdrawal address book; for those you'll want Kraken. Support is still in beta.`,
+          expose a withdrawal address book; for those you'll want Kraken.`,
     products: [
       {
         name: 'Coinbase Advanced',

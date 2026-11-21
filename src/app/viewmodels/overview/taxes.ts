@@ -13,6 +13,10 @@ const EXCHANGE_NAMES: Record<string, string> = {
   binance: 'Binance',
   gemini: 'Gemini',
   robinhood: 'Robinhood',
+  okx: 'OKX',
+  cryptocom: 'Crypto.com',
+  gate: 'Gate.io',
+  kucoin: 'KuCoin',
 };
 
 class TaxesController {
@@ -251,7 +255,17 @@ class TaxesController {
       let reason = '';
       if (t.state === 'disabled' && t.disabled_reason) reason = t.disabled_reason;
       else if (t.state === 'error' && t.last_error) reason = t.last_error;
-      else if (t.state === 'unsupported') reason = 'This exchange has no trade-history API.';
+      else if (t.state === 'unsupported' && conn.exchange === 'kucoin') {
+        reason = 'Cyrus doesn\'t import KuCoin trade history yet. Add purchases by hand, '
+          + 'or import a KuCoin trade export, to fill in costs.';
+      } else if (t.state === 'unsupported') reason = 'This exchange has no trade-history API.';
+      else if (conn.exchange === 'okx') {
+        reason = 'OKX keeps the last three months of trades available to apps, so older '
+          + 'purchases may need adding by hand.';
+      } else if (conn.exchange === 'cryptocom') {
+        reason = 'Cyrus reads the last six months of Crypto.com trades, a day at a time, '
+          + 'so older purchases may need adding by hand.';
+      }
       else if (conn.exchange === 'binance') {
         reason = 'Binance only reports trades market by market, so Cyrus checks the '
           + 'markets for coins you hold, have moved, or have traded before.';

@@ -134,7 +134,7 @@ const DemoData = (() => {
       },
       {
         id: 'coinbase',
-        name: 'Coinbase Advanced (Beta)',
+        name: 'Coinbase Advanced',
         requires_passphrase: false,
         has_withdrawal_addresses: false,
         supports_withdraw: false,
@@ -147,7 +147,7 @@ const DemoData = (() => {
       },
       {
         id: 'binance',
-        name: 'Binance (Beta)',
+        name: 'Binance',
         requires_passphrase: false,
         has_withdrawal_addresses: false,
         supports_withdraw: false,
@@ -173,7 +173,7 @@ const DemoData = (() => {
       },
       {
         id: 'robinhood',
-        name: 'Robinhood (Beta)',
+        name: 'Robinhood',
         requires_passphrase: false,
         has_withdrawal_addresses: false,
         supports_withdraw: false,
@@ -184,6 +184,58 @@ const DemoData = (() => {
         website: 'https://robinhood.com',
         api_key_url: 'https://robinhood.com/account/crypto',
         guide_url: 'https://docs.robinhood.com/crypto/trading/',
+      },
+      {
+        id: 'okx',
+        name: 'OKX (Beta)',
+        requires_passphrase: true,
+        has_withdrawal_addresses: false,
+        supports_withdraw: false,
+        supports_rebalance: true,
+        needs_generated_keypair: false,
+        has_sandbox: true,
+        website: 'https://www.okx.com',
+        api_key_url: 'https://www.okx.com/account/my-api',
+        guide_url: 'https://www.okx.com/help/how-can-i-do-an-api-trading',
+      },
+      {
+        id: 'kucoin',
+        name: 'KuCoin (Beta)',
+        requires_passphrase: true,
+        has_withdrawal_addresses: false,
+        supports_withdraw: false,
+        supports_rebalance: true,
+        needs_generated_keypair: false,
+        has_sandbox: false,
+        website: 'https://www.kucoin.com',
+        api_key_url: 'https://www.kucoin.com/account/api',
+        guide_url: 'https://www.kucoin.com/support/360015102174',
+      },
+      {
+        id: 'cryptocom',
+        name: 'Crypto.com Exchange (Beta)',
+        requires_passphrase: false,
+        has_withdrawal_addresses: false,
+        supports_withdraw: false,
+        supports_rebalance: true,
+        needs_generated_keypair: false,
+        has_sandbox: false,
+        website: 'https://crypto.com/exchange',
+        api_key_url: 'https://crypto.com/exchange/user/settings/api-management',
+        guide_url: 'https://exchange-docs.crypto.com/exchange/v1/rest-ws/index.html',
+      },
+      {
+        id: 'gate',
+        name: 'Gate.io (Beta)',
+        requires_passphrase: false,
+        has_withdrawal_addresses: false,
+        supports_withdraw: false,
+        supports_rebalance: true,
+        needs_generated_keypair: false,
+        has_sandbox: false,
+        website: 'https://www.gate.io',
+        api_key_url: 'https://www.gate.io/myaccount/api_key_manage',
+        guide_url: 'https://www.gate.io/docs/developers/apiv4/',
       },
     ];
   }
@@ -1551,6 +1603,10 @@ class DemoMode {
       [MarketData, 'getTicker', async (_t: string, sym: string) => DemoData.wrap(DemoData.ticker(sym))],
       [MarketData, 'getHoldings', async (_t: string, connId: number | 'all') => DemoData.wrap(DemoData.holdings(connId))],
       [MarketData, 'getAssetDetail', async (_t: string, sym: string) => DemoData.wrap(DemoData.assetDetail(sym))],
+      [MarketData, 'getFundamentals', async (_t: string, sym: string) => {
+        const d = DemoData.assetDetail(sym);
+        return DemoData.wrap({ symbol: sym, is_cash: !!d?.is_cash, info: d?.info ?? null, live: true });
+      }],
     ];
   }
 

@@ -441,11 +441,18 @@ button:disabled,
 .exchange-binance  { color: #F2C94C; border-color: color-mix(in srgb, #F2C94C 40%, transparent); background: transparent; }
 .exchange-gemini   { color: #5EE6F7; border-color: color-mix(in srgb, #5EE6F7 40%, transparent); background: transparent; }
 .exchange-robinhood{ color: var(--pos); border-color: color-mix(in srgb, var(--pos) 40%, transparent); background: transparent; }
+.exchange-okx      { color: var(--text-primary); border-color: color-mix(in srgb, var(--text-primary) 35%, transparent); background: transparent; }
+.exchange-cryptocom{ color: #4FA3F7; border-color: color-mix(in srgb, #4FA3F7 40%, transparent); background: transparent; }
+.exchange-gate     { color: #7C9BFF; border-color: color-mix(in srgb, #7C9BFF 40%, transparent); background: transparent; }
+.exchange-kucoin   { color: #3FD2B0; border-color: color-mix(in srgb, #3FD2B0 40%, transparent); background: transparent; }
 
 body.theme-light .exchange-kraken   { color: #5B3FC4; }
 body.theme-light .exchange-coinbase { color: #1D4ED8; }
 body.theme-light .exchange-binance  { color: #8A6100; }
 body.theme-light .exchange-gemini   { color: #0E7490; }
+body.theme-light .exchange-cryptocom{ color: #0B5CAD; }
+body.theme-light .exchange-gate     { color: #1E3FB8; }
+body.theme-light .exchange-kucoin   { color: #0F7A63; }
 
 .side-buy,
 .side-sell {

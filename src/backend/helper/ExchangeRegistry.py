@@ -5,6 +5,8 @@ helper that loads a user's exchange connection from the DB and returns a
 ready-to-use ``ccxt.Exchange`` instance.
 """
 
+import time
+
 from helper.Security import decrypt_api_key
 from helper.Helper import execute_query_one
 from helper.ExchangeClient import create_exchange
@@ -13,6 +15,15 @@ from helper.ExchangeClient import create_exchange
 # ---------------------------------------------------------------------------
 # Supported exchanges
 # ---------------------------------------------------------------------------
+
+
+def _days_ago(days: int) -> int:
+    """A history epoch for exchanges that only keep a recent window of fills.
+
+    Computed at startup; the sync only uses it for a connection's first pass.
+    """
+    return int(time.time()) - days * 86400
+
 
 SUPPORTED_EXCHANGES: dict[str, dict] = {
     'kraken': {
@@ -57,7 +68,7 @@ SUPPORTED_EXCHANGES: dict[str, dict] = {
         'guide_url': 'https://support.kraken.com/articles/360000919966-how-to-create-an-api-key',
     },
     'coinbase': {
-        'name': 'Coinbase Advanced (Beta)',
+        'name': 'Coinbase Advanced',
         # CCXT serves the Coinbase Advanced Trade API through the 'coinbase'
         # class; 'coinbaseadvanced' is not a registered ccxt id (getattr would
         # return None and every Coinbase connection would fail to build).
@@ -104,7 +115,7 @@ SUPPORTED_EXCHANGES: dict[str, dict] = {
         'guide_url': 'https://docs.cdp.coinbase.com/exchange/introduction/rest-quickstart',
     },
     'binance': {
-        'name': 'Binance (Beta)',
+        'name': 'Binance',
         'ccxt_id': 'binance',
         'requires_passphrase': False,
         'has_withdrawal_addresses': False,
@@ -184,7 +195,7 @@ SUPPORTED_EXCHANGES: dict[str, dict] = {
         'guide_url': 'https://developer.gemini.com/roles',
     },
     'robinhood': {
-        'name': 'Robinhood (Beta)',
+        'name': 'Robinhood',
         'ccxt_id': None,  # Direct API via RobinhoodAdapter — not CCXT-based
         'requires_passphrase': False,
         'has_withdrawal_addresses': False,  # no withdrawal API
@@ -218,6 +229,147 @@ SUPPORTED_EXCHANGES: dict[str, dict] = {
         'website': 'https://robinhood.com',
         'api_key_url': 'https://robinhood.com/account/crypto',
         'guide_url': 'https://docs.robinhood.com/crypto/trading/',
+    },
+    'okx': {
+        'name': 'OKX (Beta)',
+        'ccxt_id': 'okx',
+        # OKX API keys come with a passphrase chosen when the key is created.
+        'requires_passphrase': True,
+        'has_withdrawal_addresses': False,
+        'supports_withdraw': False,
+        'supports_rebalance': True,
+        # Order placement allows 60 requests / 2s per instrument.
+        'order_pacing_ms': 250,
+        'supports_transfer_history': True,
+        # Deposit and withdrawal history take begin/end timestamps and return
+        # at most 100 rows a call; a full window is bisected by the sync.
+        'transfer_history': {
+            'source': 'transactions',
+            'window_seconds': 90 * 86400,
+            'page_cap': 100,
+            'history_epoch': 1483228800,   # 2017-01-01, OKX launch
+            'page_pacing_ms': 400,
+        },
+        # fills-history takes no symbol (instType SPOT), honours begin/end, and
+        # ccxt pages it dynamically. OKX only keeps the last three months there,
+        # so the walk starts there rather than at the launch date.
+        'supports_trade_history': True,
+        'trade_history': {
+            'strategy': 'window',
+            'paging': 'paginate',
+            'pagination_calls': 20,
+            'window_seconds': 30 * 86400,
+            'page_cap': 2000,              # 100 a call x 20 calls
+            'history_epoch': _days_ago(90),
+            'page_pacing_ms': 350,
+        },
+        # Demo trading: separate demo-account API keys, same endpoints.
+        'has_sandbox': True,
+        'website': 'https://www.okx.com',
+        'api_key_url': 'https://www.okx.com/account/my-api',
+        'guide_url': 'https://www.okx.com/help/how-can-i-do-an-api-trading',
+    },
+    'kucoin': {
+        'name': 'KuCoin (Beta)',
+        'ccxt_id': 'kucoin',
+        # KuCoin API keys come with a passphrase chosen when the key is created.
+        'requires_passphrase': True,
+        'has_withdrawal_addresses': False,
+        'supports_withdraw': False,
+        'supports_rebalance': True,
+        # Spot order entry is weight-limited per 30s window; 300ms is well
+        # inside it for a ladder.
+        'order_pacing_ms': 300,
+        # Not yet: KuCoin's "high-frequency" accounts (most accounts now) only
+        # return fills one market at a time, a week per query, and deposit /
+        # withdrawal history has its own short ranges. Until that's built and
+        # tested against a real account, the Taxes and Transfers pages say so
+        # rather than show a partial history.
+        'supports_transfer_history': False,
+        'transfer_history': None,
+        'supports_trade_history': False,
+        'trade_history': None,
+        # KuCoin retired its public sandbox.
+        'has_sandbox': False,
+        'website': 'https://www.kucoin.com',
+        'api_key_url': 'https://www.kucoin.com/account/api',
+        'guide_url': 'https://www.kucoin.com/support/360015102174',
+    },
+    'cryptocom': {
+        # The Crypto.com Exchange (exchange.crypto.com), which is where API keys
+        # come from. Coins held in the Crypto.com App have no API.
+        'name': 'Crypto.com Exchange (Beta)',
+        'ccxt_id': 'cryptocom',
+        'requires_passphrase': False,
+        'ccxt_options': {'defaultType': 'spot'},
+        'has_withdrawal_addresses': False,
+        'supports_withdraw': False,
+        'supports_rebalance': True,
+        # Order entry: 15 requests / 100ms on create-order; 250ms is generous.
+        'order_pacing_ms': 250,
+        'supports_transfer_history': True,
+        # Deposit / withdrawal history take start/end timestamps.
+        'transfer_history': {
+            'source': 'transactions',
+            'window_seconds': 30 * 86400,
+            'page_cap': 100,
+            'history_epoch': 1572566400,   # 2019-11-01, Exchange launch
+            'page_pacing_ms': 400,
+        },
+        # get-trades takes no symbol, but a start/end pair may span at most a
+        # day, so the walk is a day at a time (ccxt pages inside each day).
+        # Cyrus reads the last six months; older purchases are added by hand.
+        'supports_trade_history': True,
+        'trade_history': {
+            'strategy': 'window',
+            'paging': 'paginate',
+            'pagination_calls': 10,
+            'window_seconds': 86400,
+            'page_cap': 1000,              # 100 a call x 10 calls
+            'history_epoch': _days_ago(180),
+            'page_pacing_ms': 300,
+        },
+        'has_sandbox': False,
+        'website': 'https://crypto.com/exchange',
+        'api_key_url': 'https://crypto.com/exchange/user/settings/api-management',
+        'guide_url': 'https://exchange-docs.crypto.com/exchange/v1/rest-ws/index.html',
+    },
+    'gate': {
+        'name': 'Gate.io (Beta)',
+        'ccxt_id': 'gate',
+        'requires_passphrase': False,
+        # Spot only, and only spot markets loaded (the full list, futures and
+        # options included, takes ~15s to load).
+        'ccxt_options': {'defaultType': 'spot', 'fetchMarkets': {'types': ['spot']}},
+        'has_withdrawal_addresses': False,
+        'supports_withdraw': False,
+        'supports_rebalance': True,
+        # Spot order entry: 10 requests/s per pair.
+        'order_pacing_ms': 250,
+        'supports_transfer_history': True,
+        # Deposits / withdrawals: from/to may span at most 30 days.
+        'transfer_history': {
+            'source': 'transactions',
+            'window_seconds': 30 * 86400,
+            'page_cap': 100,
+            'history_epoch': 1514764800,   # 2018-01-01
+            'page_pacing_ms': 400,
+        },
+        # Spot my_trades: no symbol needed, from/to may span at most 30 days.
+        'supports_trade_history': True,
+        'trade_history': {
+            'strategy': 'window',
+            'paging': 'paginate',
+            'pagination_calls': 10,
+            'window_seconds': 30 * 86400,
+            'page_cap': 1000,              # 100 a call x 10 calls
+            'history_epoch': 1514764800,   # 2018-01-01
+            'page_pacing_ms': 300,
+        },
+        'has_sandbox': False,
+        'website': 'https://www.gate.io',
+        'api_key_url': 'https://www.gate.io/myaccount/api_key_manage',
+        'guide_url': 'https://www.gate.io/docs/developers/apiv4/',
     },
 }
 
@@ -407,10 +559,11 @@ def get_user_exchange(user_id: int, connection_id: int):
         from helper.robinhood.adapter import RobinhoodAdapter
         return RobinhoodAdapter(api_key=api_key, private_key_b64=private_key)
 
-    ccxt_id = SUPPORTED_EXCHANGES[exchange_name]['ccxt_id']
+    meta = SUPPORTED_EXCHANGES[exchange_name]
     passphrase = decrypt_api_key(row['passphrase_encrypted']) if row.get('passphrase_encrypted') else None
     sandbox = bool(row.get('is_sandbox', False))
-    return create_exchange(ccxt_id, api_key, private_key, passphrase, sandbox)
+    return create_exchange(meta['ccxt_id'], api_key, private_key, passphrase, sandbox,
+                           options=meta.get('ccxt_options'))
 
 
 def get_connection_row(user_id: int, connection_id: int) -> dict | None:
