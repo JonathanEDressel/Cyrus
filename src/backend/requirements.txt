@@ -1,10 +1,17 @@
-flask==3.1.0
-flask-cors==5.0.1
-bcrypt==4.2.1
-cryptography==44.0.0
-pyjwt==2.10.1
-python-dotenv==1.0.0
-requests==2.32.3
-ccxt>=4.2.0
-pynacl>=1.5.0
-anthropic>=0.116.0
+flask==3.1.3
+werkzeug==3.1.9
+flask-cors==6.0.5
+# bcrypt 5 raises on passwords over 72 bytes; helper/Security.py truncates
+# to 72 as bcrypt 4 did, so existing hashes keep verifying.
+bcrypt==5.0.0
+cryptography==50.0.2
+pyjwt==2.15.1
+python-dotenv==1.2.4
+requests==2.34.2
+# Pinned so the Windows and Mac builds trade through the same, tested ccxt.
+ccxt==4.5.93
+pynacl==1.6.2
+# Pinned: 1.x/2.x change the HTTP stack and API version (a separate migration).
+anthropic==0.121.0
+# SQLCipher: the database is encrypted on disk (helper/DbCrypto.py).
+sqlcipher3==0.6.5

@@ -9,13 +9,20 @@ import base64
 import hashlib
 
 
+def _bcrypt_input(password: str) -> bytes:
+    """bcrypt only reads the first 72 bytes. bcrypt < 5 dropped the rest
+    silently; 5.x raises instead. Truncating here keeps every existing hash
+    (made under the old behaviour) verifying, and long passwords working."""
+    return password.encode('utf-8')[:72]
+
+
 def hash_password(password: str) -> str:
     salt = bcrypt.gensalt()
-    return bcrypt.hashpw(password.encode('utf-8'), salt).decode('utf-8')
+    return bcrypt.hashpw(_bcrypt_input(password), salt).decode('utf-8')
 
 
 def verify_password(password: str, hashed: str) -> bool:
-    return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
+    return bcrypt.checkpw(_bcrypt_input(password), hashed.encode('utf-8'))
 
 
 def generate_token(user_id: int, username: str) -> str:
