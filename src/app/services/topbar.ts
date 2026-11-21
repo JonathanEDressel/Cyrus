@@ -37,8 +37,8 @@ class TopBar {
 
   private static readonly TICKER_MS = 5 * 60 * 1000;
   private static readonly WORKER_MS = 30 * 1000;
-  /** Most positions the ticker shows after the portfolio total. */
-  private static readonly TICKER_MAX = 8;
+  /** Marquee speed, in px per second. */
+  private static readonly TICKER_SPEED = 38;
 
   private static tickerAt = 0;
   private static workerAt = 0;
@@ -53,6 +53,15 @@ class TopBar {
     TopBar.bindShortcuts();
     // One cheap tick decides whether anything is due; fetches stay rare.
     window.setInterval(() => TopBar.tick(), 10000);
+    // Whether the holdings fit (and so whether they scroll) depends on width.
+    let resizeTimer: number | undefined;
+    window.addEventListener('resize', () => {
+      window.clearTimeout(resizeTimer);
+      resizeTimer = window.setTimeout(() => {
+        const el = document.getElementById('app-ticker');
+        if (el) TopBar.setupMarquee(el);
+      }, 200);
+    });
   }
 
   /** Shortcut hints say ⌘K on macOS; the handler already accepts ⌘ and Ctrl. */
@@ -117,36 +126,69 @@ class TopBar {
     const prior = total - change;
     const changePct = prior > 0 ? (change / prior) * 100 : 0;
 
-    const parts: string[] = [];
-    if (total > 0) {
-      parts.push(`<span class="ticker-item">PORT <b>${TopBar.esc(TopBar.fmtUsd(total))}</b> `
-        + `${TopBar.changeHtml(changePct)}</span>`);
-    }
+    // The portfolio total stays put on the left; every holding, largest
+    // first, runs past it (setupMarquee) when they don't all fit.
+    const port = total > 0
+      ? `<span class="ticker-item ticker-port">PORT <b>${TopBar.esc(TopBar.fmtUsd(total))}</b> `
+        + `${TopBar.changeHtml(changePct)}</span>`
+      : '';
 
-    positions
+    const coins = positions
       .filter(p => !p.is_cash && Number(p.usd_value) > 0)
       .sort((a, b) => Number(b.usd_value) - Number(a.usd_value))
-      .slice(0, TopBar.TICKER_MAX)
-      .forEach(p => {
+      .map(p => {
         const price = p.info?.price ?? p.unit_price;
         const pct = p.info?.change_24h_pct;
-        parts.push(`<span class="ticker-item">${TopBar.esc(String(p.asset || '').toUpperCase())} `
+        return `<span class="ticker-item">${TopBar.esc(String(p.asset || '').toUpperCase())} `
           + `<b>${TopBar.esc(price != null ? TopBar.fmtPrice(Number(price)) : '—')}</b> `
-          + `${pct != null ? TopBar.changeHtml(Number(pct)) : ''}</span>`);
+          + `${pct != null ? TopBar.changeHtml(Number(pct)) : ''}</span>`;
       });
 
-    if (!parts.length) {
-      parts.push('<span class="ticker-flat">No holdings to show yet</span>');
-    }
+    const track = coins.length
+      ? coins.join('')
+      : (port ? '' : '<span class="ticker-flat">No holdings to show yet</span>');
 
     const names = (ExchangeStore.connections || []).map(c =>
       ExchangeStore.getExchangeName(c.id).toUpperCase());
     const live = data.market_data_live !== false;
-    parts.push(`<span class="ticker-end">${TopBar.esc(names.join(' · '))} `
-      + `<span class="${live ? 'ticker-up' : 'ticker-flat'}">● ${live ? 'LIVE' : 'STALE'}</span></span>`);
+    const end = `<span class="ticker-end">${TopBar.esc(names.join(' · '))} `
+      + `<span class="${live ? 'ticker-up' : 'ticker-flat'}">● ${live ? 'LIVE' : 'STALE'}</span></span>`;
 
-    const end = parts.pop();
-    el.innerHTML = `<div class="ticker-items">${parts.join('')}</div>${end}`;
+    el.innerHTML = `${port}<div class="ticker-items"><div class="ticker-track">${track}</div></div>${end}`;
+    TopBar.setupMarquee(el);
+  }
+
+  /**
+   * Scroll the holdings when they're wider than the strip: the set is
+   * repeated once and the track slides by exactly one set, so it loops
+   * seamlessly. Hover pauses it (CSS); with reduced motion on it doesn't move.
+   */
+  private static setupMarquee(el: HTMLElement): void {
+    const box = el.querySelector('.ticker-items') as HTMLElement | null;
+    const track = el.querySelector('.ticker-track') as HTMLElement | null;
+    if (!box || !track) return;
+    track.querySelectorAll('[data-clone]').forEach(n => n.remove());
+    box.classList.remove('is-scrolling');
+    track.style.removeProperty('--ticker-shift');
+    track.style.removeProperty('--ticker-dur');
+
+    const items = Array.from(track.children) as HTMLElement[];
+    if (!items.length || box.clientWidth === 0) return;
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+    const setWidth = track.scrollWidth;
+    if (setWidth <= box.clientWidth) return;
+
+    const gap = parseFloat(getComputedStyle(track).columnGap) || 0;
+    items.forEach(n => {
+      const copy = n.cloneNode(true) as HTMLElement;
+      copy.setAttribute('data-clone', '');
+      copy.setAttribute('aria-hidden', 'true');
+      track.appendChild(copy);
+    });
+    const shift = setWidth + gap;
+    track.style.setProperty('--ticker-shift', `${shift}px`);
+    track.style.setProperty('--ticker-dur', `${(shift / TopBar.TICKER_SPEED).toFixed(1)}s`);
+    box.classList.add('is-scrolling');
   }
 
   private static async refreshWorker(): Promise<void> {

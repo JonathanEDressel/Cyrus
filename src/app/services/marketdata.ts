@@ -31,6 +31,14 @@ class MarketData {
     );
   }
 
+  /** Market cap and the like for one coin (CoinGecko, cached by the backend). */
+  static async getFundamentals(token: string, symbol: string): Promise<ApiResponse<any>> {
+    return DataAccess.get<any>(
+      `${AppConfig.API_BASE}/market/fundamentals/${encodeURIComponent(symbol)}`,
+      token
+    );
+  }
+
   static async getTicker(token: string, symbol: string): Promise<ApiResponse<any>> {
     const params = new URLSearchParams({ symbol });
     return DataAccess.get<any>(

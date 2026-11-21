@@ -586,31 +586,7 @@
   padding: 0.25rem 0;
 }
 
-.flow-legend {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.5rem 1.25rem;
-  padding: 0.7rem 0.25rem;
-  border-top: 1px solid var(--border-primary);
-  margin-top: 0.5rem;
-}
-
-.flow-legend-title {
-  font-size: 0.7rem;
-  font-weight: 700;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.6px;
-}
-
-.flow-legend-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  font-size: 0.76rem;
-  color: var(--text-muted);
-}
+/* .flow-legend lives in ruleflow.css (shared with Open Orders). */
 
 /* ─── Edit Rule Modal ───────────────────────────────────────────── */
 
@@ -982,21 +958,71 @@
   margin: 0 0 1rem;
 }
 
+/* A real table here. The shared .data-table lays the header and each row out
+   as separate fixed-width tables, which only lines columns up when they're
+   all the same width; this one has a wide first column and nine narrow ones. */
+.capabilities-table-wrap {
+  overflow-x: auto;
+}
+
+.capabilities-table thead { display: table-header-group; }
+.capabilities-table tbody { display: table-row-group; max-height: none; overflow: visible; }
+.capabilities-table thead tr,
+.capabilities-table tbody tr { display: table-row; }
+
+.capabilities-table th.cap-rule-col {
+  vertical-align: bottom;
+}
+
 .capabilities-table th.cap-ex-col {
   text-align: center;
-  white-space: nowrap;
+  vertical-align: bottom;
+  min-width: 74px;
+  padding: 0.75rem 0.4rem;
+  font-size: 0.7rem;
+  line-height: 1.3;
+  white-space: normal;
+}
+
+.cap-ex-name {
+  display: block;
+}
+
+.cap-ex-beta {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 1px 5px;
+  border: 1px solid var(--border-primary);
+  border-radius: 4px;
+  font-size: 0.58rem;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
 }
 
 .capabilities-table .cap-cell {
   text-align: center;
+  vertical-align: middle;
   font-size: 1rem;
+  padding-left: 0.4rem;
+  padding-right: 0.4rem;
 }
 
-.cap-rule-cell {
+/* The automation names stay in view when the table scrolls sideways. */
+.capabilities-table .cap-rule-col,
+.capabilities-table .cap-rule-cell {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  min-width: 250px;
+}
+
+.capabilities-table .cap-rule-col { background: var(--bg-primary); }
+.capabilities-table .cap-rule-cell { background: var(--bg-secondary); }
+
+.cap-rule {
   display: flex;
   align-items: center;
   gap: 0.7rem;
-  min-width: 240px;
 }
 
 .cap-rule-icon {

@@ -85,14 +85,29 @@ class CommandsController {
     }
     this.renderCapabilities();
 
+    // Shown or hidden, it stays that way across restarts (localStorage).
     const header = document.getElementById('capabilities-toggle');
     const section = header?.closest('.capabilities-section') as HTMLElement | null;
     if (header && section) {
       const KEY = 'cyrus-cap-collapsed';
-      if (sessionStorage.getItem(KEY) === '1') section.classList.add('collapsed');
-      header.addEventListener('click', () => {
-        const collapsed = section.classList.toggle('collapsed');
-        sessionStorage.setItem(KEY, collapsed ? '1' : '0');
+      let saved: string | null = null;
+      try { saved = localStorage.getItem(KEY); } catch { /* storage unavailable */ }
+      const apply = (collapsed: boolean) => {
+        section.classList.toggle('collapsed', collapsed);
+        header.setAttribute('aria-expanded', String(!collapsed));
+      };
+      apply(saved === '1');
+      const toggle = () => {
+        const collapsed = !section.classList.contains('collapsed');
+        apply(collapsed);
+        try { localStorage.setItem(KEY, collapsed ? '1' : '0'); } catch { /* not remembered */ }
+      };
+      header.addEventListener('click', toggle);
+      header.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          toggle();
+        }
       });
     }
   }
@@ -124,8 +139,14 @@ class CommandsController {
         desc: 'Send funds out once a balance builds up', needsWithdraw: true },
     ];
 
-    head.innerHTML = '<th>Automation</th>' +
-      exchanges.map((e: any) => `<th class="cap-ex-col">${this.escapeHtml(e.name)}</th>`).join('');
+    // Names without "(Beta)", which becomes a small tag under the name.
+    head.innerHTML = '<th class="cap-rule-col">Automation</th>' +
+      exchanges.map((e: any) => {
+        const name = String(e.name || e.id).replace(/\s*\(beta\)\s*/i, '');
+        const beta = /\(beta\)/i.test(String(e.name || ''));
+        return `<th class="cap-ex-col" scope="col"><span class="cap-ex-name">${this.escapeHtml(name)}</span>`
+          + `${beta ? '<span class="cap-ex-beta">Beta</span>' : ''}</th>`;
+      }).join('');
 
     tbody.innerHTML = rows.map((r) => {
       const cells = exchanges.map((e: any) => {
@@ -136,13 +157,13 @@ class CommandsController {
         return `<td class="cap-cell">${icon}</td>`;
       }).join('');
       return `<tr>
-        <td class="cap-rule-cell">
+        <td class="cap-rule-cell"><div class="cap-rule">
           <span class="cap-rule-icon"><i class="fa-solid ${r.icon}"></i></span>
           <span class="cap-rule-text">
             <span class="cap-rule-name">${this.escapeHtml(r.name)}</span>
             <span class="cap-rule-desc">${this.escapeHtml(r.desc)}</span>
           </span>
-        </td>${cells}</tr>`;
+        </div></td>${cells}</tr>`;
     }).join('');
   }
 

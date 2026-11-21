@@ -39,18 +39,19 @@ def _get_pairs_cached() -> list[dict]:
 
     exchange = _get_kraken()
     exchange.load_markets(True)  # force reload
+    # Every active spot pair, whatever it's priced in (XRP/CAD, ETH/EUR,
+    # SOL/BTC...): /ohlcv and /ticker take any Kraken market. Within a coin,
+    # the common quotes come first so "BTC" still leads with BTC/USD.
+    quote_rank = {q: i for i, q in enumerate(('USD', 'USDT', 'USDC', 'EUR', 'CAD', 'GBP', 'AUD'))}
     pairs = []
     for symbol, market in exchange.markets.items():
-        if not market.get('active', True):
+        if not market.get('active', True) or market.get('spot') is False:
             continue
-        quote = market.get('quote', '')
-        if quote in ('USD', 'USDT'):
-            pairs.append({
-                'symbol': symbol,
-                'base': market.get('base', ''),
-                'quote': quote,
-            })
-    pairs.sort(key=lambda p: p['base'])
+        base, quote = market.get('base', ''), market.get('quote', '')
+        if not base or not quote:
+            continue
+        pairs.append({'symbol': symbol, 'base': base, 'quote': quote})
+    pairs.sort(key=lambda p: (p['base'], quote_rank.get(p['quote'], len(quote_rank)), p['quote']))
     _pairs_cache = pairs
     _pairs_cache_ts = now
     return _pairs_cache
@@ -417,6 +418,32 @@ def asset_detail(symbol):
             'market_data_stale_seconds': stale_seconds,
         })
 
+    except Exception as e:
+        return handle_error(e)
+
+
+@market_data_bp.route('/fundamentals/<symbol>', methods=['GET'])
+@token_required
+@active_required
+def fundamentals(symbol):
+    """Just the CoinGecko fundamentals (market cap, rank...) for one coin.
+
+    The light version of /asset/<symbol>, for the Live Data stats strip: no
+    exchange history, and served from the asset_market_info cache when fresh.
+    """
+    try:
+        from helper import coingecko
+
+        symbol = (symbol or '').strip().upper()
+        if not symbol:
+            return bad_request("symbol is required")
+        if coingecko.is_fiat(symbol):
+            return success_response(data={'symbol': symbol, 'is_cash': True, 'info': None, 'live': True})
+        info, live, stale_seconds = _load_fundamentals([symbol])
+        return success_response(data={
+            'symbol': symbol, 'is_cash': False, 'info': info.get(symbol),
+            'live': live, 'stale_seconds': stale_seconds,
+        })
     except Exception as e:
         return handle_error(e)
 

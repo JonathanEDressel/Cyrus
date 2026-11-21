@@ -333,10 +333,7 @@ class HomeController {
       case 'flow':
         this.bindFlowTabs();
         this.renderRuleFlow();
-        if (!ExchangeStore.error) {
-          const ordersChart = document.getElementById('overview-orders-chart');
-          if (ordersChart) OrderFlow.render(ordersChart, ExchangeStore.openOrders);
-        }
+        if (!ExchangeStore.error) this.renderOrderFlow();
         break;
       case 'movers': this.renderMovers(); break;
       case 'accounts': this.renderAccounts(); break;
@@ -354,8 +351,7 @@ class HomeController {
     // doughnut is an SVG that scales; the flow graphs lay out by width.
     if (w.type === 'flow') {
       this.renderRuleFlow();
-      const ordersChart = document.getElementById('overview-orders-chart');
-      if (ordersChart && !ExchangeStore.error) OrderFlow.render(ordersChart, ExchangeStore.openOrders);
+      if (!ExchangeStore.error) this.renderOrderFlow();
     }
   }
 
@@ -374,9 +370,7 @@ class HomeController {
       document.querySelectorAll('#overview-flow-tab-strip .rules-tab-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       this.applyFlowTab();
-      if (tab === 'orders') {
-        OrderFlow.render(document.getElementById('overview-orders-chart')!, ExchangeStore.openOrders);
-      }
+      if (tab === 'orders') this.renderOrderFlow();
     });
   }
 
@@ -862,6 +856,15 @@ class HomeController {
     }
   }
 
+  private renderOrderFlow(): void {
+    const ordersChart = document.getElementById('overview-orders-chart');
+    if (!ordersChart) return;
+    OrderFlow.render(ordersChart, ExchangeStore.openOrders, {
+      onOpen: () => router.navigate('openorders'),
+      openLabel: 'Open in Open Orders',
+    });
+  }
+
   /** Rules in scope for the selected exchange. */
   private scopedRules(): any[] {
     if (ExchangeStore.isAllMode()) return this.rules;
@@ -1129,6 +1132,14 @@ class HomeController {
         ).join('\n        ')}
       </div>
       <div class="chart-container" id="chart-el-${cardId}"></div>
+      <div class="chart-stats-wrap">
+        <div class="chart-stats" id="chart-stats-${cardId}">
+          <div class="chart-stat" data-stat="high"><span class="chart-stat-k">${savedRange} high</span><span class="chart-stat-v">--</span></div>
+          <div class="chart-stat" data-stat="low"><span class="chart-stat-k">${savedRange} low</span><span class="chart-stat-v">--</span></div>
+          <div class="chart-stat" data-stat="vol"><span class="chart-stat-k">24h volume</span><span class="chart-stat-v">--</span></div>
+          <div class="chart-stat" data-stat="cap"><span class="chart-stat-k">Market cap</span><span class="chart-stat-v">--</span></div>
+        </div>
+      </div>
     `;
     container.appendChild(card);
 
@@ -1225,6 +1236,7 @@ class HomeController {
 
     await this.loadChartData(symbol, savedRange);
     this.loadTicker(symbol);
+    void this.loadFundamentals(symbol);
   }
 
   private async loadChartData(symbol: string, range: string): Promise<void> {
@@ -1252,6 +1264,7 @@ class HomeController {
       inst.series.applyOptions({ priceFormat: { type: 'price', precision, minMove } });
 
       inst.series.setData(lineData);
+      this.showRangeStats(symbol, range, candles);
       const hideTime = ['3M', 'YTD', '1Y', '5Y', 'ALL'].includes(range);
       inst.chart.applyOptions({ timeScale: { timeVisible: !hideTime } });
       inst.chart.timeScale().fitContent();
@@ -1276,6 +1289,105 @@ class HomeController {
     }
   }
 
+  /**
+   * The strip under the chart: the range's high and low, 24h volume and the
+   * coin's market cap. High and low are the candles' true highs and lows
+   * (wicks included), so the high can sit a little above the line's peak,
+   * which plots closing prices.
+   */
+  private setStat(symbol: string, key: string, value: string, title = '', label?: string): void {
+    const box = document.getElementById(`chart-stats-${this.symbolToId(symbol)}`);
+    const cell = box?.querySelector(`[data-stat="${key}"]`) as HTMLElement | null;
+    if (!cell) return;
+    const v = cell.querySelector('.chart-stat-v') as HTMLElement;
+    v.innerHTML = value;
+    if (label != null) (cell.querySelector('.chart-stat-k') as HTMLElement).textContent = label;
+    if (title) cell.title = title;
+    else cell.removeAttribute('title');
+  }
+
+  private showRangeStats(symbol: string, range: string, candles: any[]): void {
+    const highs = candles.map((c: any) => Number(c.high ?? c.close)).filter(isFinite);
+    const lows = candles.map((c: any) => Number(c.low ?? c.close)).filter(isFinite);
+    const ok = highs.length >= 2 && lows.length >= 2;
+    const hi = ok ? Math.max(...highs) : 0, lo = ok ? Math.min(...lows) : 0;
+    this.setStat(symbol, 'high', ok ? this.escapeHtml(this.formatQuotePrice(hi, symbol)) : '--',
+      ok ? `Highest price over ${range}` : '', `${range} high`);
+    this.setStat(symbol, 'low', ok ? this.escapeHtml(this.formatQuotePrice(lo, symbol)) : '--',
+      ok ? `Lowest price over ${range}` : '', `${range} low`);
+  }
+
+  /** Market cap, cached per coin for 10 minutes (the backend caches too). */
+  private fundamentalsCache = new Map<string, { at: number; data: any }>();
+
+  private async loadFundamentals(symbol: string): Promise<void> {
+    const base = (symbol.split('/')[0] || '').toUpperCase();
+    if (!base) return;
+    let data: any = null;
+    const hit = this.fundamentalsCache.get(base);
+    if (hit && Date.now() - hit.at < 10 * 60 * 1000) {
+      data = hit.data;
+    } else {
+      try {
+        const token = AuthController.getToken();
+        if (!token) return;
+        data = (await MarketData.getFundamentals(token, base)).data;
+        this.fundamentalsCache.set(base, { at: Date.now(), data });
+      } catch {
+        this.setStat(symbol, 'cap', '&mdash;', 'Market data is unavailable right now');
+        return;
+      }
+    }
+    const info = data?.info;
+    const cap = Number(info?.market_cap);
+    if (data?.is_cash) {
+      this.setStat(symbol, 'cap', '&mdash;', `${base} is a currency, not a coin`);
+    } else if (!(cap > 0)) {
+      this.setStat(symbol, 'cap', '&mdash;', `CoinGecko has no market cap for ${base}`);
+    } else {
+      const usdQuote = /^(USD|USDT|USDC|USDG|RLUSD|PYUSD|DAI)$/.test((symbol.split('/')[1] || '').split(':')[0].toUpperCase());
+      let text = this.formatCompact(cap, 'USD');
+      // Market cap is in US dollars; say so when the pair is priced in something else.
+      if (!usdQuote && text.startsWith('$')) text = 'US' + text;
+      const rank = Number(info.market_cap_rank);
+      this.setStat(symbol, 'cap',
+        this.escapeHtml(text) + (rank > 0 ? ` <span class="chart-stat-sub">#${rank}</span>` : ''),
+        `${info.name || base} market cap in US dollars, from CoinGecko${rank > 0 ? ` (#${rank} by market cap)` : ''}`);
+    }
+  }
+
+  /** "$1.24B", "CA$12.4M", or "1.2K BTC" for a coin. */
+  private formatCompact(n: number, currencyOrCoin: string): string {
+    const code = currencyOrCoin.toUpperCase();
+    const money = /^(USD|USDT|USDC|USDG|RLUSD|PYUSD|DAI)$/.test(code) ? 'USD'
+      : /^(EUR|CAD|GBP|AUD|JPY|CHF|NZD|SGD|HKD)$/.test(code) ? code : '';
+    const opts: Intl.NumberFormatOptions = { notation: 'compact', maximumFractionDigits: 2 };
+    if (money) {
+      try {
+        return n.toLocaleString(undefined, { ...opts, style: 'currency', currency: money });
+      } catch { /* fall through */ }
+    }
+    return `${n.toLocaleString(undefined, opts)} ${code}`;
+  }
+
+  /**
+   * A pair's price in what it's quoted in: "$1.32" for USD and dollar
+   * stablecoins, "CA$1.32" / "€1.20" for other money, "0.00001234 BTC" for a
+   * coin.
+   */
+  private formatQuotePrice(price: number, symbol: string): string {
+    const quote = (symbol.split('/')[1] || 'USD').split(':')[0].toUpperCase();
+    const fracDigits = price >= 1 ? 2 : price >= 0.01 ? 4 : 8;
+    const opts = { minimumFractionDigits: fracDigits, maximumFractionDigits: fracDigits };
+    if (/^(USD|USDT|USDC|USDG|RLUSD|PYUSD|DAI)$/.test(quote)) return `$${price.toLocaleString(undefined, opts)}`;
+    if (/^(EUR|CAD|GBP|AUD|JPY|CHF|NZD|SGD|HKD)$/.test(quote)) {
+      try {
+        return price.toLocaleString(undefined, { ...opts, style: 'currency', currency: quote });
+      } catch { /* unknown to Intl: fall through */ }
+    }
+    return `${price.toLocaleString(undefined, opts)} ${quote}`;
+  }
+
   private async loadTicker(symbol: string): Promise<void> {
     const cardId = this.symbolToId(symbol);
     try {
@@ -1289,8 +1401,15 @@ class HomeController {
 
       if (priceEl && t.last != null) {
         const price = Number(t.last);
-        const fracDigits = price >= 1 ? 2 : price >= 0.01 ? 4 : 8;
-        priceEl.textContent = `$${price.toLocaleString(undefined, { minimumFractionDigits: fracDigits, maximumFractionDigits: fracDigits })}`;
+        priceEl.textContent = this.formatQuotePrice(price, symbol);
+      }
+
+      // Kraken reports volume in the coin; show it in what the pair is priced in.
+      const baseVol = Number(t.volume), last = Number(t.last);
+      const quote = (symbol.split('/')[1] || '').split(':')[0];
+      if (baseVol > 0 && last > 0) {
+        this.setStat(symbol, 'vol', this.escapeHtml(this.formatCompact(baseVol * last, quote)),
+          `Traded on Kraken in the last 24 hours (${baseVol.toLocaleString(undefined, { maximumFractionDigits: 2 })} ${symbol.split('/')[0]})`);
       }
     } catch {
       // leave as --
@@ -1361,12 +1480,21 @@ class HomeController {
     const list = document.getElementById('add-crypto-list');
     if (!list) return;
 
+    // "xrp cad", "XRP/CAD" and "xrpcad" all find XRP/CAD; a single word like
+    // "btc" matches the coin or the currency it's priced in.
     const q = query.toLowerCase().trim();
+    const words = q.split(/[\s/\-]+/).filter(Boolean);
+    const squashed = q.replace(/[\s/\-]+/g, '');
     const watchedSymbols = new Set(this.watchlistSymbols);
     const filtered = this.allPairs.filter((p: any) => {
       if (watchedSymbols.has(p.symbol)) return false;
       if (!q) return true;
-      return p.symbol.toLowerCase().includes(q) || p.base.toLowerCase().includes(q);
+      const sym = String(p.symbol).toLowerCase();
+      if (words.length > 1) {
+        const [b, qt] = [String(p.base).toLowerCase(), String(p.quote || '').toLowerCase()];
+        return b.startsWith(words[0]) && qt.startsWith(words[1]);
+      }
+      return sym.includes(q) || sym.replace('/', '').includes(squashed);
     });
 
     if (filtered.length === 0) {
@@ -1454,10 +1582,7 @@ class HomeController {
         : `A quick look at your ${ExchangeStore.getExchangeName(ExchangeStore.activeMode as number)} account`;
     }
 
-    if (!ExchangeStore.error) {
-      const ordersChart = document.getElementById('overview-orders-chart');
-      if (ordersChart) OrderFlow.render(ordersChart, ExchangeStore.openOrders);
-    }
+    if (!ExchangeStore.error) this.renderOrderFlow();
 
     this.renderLimitOrders();
     this.renderAccounts();

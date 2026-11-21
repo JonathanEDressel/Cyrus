@@ -354,9 +354,11 @@
 
 .chart-header-left {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
-  gap: 0.75rem;
+  gap: 0.35rem 0.75rem;
 }
+
 
 .chart-symbol {
   font-weight: 700;
@@ -440,6 +442,62 @@
 .chart-container {
   width: 100%;
   height: 280px;
+}
+
+/* Stats under the chart: range high / low, 24h volume, market cap
+   (home.ts showRangeStats / loadTicker / loadFundamentals). Four across, or
+   two by two when the card is narrow. */
+.chart-stats-wrap {
+  container-type: inline-size;
+  border-top: 1px solid var(--border-secondary);
+}
+
+.chart-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.chart-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  padding: 0.6rem 1.1rem 0.7rem;
+}
+
+.chart-stat + .chart-stat {
+  border-left: 1px solid var(--border-secondary);
+}
+
+.chart-stat-k {
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.chart-stat-v {
+  font-family: var(--font-mono);
+  font-size: 0.86rem;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chart-stat-sub {
+  margin-left: 0.3rem;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+@container (max-width: 520px) {
+  .chart-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .chart-stat:nth-child(3) { border-left: 0; }
+  .chart-stat:nth-child(n + 3) { border-top: 1px solid var(--border-secondary); }
 }
 
 .chart-error {
@@ -760,6 +818,10 @@
   padding-left: 0;
   padding-right: 0;
 }
+
+/* In the widget the card has no side padding; line the strip up with it. */
+.ov-card .chart-stat { padding-left: 0.85rem; padding-right: 0.85rem; }
+.ov-card .chart-stat:first-child { padding-left: 0; }
 
 .ov-card .time-range-selector {
   background: transparent;
