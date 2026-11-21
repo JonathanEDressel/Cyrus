@@ -31,6 +31,10 @@ on:
         description: Upload the .dmg files to the release for this tag
         type: boolean
         default: false
+      release:
+        description: Upload to this release instead (e.g. build main, attach to v1.5.0)
+        required: false
+        default: ''
 
 permissions:
   contents: write
@@ -54,6 +58,7 @@ jobs:
     timeout-minutes: 45
     env:
       TAG: ${{ github.event.release.tag_name || inputs.tag }}
+      RELEASE_TAG: ${{ github.event.release.tag_name || inputs.release || inputs.tag }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -166,4 +171,4 @@ jobs:
         if: github.event_name == 'release' || inputs.upload
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload "$TAG" release/Cyrus-*.dmg --clobber
+        run: gh release upload "$RELEASE_TAG" release/Cyrus-*.dmg --clobber

@@ -4,12 +4,16 @@ flask-cors==6.0.5
 # bcrypt 5 raises on passwords over 72 bytes; helper/Security.py truncates
 # to 72 as bcrypt 4 did, so existing hashes keep verifying.
 bcrypt==5.0.0
-cryptography==50.0.2
+# 48.0.1 is the newest with a prebuilt Intel-Mac wheel (universal2). From 49
+# Intel Macs build it from source against Homebrew's OpenSSL, which clashes
+# with the libssl PyInstaller bundles and the backend can't start.
+cryptography==48.0.1
 pyjwt==2.15.1
 python-dotenv==1.2.4
 requests==2.34.2
 # Pinned so the Windows and Mac builds trade through the same, tested ccxt.
-ccxt==4.5.93
+# Later releases require cryptography>=49, which has no Intel-Mac wheel (see above).
+ccxt==4.5.64
 pynacl==1.6.2
 # Pinned: 1.x/2.x change the HTTP stack and API version (a separate migration).
 anthropic==0.121.0
