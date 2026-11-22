@@ -1196,7 +1196,10 @@ const DemoData = (() => {
   function ticker(symbol: string): any {
     const base = (symbol.split('/')[0] || symbol).toUpperCase();
     const last = PRICE[base] ?? 100;
-    return { symbol, last, bid: last * 0.999, ask: last * 1.001 };
+    // 24h volume in the coin, as Kraken reports it (the chart shows it in USD).
+    const usdVolume: Record<string, number> = { BTC: 214e6, ETH: 96e6, SOL: 31e6, XRP: 18e6, DOGE: 9e6 };
+    const volume = Math.round((usdVolume[base] ?? 4e6) / last * 100) / 100;
+    return { symbol, last, bid: last * 0.999, ask: last * 1.001, volume };
   }
 
   // ── Assistant ──────────────────────────────────────────────────────────────
