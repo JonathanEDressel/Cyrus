@@ -101,6 +101,27 @@
     </div>
   </template>
 
+  <template id="tpl-widget-chart">
+    <div class="overview-section ov-card chart-widget" data-section="chart">
+      <div class="section-header">
+        <div class="section-header-left">
+          <h2 class="section-title">Chart</h2>
+          <select id="chart-widget-select" class="live-data-selector d-none" title="Saved chart" aria-label="Saved chart"></select>
+        </div>
+        <div class="chart-widget-actions">
+          <div class="chart-widget-tfs" id="chart-widget-tfs" role="group" aria-label="Timeframe"></div>
+          <button type="button" class="add-crypto-btn" id="chart-widget-open" title="Open in Charts"><i class="fa-solid fa-up-right-from-square"></i> Open</button>
+        </div>
+      </div>
+      <div class="chart-widget-body" id="chart-widget-body"></div>
+      <div class="live-data-empty d-none" id="chart-widget-empty">
+        <i class="fa-solid fa-chart-simple"></i>
+        <p id="chart-widget-empty-text">No saved charts yet.</p>
+        <button type="button" class="add-crypto-btn chart-widget-create" data-route="charts"><i class="fa-solid fa-plus"></i> Create a chart</button>
+      </div>
+    </div>
+  </template>
+
   <template id="tpl-widget-holdings">
     <div class="overview-section ov-card">
       <div class="section-header" data-collapse="holdings">

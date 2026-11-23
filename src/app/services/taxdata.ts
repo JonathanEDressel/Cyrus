@@ -6,6 +6,16 @@
  * bounded slice per call: `complete: false` means "call again".
  */
 class TaxData {
+  /** A coin's synced fills, oldest first (for buy/sell markers on a chart). */
+  static async fills(token: string, base: string): Promise<ApiResponse<ChartFill[]>> {
+    return DataAccess.get<ChartFill[]>(`${AppConfig.API_BASE}/tax/fills?${new URLSearchParams({ base })}`, token);
+  }
+
+  /** Average USD cost of the coin still held, from open cost-basis lots. */
+  static async avgCost(token: string, asset: string, method: CostBasisMethod = 'fifo'): Promise<ApiResponse<ChartAvgCost>> {
+    return DataAccess.get<ChartAvgCost>(`${AppConfig.API_BASE}/tax/avg-cost?${new URLSearchParams({ asset, method })}`, token);
+  }
+
   static async status(token: string): Promise<ApiResponse<TaxSyncStatus>> {
     return DataAccess.get<TaxSyncStatus>(`${AppConfig.API_BASE}/tax/status`, token);
   }
@@ -262,4 +272,23 @@ interface ProjectedSells {
   results: Record<string, ProjectedSell>;
   /** False when no fills have been synced at all. */
   has_history: boolean;
+}
+
+/** One synced fill, as the Charts page draws it. */
+interface ChartFill {
+  time: number;
+  side: 'buy' | 'sell';
+  price: number;
+  amount: number;
+  symbol: string;
+  quote: string;
+  exchange: string;
+}
+
+interface ChartAvgCost {
+  asset: string;
+  method: CostBasisMethod;
+  amount: number;
+  known_amount: number;
+  avg_cost_usd: number | null;
 }

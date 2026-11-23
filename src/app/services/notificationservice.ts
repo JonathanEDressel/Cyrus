@@ -4,9 +4,15 @@ class NotificationService {
   private static lastSeenLogId: number = 0;
   private static isRunning: boolean = false;
   private static notificationsEnabled: boolean = true;
+  /** Fired chart alerts are reported once each, from when the app started. */
+  private static alertsSince: number = 0;
 
   static setEnabled(enabled: boolean): void {
     NotificationService.notificationsEnabled = enabled;
+  }
+
+  static get isEnabled(): boolean {
+    return NotificationService.notificationsEnabled;
   }
 
   static async start(): Promise<void> {
@@ -18,9 +24,12 @@ class NotificationService {
     }
 
     NotificationService.isRunning = true;
+    NotificationService.alertsSince = Math.floor(Date.now() / 1000);
+    // Alerts on custom indicators are watched from here (the backend can't run Pine).
+    if (typeof ScriptAlertMonitor !== 'undefined') ScriptAlertMonitor.start();
     NotificationService.pollLogs();
     NotificationService.timer = window.setInterval(
-      () => NotificationService.pollLogs(),
+      () => { NotificationService.pollLogs(); NotificationService.pollAlerts(); },
       NotificationService.POLL_INTERVAL
     );
   }
@@ -32,6 +41,7 @@ class NotificationService {
     }
     NotificationService.isRunning = false;
     NotificationService.lastSeenLogId = 0;
+    if (typeof ScriptAlertMonitor !== 'undefined') ScriptAlertMonitor.stop();
   }
 
   private static async pollLogs(): Promise<void> {
@@ -61,6 +71,33 @@ class NotificationService {
       }
     } catch (error) {
       console.error('[NotificationService] Error polling logs:', error);
+    }
+  }
+
+  /** Price alerts set on the Charts page that fired since the last look. */
+  private static async pollAlerts(): Promise<void> {
+    if (!NotificationService.notificationsEnabled) return;
+    try {
+      const fired = (await AlertData.events(NotificationService.alertsSince)).data || [];
+      if (!fired.length) return;
+      NotificationService.alertsSince = Math.max(NotificationService.alertsSince, ...fired.map((a) => a.triggered_at || 0));
+      void ChartAlerts.refresh();
+      if (!('Notification' in window) || Notification.permission !== 'granted') return;
+      for (const a of fired) {
+        const n = new Notification(`🔔 ${a.symbol} ${ChartAlerts.describe(a)}`, {
+          body: a.note || `Your chart alert on ${a.symbol} fired. It's now off until you move the line or re-arm it.`,
+          silent: false,
+        });
+        setTimeout(() => n.close(), 15000);
+        n.onclick = () => {
+          if (typeof router !== 'undefined') {
+            void router.navigate('charts', a.chart_id ? { chartId: String(a.chart_id) } : undefined);
+          }
+          n.close();
+        };
+      }
+    } catch (error) {
+      console.error('[NotificationService] Error polling alerts:', error);
     }
   }
 

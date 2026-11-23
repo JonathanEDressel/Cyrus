@@ -10,6 +10,10 @@ from controllers.TransferController import transfer_bp
 from controllers.WalletController import wallet_bp
 from controllers.AiController import ai_bp
 from controllers.TaxController import tax_bp
+from controllers.ChartController import chart_bp
+from controllers.AlertController import alert_bp
+from controllers.IndicatorController import indicator_bp
+from controllers.ScriptAlertController import script_alert_bp
 
 
 def register_health_route(app):
@@ -54,3 +58,7 @@ def register_routes(app):
     app.register_blueprint(wallet_bp, url_prefix='/api/wallets')
     app.register_blueprint(ai_bp, url_prefix='/api/ai')
     app.register_blueprint(tax_bp, url_prefix='/api/tax')
+    app.register_blueprint(chart_bp, url_prefix='/api/charts')
+    app.register_blueprint(alert_bp, url_prefix='/api/alerts')
+    app.register_blueprint(indicator_bp, url_prefix='/api/indicators')
+    app.register_blueprint(script_alert_bp, url_prefix='/api/script-alerts')

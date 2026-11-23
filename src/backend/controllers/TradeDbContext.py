@@ -57,6 +57,21 @@ class TradeDbContext:
     # -----------------------------------------------------------------
 
     @staticmethod
+    def get_fills_for_base(user_id: int, base: str, since_ts: int = 0, limit: int = 2000) -> list[dict]:
+        """The newest fills of one coin (any quote), for drawing on a chart."""
+        return execute_query_all(
+            '''SELECT t.occurred_at, t.side, t.price_num, t.amount_num, t.symbol, t.quote,
+                      t.exchange_name, c.label AS connection_label
+               FROM trade_history t
+               LEFT JOIN exchange_connections c ON c.id = t.exchange_connection_id
+               WHERE t.user_id = ? AND t.base = ? AND t.occurred_at >= ?
+                 AND t.price_num IS NOT NULL AND t.amount_num IS NOT NULL
+               ORDER BY t.occurred_at DESC, t.id DESC
+               LIMIT ?''',
+            (user_id, base.upper(), int(since_ts), int(limit))
+        )
+
+    @staticmethod
     def get_trades(user_id: int, until_ts: int | None = None) -> list[dict]:
         """Every stored fill for the user, oldest first, with connection labels."""
         params: list = [user_id]

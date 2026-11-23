@@ -216,6 +216,8 @@ class AutomationWorker:
                     # month-over-month change). Cheap no-op until a new day bucket.
                     self._snapshotter.run(self._stop_event)
                     self._send_due_reports()
+                    self._retire_chart_sources()
+                    self._check_price_alerts()
                     self._poll_cycle()
             except Exception as e:
                 self._note_error('cycle', e)
@@ -243,6 +245,24 @@ class AutomationWorker:
                 # except Exception as e:
                 #     print(f"[WORKER] snapshot tick error: {e}")
     
+    def _retire_chart_sources(self):
+        """Move saved charts/alerts off dropped chart feeds (see helper/ChartSourceRetire)."""
+        try:
+            from helper.ChartSourceRetire import retire_chart_sources
+            retire_chart_sources()
+        except Exception as e:
+            print(f"[WORKER] Moving retired chart sources failed: {e}")
+
+    def _check_price_alerts(self):
+        """Chart price alerts. Isolated so a feed problem never stops the rules."""
+        try:
+            from automation.price_alerts import check_price_alerts
+            check_price_alerts(self._stop_event)
+        except Exception as e:
+            self._note_error('price alerts', e)
+            print(f"[WORKER] Price alert check failed: {e}")
+            traceback.print_exc()
+
     def _send_due_reports(self):
         """Email last month's report to whoever is still owed it.
 

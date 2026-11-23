@@ -1125,7 +1125,22 @@ const DemoData = (() => {
 
   // ── Market data ────────────────────────────────────────────────────────────
 
-  function pairs(): any[] {
+  /** A few demo stocks for the Charts page's Stocks source. */
+  const STOCKS: Array<[string, string, number]> = [
+    ['AAPL', 'Apple Inc. Common Stock', 228.4],
+    ['MSFT', 'Microsoft Corporation Common Stock', 431.2],
+    ['NVDA', 'NVIDIA Corporation Common Stock', 138.7],
+    ['AMZN', 'Amazon.com, Inc. Common Stock', 201.5],
+    ['GOOGL', 'Alphabet Inc. Class A Common Stock', 172.9],
+    ['TSLA', 'Tesla, Inc. Common Stock', 251.3],
+    ['SPY', 'SPDR S&P 500 ETF Trust', 589.6],
+    ['QQQ', 'Invesco QQQ Trust, Series 1', 507.8],
+  ];
+
+  function pairs(source?: string): any[] {
+    if (source === 'stocks') {
+      return STOCKS.map(([symbol, name]) => ({ symbol, base: symbol, quote: 'USD', name }));
+    }
     const bases = ['BTC', 'ETH', 'SOL', 'ADA', 'LINK', 'XRP', 'DOGE', 'AVAX', 'DOT', 'LTC', 'POL', 'ATOM', 'UNI'];
     const list = bases.map((base) => ({ symbol: `${base}/USD`, base, quote: 'USD' }));
     list.push({ symbol: 'USDC/USD', base: 'USDC', quote: 'USD' });
@@ -1191,6 +1206,191 @@ const DemoData = (() => {
     // Anchor the final close to the reference price so it matches the ticker.
     if (candles.length) candles[candles.length - 1].close = price;
     return candles;
+  }
+
+  // ── Charts page ────────────────────────────────────────────────────────────
+
+  /**
+   * Candles for any timeframe that agree with each other however they're
+   * paged: each bar's price is a pure function of (symbol, timeframe, bar
+   * index) — a few slow waves plus per-bar noise, pinned so the newest bar
+   * closes at the reference price — so a page fetched later lines up with
+   * the bars already on screen.
+   */
+  const TF_STEP: Record<string, number> = { '1m': 60, '5m': 300, '15m': 900, '30m': 1800, '1h': 3600, '4h': 14400, '1d': 86400, '1w': 604800 };
+  const TF_SWING: Record<string, number> = { '1m': 0.12, '5m': 0.2, '15m': 0.3, '30m': 0.4, '1h': 0.55, '4h': 0.9, '1d': 1.5, '1w': 2.4 };
+  const CHART_SOURCES: ChartSource[] = [
+    { id: 'coinbase', name: 'Coinbase Advanced', kind: 'crypto', can_page: true, max_limit: 300, timeframes: Object.keys(TF_STEP) },
+    { id: 'kraken', name: 'Kraken', kind: 'crypto', can_page: false, max_limit: 720, timeframes: Object.keys(TF_STEP) },
+    { id: 'stocks', name: 'Stocks', kind: 'stock', requires_key: true, configured: true, can_page: true, max_limit: 1000, timeframes: Object.keys(TF_STEP) },
+  ];
+  const DEMO_HISTORY_BARS = 3000;
+
+  function noise(seed: string, k: number): number {
+    return seeded(hash(`${seed}|${k}`))() * 2 - 1;
+  }
+
+  function demoClose(symbol: string, tf: string, k: number, nowIdx: number): number {
+    const base = (symbol.split('/')[0] || symbol).toUpperCase();
+    const price = PRICE[base] ?? STOCKS.find(([s]) => s === base)?.[2] ?? 100;
+    const m = (TF_SWING[tf] ?? 0.5) * 0.1;
+    const ph = (hash(symbol) % 1000) / 159;
+    const wave = (i: number) =>
+      m * (0.9 * Math.sin(i / 37 + ph) + 0.6 * Math.sin(i / 11 + ph * 2) + 1.4 * Math.sin(i / 190 + ph * 3)) +
+      m * 0.12 * noise(`${symbol}|${tf}`, i);
+    return price * Math.exp(wave(k) - wave(nowIdx));
+  }
+
+  function candles(symbol: string, tf: string, source: string, before?: number, limit?: number): CandlePage {
+    const step = TF_STEP[tf] ?? 3600;
+    const src = CHART_SOURCES.find((x) => x.id === source) || CHART_SOURCES[0];
+    if (!src.timeframes.includes(tf)) throw `${src.name} has no ${tf} candles`;
+    const n = Math.min(limit ?? src.max_limit, src.max_limit);
+    const nowIdx = Math.floor(Date.now() / 1000 / step);
+    if (before != null && !src.can_page) return { candles: [], has_more: false };
+    const endIdx = before != null ? Math.ceil(before / step) - 1 : nowIdx;
+    const minIdx = nowIdx - (src.can_page ? DEMO_HISTORY_BARS : src.max_limit - 1);
+    const startIdx = Math.max(minIdx, endIdx - n + 1);
+    const m = (TF_SWING[tf] ?? 0.5) * 0.004;
+    const seed = `${symbol}|${tf}|hl`;
+    const out: ChartBar[] = [];
+    for (let k = startIdx; k <= endIdx; k++) {
+      const open = demoClose(symbol, tf, k - 1, nowIdx);
+      let close = demoClose(symbol, tf, k, nowIdx);
+      // The live bar wiggles so polling visibly updates it.
+      if (k === nowIdx) close *= 1 + 0.0015 * Math.sin(Date.now() / 6000);
+      const high = Math.max(open, close) * (1 + Math.abs(noise(seed, k)) * m);
+      const low = Math.min(open, close) * (1 - Math.abs(noise(seed, k + 7e6)) * m);
+      const volume = Math.round((0.6 + 0.8 * Math.abs(noise(seed, k + 3e6))) * 1e6 / Math.max(close, 0.0001) * step / 3600 * 100) / 100;
+      out.push({ time: k * step, open, high, low, close, volume });
+    }
+    return { candles: out, has_more: src.can_page && startIdx > minIdx };
+  }
+
+  /** Saved charts for the session, seeded with one that shows the tools off. */
+  let savedCharts: SavedChart[] | null = null;
+  let nextChartId = 100;
+
+  function chartStore(): SavedChart[] {
+    if (savedCharts) return savedCharts;
+    const tf = '4h', step = TF_STEP[tf];
+    const nowIdx = Math.floor(Date.now() / 1000 / step);
+    const at = (sym: string, back: number) => ({ time: (nowIdx - back) * step, price: demoClose(sym, tf, nowIdx - back, nowIdx) });
+    const lo = at('BTC/USD', 150), hi = at('BTC/USD', 40);
+    const c1 = at('BTC/USD', 260), c2 = at('BTC/USD', 170);
+    const state: ChartState = {
+      v: 1, timeframe: tf, chartType: 'candles', view: { barSpacing: 6 },
+      panes: [
+        {
+          id: 'demo-p1', symbol: 'BTC/USD', source: 'kraken', volume: true,
+          indicators: [{ id: 'demo-i1', type: 'ema', params: { length: 21 }, color: '#F2C94C' }],
+          drawings: [
+            { id: 'demo-d1', type: 'fib', points: [lo, hi], style: { color: '#7AA2F7', width: 2, dash: 'solid', fill: true },
+              levels: [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1, 1.618].map((value) => ({ value, on: value <= 1 })) },
+            { id: 'demo-d2', type: 'channel', points: [c1, c2, { time: c1.time, price: c1.price * 1.06 }],
+              style: { color: '#3DDC97', width: 2, dash: 'solid', fill: true } },
+            { id: 'demo-d3', type: 'hline', points: [{ time: hi.time, price: Math.round(hi.price * 1.04) }],
+              style: { color: '#FF8FA3', width: 1, dash: 'dashed', fill: false } },
+          ],
+        },
+        {
+          id: 'demo-p2', symbol: 'ETH/USD', source: 'kraken', volume: false,
+          indicators: [{ id: 'demo-i2', type: 'rsi', params: { length: 14 }, color: '#B9A3FF' }],
+          drawings: [],
+        },
+      ],
+    };
+    const now = new Date().toISOString().replace('T', ' ').slice(0, 19);
+    savedCharts = [{ id: 1, name: 'BTC vs ETH · 4H levels', state, created_at: now, updated_at: now }];
+    return savedCharts;
+  }
+
+  function chartList(): ChartSummary[] {
+    return chartStore().map((c) => ({
+      id: c.id, name: c.name, created_at: c.created_at, updated_at: c.updated_at,
+      symbols: (c.state?.panes || []).map((p) => p.symbol), timeframe: c.state?.timeframe || null,
+    }));
+  }
+
+  function chartGet(id: number): SavedChart {
+    const c = chartStore().find((x) => x.id === id);
+    if (!c) throw 'Chart not found';
+    return JSON.parse(JSON.stringify(c));
+  }
+
+  function chartSave(id: number | null, changes: { name?: string; state?: ChartState }): SavedChart {
+    const now = new Date().toISOString().replace('T', ' ').slice(0, 19);
+    const store = chartStore();
+    let c = id == null ? undefined : store.find((x) => x.id === id);
+    if (id != null && !c) throw 'Chart not found';
+    if (!c) {
+      c = { id: nextChartId++, name: changes.name || 'Untitled', state: changes.state || null, created_at: now, updated_at: now };
+      store.push(c);
+    } else {
+      if (changes.name) c.name = changes.name;
+      if (changes.state) c.state = JSON.parse(JSON.stringify(changes.state));
+      c.updated_at = now;
+    }
+    store.sort((a, b) => b.updated_at.localeCompare(a.updated_at));
+    return JSON.parse(JSON.stringify(c));
+  }
+
+  /** A few months of fills per coin, priced off the demo candles. */
+  function demoFills(base: string): ChartFill[] {
+    const b = base.toUpperCase();
+    if (!PRICE[b] || ['USD', 'USDT', 'USDC'].includes(b)) return [];
+    const tf = '4h', step = TF_STEP[tf];
+    const nowIdx = Math.floor(Date.now() / 1000 / step);
+    const rng = seeded(hash(`fills|${b}`));
+    const out: ChartFill[] = [];
+    let k = nowIdx - 520;
+    while (k < nowIdx - 3) {
+      k += 18 + Math.floor(rng() * 40);
+      const price = demoClose(`${b}/USD`, tf, k, nowIdx) * (1 + (rng() - 0.5) * 0.004);
+      const buy = rng() < 0.62;
+      out.push({
+        time: k * step + Math.floor(rng() * step), side: buy ? 'buy' : 'sell', price,
+        amount: Math.round((250 + rng() * 1500) / price * 1e6) / 1e6,
+        symbol: `${b}/USD`, quote: 'USD', exchange: 'Kraken',
+      });
+    }
+    return out.filter((f) => f.time < Date.now() / 1000);
+  }
+
+  function demoAvgCost(base: string): ChartAvgCost {
+    const b = base.toUpperCase();
+    const unit = demoUnitCost(b);
+    const held = unit == null ? 0 : 1;
+    return { asset: b, method: 'fifo', amount: held, known_amount: held, avg_cost_usd: unit };
+  }
+
+  /** Alerts for the session; demo mode never fires them. */
+  let demoAlerts: PriceAlert[] = [];
+  let nextAlertId = 500;
+
+  function alertSave(id: number | null, body: any): PriceAlert {
+    const now = Math.floor(Date.now() / 1000);
+    const geom = body.kind === 'level'
+      ? { kind: 'level' as const, price: Number(body.price), t1: null, p1: null, t2: null, p2: null }
+      : { kind: 'line' as const, price: null, t1: body.points[0].time, p1: body.points[0].price, t2: body.points[1].time, p2: body.points[1].price };
+    const at = geom.kind === 'level' ? geom.price as number
+      : (geom.p1 as number) + ((geom.p2 as number) - (geom.p1 as number)) * (now - (geom.t1 as number)) / (((geom.t2 as number) - (geom.t1 as number)) || 1);
+    const existing = id == null ? undefined : demoAlerts.find((a) => a.id === id);
+    const symbol = existing?.symbol || body.symbol;
+    const base = (symbol.split('/')[0] || '').toUpperCase();
+    const last = PRICE[base] ?? STOCKS.find(([s]) => s === base)?.[2] ?? at;
+    const alert: PriceAlert = {
+      id: existing?.id ?? nextAlertId++, chart_id: existing?.chart_id ?? body.chart_id ?? null,
+      drawing_id: existing?.drawing_id ?? body.drawing_id ?? null, source: existing?.source || body.source, symbol,
+      ...geom, direction: at > last ? 'above' : 'below', note: null, status: 'active',
+      created_at: existing?.created_at ?? now, triggered_at: null, triggered_price: null, price_now: at,
+    };
+    demoAlerts = [alert, ...demoAlerts.filter((a) => a.id !== alert.id)];
+    return alert;
+  }
+
+  function chartRemove(id: number): void {
+    savedCharts = chartStore().filter((x) => x.id !== id);
   }
 
   function ticker(symbol: string): any {
@@ -1464,6 +1664,17 @@ const DemoData = (() => {
     pairs,
     ohlcv,
     ticker,
+    candles,
+    chartSources: () => CHART_SOURCES,
+    chartList,
+    chartGet,
+    chartSave,
+    chartRemove,
+    demoFills,
+    demoAvgCost,
+    alertList: () => demoAlerts,
+    alertSave,
+    alertRemove: (id: number) => { demoAlerts = demoAlerts.filter((a) => a.id !== id); },
     profile,
     taxStatus,
     taxGains,
@@ -1601,7 +1812,24 @@ class DemoMode {
       [WatchlistData, 'removeFromWatchlist', async (_t: string, s: string) => { DemoData.removeWatch(s); return DemoData.wrap({}); }],
       [WatchlistData, 'updateOrder', async () => DemoData.wrap({})],
 
-      [MarketData, 'getPairs', async () => DemoData.wrap(DemoData.pairs())],
+      [MarketData, 'getPairs', async (_t: string, source?: string) => DemoData.wrap(DemoData.pairs(source))],
+      [StockKeyData, 'getStatus', async () => DemoData.wrap({ configured: true, feed: 'iex' })],
+      [MarketData, 'getCandles', async (_t: string, req: { symbol: string; timeframe: string; source: string; before?: number; limit?: number }) =>
+        DemoData.wrap(DemoData.candles(req.symbol, req.timeframe, req.source, req.before, req.limit))],
+      [MarketData, 'getChartSources', async () => DemoData.wrap(DemoData.chartSources())],
+
+      [ChartData, 'list', async () => DemoData.wrap(DemoData.chartList())],
+      [ChartData, 'get', async (id: number) => DemoData.wrap(DemoData.chartGet(id))],
+      [ChartData, 'create', async (name: string, state: ChartState) => DemoData.wrap(DemoData.chartSave(null, { name, state }))],
+      [ChartData, 'update', async (id: number, changes: { name?: string; state?: ChartState }) => DemoData.wrap(DemoData.chartSave(id, changes))],
+      [ChartData, 'remove', async (id: number) => { DemoData.chartRemove(id); return DemoData.wrap({}); }],
+      [TaxData, 'fills', async (_t: string, base: string) => DemoData.wrap(DemoData.demoFills(base))],
+      [TaxData, 'avgCost', async (_t: string, asset: string) => DemoData.wrap(DemoData.demoAvgCost(asset))],
+      [AlertData, 'list', async () => DemoData.wrap(DemoData.alertList())],
+      [AlertData, 'create', async (body: any) => DemoData.wrap(DemoData.alertSave(null, body))],
+      [AlertData, 'update', async (id: number, body: any) => DemoData.wrap(DemoData.alertSave(id, body))],
+      [AlertData, 'remove', async (id: number) => { DemoData.alertRemove(id); return DemoData.wrap({}); }],
+      [AlertData, 'events', async () => DemoData.wrap([])],
       [MarketData, 'getOHLCV', async (_t: string, sym: string, range: string) => DemoData.wrap(DemoData.ohlcv(sym, range))],
       [MarketData, 'getTicker', async (_t: string, sym: string) => DemoData.wrap(DemoData.ticker(sym))],
       [MarketData, 'getHoldings', async (_t: string, connId: number | 'all') => DemoData.wrap(DemoData.holdings(connId))],
@@ -1621,6 +1849,8 @@ class DemoMode {
       DemoMode.originals.push({ holder, name, fn: holder[name] });
       holder[name] = fn;
     }
+    // The chart sources are cached per session; demo has its own list.
+    ChartWorkspace.invalidateSources();
   }
 
   private static restore(): void {
@@ -1630,6 +1860,7 @@ class DemoMode {
     }
     DemoMode.originals = [];
     DemoMode.patched = false;
+    ChartWorkspace.invalidateSources();
   }
 
   /** Re-sync the shared store with the (now swapped) data source and re-render

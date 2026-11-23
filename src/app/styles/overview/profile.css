@@ -583,9 +583,20 @@ a.help-icon { text-decoration: none; color: inherit; }
 
 body.theme-light .ai-status-on { color: var(--pos); }
 
-.ai-setup-card .card-head > i {
+.ai-setup-card .card-head > i,
+.key-setup-card .card-head > i {
   color: var(--accent-purple-light);
   background: color-mix(in srgb, var(--accent-purple) 13%, transparent);
+}
+
+/* A card reached by a deep link (route param `focus`) pulses once. */
+.profile-card.card-flash {
+  animation: card-flash 1.8s ease-out;
+}
+
+@keyframes card-flash {
+  0%, 30% { box-shadow: 0 0 0 2px var(--accent-cyan); }
+  100%    { box-shadow: 0 0 0 2px transparent; }
 }
 
 .fact-list {

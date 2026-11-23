@@ -9,6 +9,8 @@
 const TAB = t => `#rules-tab-strip button[data-tab="${t}"]`;
 const ROW = id => `#rules-tbody tr:has([data-rule-id="${id}"])`;
 const RADIO = (name, value) => `label.radio-label:has(input[name="${name}"][value="${value}"])`;
+const FLOW_NODE = key => `#rules-flow-chart .rf-node[data-key$="|${key}"]`;
+const FLOW_CHIP = id => `#rules-flow-chart .rf-chip[data-item="${id}"]`;
 
 module.exports = {
   id: 'automations',
@@ -55,19 +57,38 @@ module.exports = {
     },
     {
       chapter: 'Your automations',
-      say: "The Flow tab draws your automations as a map. Each circle is a coin, and each line is a rule moving money onward, or out to a withdrawal wallet. Dashed circles belong to paused rules.",
+      say: "The Flow tab draws your automations as a map, read from left to right: the coin a rule sends, a box for the rule itself, and where the money ends up, either another coin or a withdrawal address. Each colour is a kind of trigger, and paused rules are dashed.",
       act: async h => {
         await h.scrollTo('#rules-count-title', { offset: 90 });
-        await h.spot('#rules-flow-chart');
-        await h.wait(2500);
-        await h.hover('#rules-flow-chart .rf-node.rf-paused');
-        await h.wait(1200);
+        await h.spot(FLOW_NODE('A:SOL'));
+        await h.wait(1800);
+        await h.spot(FLOW_CHIP(5001));
+        await h.wait(1800);
+        await h.spot(FLOW_NODE('A:USDC'));
+        await h.wait(1300);
+        await h.spot(FLOW_NODE('W:cold_storage_btc'));
+        await h.wait(1300);
+        await h.spot('#rules-flow-view .flow-legend');
+        await h.wait(1800);
+        await h.spot(FLOW_CHIP(5003));
+        await h.wait(1500);
         await h.spot(null);
       },
     },
     {
-      say: "Hover a circle to read, in plain English, what its rules will do. Click it to edit, and if several rules start there, Cyrus asks which one.",
-      act: async h => { await h.hover('#rules-flow-chart .rf-node[data-key$="A:SOL"]'); await h.wait(2800); },
+      say: "Click a rule to light up its path, and underneath, Cyrus spells it out in plain English, with how many times it has run. From there you can edit it, or pause and resume it.",
+      act: async h => {
+        await h.click(FLOW_CHIP(5003));
+        await h.wait(1000);
+        await h.spot('#rules-flow-chart .rf-detail');
+        await h.wait(2500);
+        await h.hover('#rules-flow-chart .rf-detail button[data-rf-action="edit"]', 600);
+        await h.wait(700);
+        await h.hover('#rules-flow-chart .rf-detail button[data-rf-action="toggle"]', 500);
+        await h.wait(900);
+        await h.spot(null);
+        await h.click(FLOW_CHIP(5003));
+      },
     },
     {
       say: "The Rules tab lists the same automations as a table: name, trigger, action, whether it's active or paused, and how often it has fired.",

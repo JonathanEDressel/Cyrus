@@ -35,7 +35,8 @@ function applyTheme(theme: string): void {
   router.register('home', {
     view: 'app/views/overview/home.html',
     viewModel: '../dist/app/viewmodels/overview/home.js',
-    style: 'app/styles/overview/home.css',
+    // charts.css carries the chart workspace styles the Chart widget uses.
+    style: ['app/styles/overview/home.css', 'app/styles/overview/charts.css'],
     showChrome: true,
     title: 'Home',
   });
@@ -43,7 +44,8 @@ function applyTheme(theme: string): void {
   router.register('positions', {
     view: 'app/views/overview/home.html',
     viewModel: '../dist/app/viewmodels/overview/home.js',
-    style: 'app/styles/overview/home.css',
+    // charts.css carries the chart workspace styles the Chart widget uses.
+    style: ['app/styles/overview/home.css', 'app/styles/overview/charts.css'],
     showChrome: true,
     title: 'Positions',
   });
@@ -141,6 +143,20 @@ function applyTheme(theme: string): void {
     // Has its own picker with an "All exchanges" option that aggregates.
     showExchangeSelector: false,
     title: 'Holdings',
+  });
+
+  router.register('charts', {
+    view: 'app/views/overview/charts.html',
+    viewModel: '../dist/app/viewmodels/overview/charts.js',
+    style: [
+      'app/styles/overview/home.css',
+      'app/styles/overview/commands.css',
+      'app/styles/overview/charts.css',
+    ],
+    showChrome: true,
+    // Each pane picks its own exchange feed.
+    showExchangeSelector: false,
+    title: 'Charts',
   });
 
   router.register('rebalancer', {

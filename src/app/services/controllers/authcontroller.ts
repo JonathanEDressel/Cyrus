@@ -33,6 +33,9 @@ class AuthController {
     ExchangeStore.stop();
     NotificationService.stop();
     ApiKeyState.reset();
+    ChartAlerts.reset();
+    CustomIndicators.reset();
+    ScriptAlerts.reset();
     localStorage.removeItem(AppConfig.TOKEN_KEY);
     localStorage.removeItem(AppConfig.USER_KEY);
     UsageStats.signedOut();

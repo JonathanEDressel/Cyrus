@@ -132,6 +132,108 @@ def setup_database():
             )
         ''')
 
+        # Price alerts set from chart lines. Checked by the worker against the
+        # public candle feed (no exchange connection needed). `kind` 'level'
+        # uses `price`; 'line' follows the line through (t1,p1)-(t2,p2), so a
+        # trend line's alert price moves with time. One-shot: a fired alert
+        # stays 'triggered' until it's moved or re-armed.
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS price_alerts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                chart_id INTEGER,
+                drawing_id TEXT,
+                source TEXT NOT NULL,
+                symbol TEXT NOT NULL,
+                kind TEXT NOT NULL,
+                price REAL,
+                t1 INTEGER, p1 REAL, t2 INTEGER, p2 REAL,
+                direction TEXT NOT NULL,
+                note TEXT,
+                status TEXT NOT NULL DEFAULT 'active',
+                created_at INTEGER NOT NULL,
+                updated_at INTEGER NOT NULL,
+                last_checked_at INTEGER,
+                triggered_at INTEGER,
+                triggered_price REAL,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            )
+        ''')
+
+        # Charts page: named chart layouts. `state` is the client's JSON
+        # document (panes, timeframe, indicators, drawings); the server only
+        # checks its shape and size, so new drawing tools need no migration.
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS saved_charts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                name TEXT NOT NULL,
+                state TEXT NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            )
+        ''')
+
+        # Charts page: the user's own indicators, written in Pine Script.
+        # `source` is the script text; the client parses and runs it.
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS custom_indicators (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                name TEXT NOT NULL,
+                source TEXT NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            )
+        ''')
+
+        # Alerts on a custom indicator's alertcondition()/alert(). The script
+        # and its inputs are copied in when the alert is made (as TradingView
+        # does), so editing the indicator later doesn't change a live alert.
+        # The app evaluates them (the backend can't run Pine) and reports a
+        # hit through script_alert_events, whose UNIQUE(alert_id, bar_time)
+        # makes a fire idempotent.
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS script_alerts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                indicator_id INTEGER,
+                chart_id INTEGER,
+                indicator_name TEXT NOT NULL,
+                source TEXT NOT NULL,
+                symbol TEXT NOT NULL,
+                timeframe TEXT NOT NULL,
+                condition_key TEXT NOT NULL,
+                condition_title TEXT NOT NULL,
+                script_source TEXT NOT NULL,
+                inputs TEXT NOT NULL DEFAULT '{}',
+                frequency TEXT NOT NULL DEFAULT 'bar_close',
+                message TEXT,
+                status TEXT NOT NULL DEFAULT 'active',
+                last_bar_time INTEGER,
+                trigger_count INTEGER NOT NULL DEFAULT 0,
+                triggered_at INTEGER,
+                created_at INTEGER NOT NULL,
+                updated_at INTEGER NOT NULL,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            )
+        ''')
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS script_alert_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                alert_id INTEGER NOT NULL,
+                user_id INTEGER NOT NULL,
+                bar_time INTEGER NOT NULL,
+                fired_at INTEGER NOT NULL,
+                message TEXT,
+                UNIQUE(alert_id, bar_time),
+                FOREIGN KEY (alert_id) REFERENCES script_alerts(id) ON DELETE CASCADE,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            )
+        ''')
+
         # Portfolio value history — one header row per snapshot (per connection,
         # 30-min aligned), with a detail row per held asset. captured_at is a
         # UNIX epoch second so the frontend chart can consume it directly.
@@ -413,6 +515,12 @@ def setup_database():
         conn.execute('CREATE INDEX IF NOT EXISTS idx_user_log ON automation_log(user_id, created_at)')
         conn.execute('CREATE INDEX IF NOT EXISTS idx_exchange_conn_user ON exchange_connections(user_id)')
         conn.execute('CREATE INDEX IF NOT EXISTS idx_watched_cryptos_user ON watched_cryptos(user_id)')
+        conn.execute('CREATE INDEX IF NOT EXISTS idx_saved_charts_user ON saved_charts(user_id)')
+        conn.execute('CREATE INDEX IF NOT EXISTS idx_price_alerts_user ON price_alerts(user_id)')
+        conn.execute('CREATE INDEX IF NOT EXISTS idx_price_alerts_status ON price_alerts(status)')
+        conn.execute('CREATE INDEX IF NOT EXISTS idx_custom_indicators_user ON custom_indicators(user_id)')
+        conn.execute('CREATE INDEX IF NOT EXISTS idx_script_alerts_user ON script_alerts(user_id)')
+        conn.execute('CREATE INDEX IF NOT EXISTS idx_script_alert_events_user ON script_alert_events(user_id, fired_at)')
         conn.execute('CREATE INDEX IF NOT EXISTS idx_pf_snap_user_time ON portfolio_snapshots(user_id, captured_at)')
         conn.execute('CREATE INDEX IF NOT EXISTS idx_pf_snap_assets_snap ON portfolio_snapshot_assets(snapshot_id)')
         conn.execute('CREATE INDEX IF NOT EXISTS idx_transfer_user_time ON transfer_history(user_id, occurred_at DESC)')

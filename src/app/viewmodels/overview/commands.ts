@@ -1830,6 +1830,12 @@ class CommandsController {
   /** Open the editor for a rule someone clicked on another page's flow chart. */
   private openDeepLinkedRule(): void {
     const params = (window as any).__routeParams;
+    if (params?.newPriceRule) {
+      const raw = params.newPriceRule;
+      delete params.newPriceRule;
+      void this.openPriceRuleFromChart(raw);
+      return;
+    }
     const requested = params?.editRuleId;
     if (!requested) return;
     // One-shot: without clearing it, every later reload would reopen the modal.
@@ -1837,6 +1843,50 @@ class CommandsController {
 
     const rule = this.allRules.find((r: any) => String(r.id) === String(requested));
     if (rule) this.editRule(rule);
+  }
+
+  /**
+   * "Make a rule" from a line on the Charts page: open the price-rule wizard
+   * with the coin, price and quote filled in. The coin list loads from the
+   * account's balances, so it's selected once it arrives (if the account
+   * holds that coin at all).
+   */
+  private async openPriceRuleFromChart(raw: string): Promise<void> {
+    let req: { asset?: string; price?: number; quote?: string } = {};
+    try { req = JSON.parse(raw); } catch { return; }
+    if (!req.asset || !(Number(req.price) > 0)) return;
+    if (!this.selectedConnectionId) {
+      this.showError('Connect and select an exchange to make an automation rule from your chart line.');
+      return;
+    }
+    this.openCreateModal('take_profit');
+    const threshold = document.getElementById('price-trigger-threshold') as HTMLInputElement | null;
+    const quoteSel = document.getElementById('price-quote-asset') as HTMLSelectElement | null;
+    const quote = String(req.quote || 'USD').toUpperCase();
+    if (quoteSel) {
+      const want = ['USD', 'USDT', 'USDC'].includes(quote) ? quote : 'USD';
+      if (Array.from(quoteSel.options).some((o) => o.value === want)) {
+        quoteSel.value = want;
+        quoteSel.dispatchEvent(new Event('change'));
+      }
+    }
+    const assetSel = document.getElementById('price-trigger-asset') as HTMLSelectElement | null;
+    const asset = String(req.asset).toUpperCase();
+    for (let i = 0; i < 40 && assetSel; i++) {
+      if (Array.from(assetSel.options).some((o) => o.value === asset)) {
+        assetSel.value = asset;
+        assetSel.dispatchEvent(new Event('change'));
+        break;
+      }
+      await new Promise((r) => setTimeout(r, 150));
+    }
+    if (threshold) {
+      threshold.value = String(req.price);
+      threshold.dispatchEvent(new Event('input'));
+    }
+    if (assetSel && assetSel.value !== asset) {
+      this.showError(`This account doesn't hold any ${asset}, so pick the coin to sell in the form.`);
+    }
   }
 
   private applyRulesFilter(): void {

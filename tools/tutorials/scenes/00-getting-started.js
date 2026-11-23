@@ -195,6 +195,16 @@ module.exports = {
       },
     },
     {
+      chapter: 'Stock charts',
+      say: "Further down, Stock market data is optional. Add a free Alpaca key here, and the Charts page can show US stocks and ETFs as well as crypto. The Charts video covers it.",
+      act: async h => {
+        await h.scrollTo('#stocks-card');
+        await h.spot('#stocks-card');
+        await h.wait(3500);
+        await h.spot(null);
+      },
+    },
+    {
       chapter: 'The assistant key',
       say: "The Assistant tab switches on the AI assistant. It's off until you add your own Anthropic API key, which Cyrus checks with Anthropic and encrypts like your exchange keys.",
       act: async h => {

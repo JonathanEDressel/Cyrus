@@ -1688,3 +1688,50 @@ body.theme-light .ov-cap-over .ov-cap-fill { background: var(--warn); }
   outline: none;
   border-color: var(--accent-cyan);
 }
+
+/* ── Chart widget (a saved chart from the Charts page) ── */
+
+.chart-widget-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.chart-widget-tfs {
+  display: inline-flex;
+  gap: 3px;
+}
+
+.chart-widget-tfs .time-range-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.chart-widget-body {
+  position: relative;
+  /* Set per chart from its pane count; a fixed-height widget overrides it. */
+  height: var(--cw-h, 340px);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.chart-widget-body:empty,
+.chart-widget-body.d-none {
+  display: none;
+}
+
+.chart-widget-create {
+  margin-top: 12px;
+}
+
+.dash-widget.has-h .chart-widget {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.dash-widget.has-h .chart-widget-body {
+  flex: 1;
+  height: auto;
+  min-height: 160px;
+}

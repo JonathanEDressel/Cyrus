@@ -129,6 +129,16 @@ class UserDbContext:
         return True
 
     @staticmethod
+    def update_alpaca_keys(user_id: int, key_id_encrypted: Optional[str],
+                           secret_encrypted: Optional[str]) -> bool:
+        """Store (or clear, with ``None``) the user's encrypted Alpaca key pair."""
+        execute_non_query(
+            'UPDATE users SET alpaca_key_id_encrypted = ?, alpaca_secret_encrypted = ? WHERE id = ?',
+            (key_id_encrypted, secret_encrypted, user_id)
+        )
+        return True
+
+    @staticmethod
     def get_email_settings(user_id: int) -> Optional[dict]:
         """Return the raw email-notification columns for the worker to use.
 

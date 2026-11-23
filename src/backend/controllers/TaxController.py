@@ -678,3 +678,68 @@ def export():
         })
     except Exception as e:
         return handle_error(e)
+
+
+# ---------------------------------------------------------------------------
+# Charts page overlays
+# ---------------------------------------------------------------------------
+
+@tax_bp.route('/fills', methods=['GET'])
+@token_required
+def chart_fills():
+    """A coin's synced fills (newest 2000), for buy/sell markers on a chart."""
+    try:
+        base = (request.args.get('base') or '').strip().upper()
+        if not base:
+            return bad_request('base is required')
+        try:
+            since = int(request.args.get('since') or 0)
+        except ValueError:
+            return bad_request('since must be an integer')
+        names = _connection_names(request.user_id)
+        rows = TradeDbContext.get_fills_for_base(request.user_id, base, since)
+        data = [{
+            'time': int(r['occurred_at']),
+            'side': r['side'],
+            'price': r['price_num'],
+            'amount': r['amount_num'],
+            'symbol': r['symbol'],
+            'quote': r['quote'],
+            'exchange': _exchange_display(r['exchange_name']) + (f" ({r['connection_label']})" if r.get('connection_label') else ''),
+        } for r in rows]
+        data.reverse()  # oldest first, as the chart wants them
+        return success_response(data=data)
+    except Exception as e:
+        return handle_error(e)
+
+
+@tax_bp.route('/avg-cost', methods=['GET'])
+@token_required
+def chart_avg_cost():
+    """Average USD cost of the coin still held, from the open cost-basis lots.
+
+    Only lots with a known cost count toward the average; ``known_amount``
+    says how much of the holding that covers.
+    """
+    try:
+        asset = (request.args.get('asset') or '').strip().upper()
+        if not asset:
+            return bad_request('asset is required')
+        method = _method(request.args.get('method'))
+        if method is None:
+            return bad_request('method must be fifo or hifo')
+        result, _trades, _transfers = _replay(request.user_id, method)
+        lots = [l for l in result.get('open_lots', []) if str(l.get('asset', '')).upper() == asset]
+        amount = sum(float(l['amount']) for l in lots)
+        known = [l for l in lots if l.get('unit_cost') is not None]
+        known_amount = sum(float(l['amount']) for l in known)
+        cost = sum(float(l['amount']) * float(l['unit_cost']) for l in known)
+        return success_response(data={
+            'asset': asset,
+            'method': method,
+            'amount': amount,
+            'known_amount': known_amount,
+            'avg_cost_usd': (cost / known_amount) if known_amount > 0 else None,
+        })
+    except Exception as e:
+        return handle_error(e)

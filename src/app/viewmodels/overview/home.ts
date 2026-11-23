@@ -45,6 +45,9 @@ const OVERVIEW_WIDGETS: DashWidgetDef[] = [
   { type: 'live-data', title: 'Live price chart', icon: 'fa-chart-line', template: 'tpl-widget-live-data',
     description: 'A live chart for any pair you track, with time ranges.',
     defaultW: 6, minW: 4, minH: 260 },
+  { type: 'chart', title: 'Saved chart', icon: 'fa-chart-simple', template: 'tpl-widget-chart',
+    description: 'One of your charts from the Charts page, with its drawings and compared coins.',
+    defaultW: 6, minW: 4, minH: 300 },
   { type: 'holdings', title: 'Biggest holdings', icon: 'fa-coins', template: 'tpl-widget-holdings',
     description: 'Your five largest positions with seven-day trend lines.',
     defaultW: 6, minW: 3 },
@@ -108,6 +111,12 @@ class HomeController {
   private static readonly HOLDINGS_INTERVAL = 5 * 60_000;
 
   private flowTab: 'automations' | 'orders' = 'automations';
+
+  // Saved-chart widget.
+  private chartWidget: ChartWorkspace | null = null;
+  private chartWidgetSeq = 0;
+  private chartWidgetId: number | null = null;
+  private static readonly CHART_WIDGET_TFS = ['15m', '1h', '4h', '1d', '1w'];
 
   // Everything the panels below are rendered from. Each loader fills its own
   // slice and re-renders; nothing waits on anything else.
@@ -187,6 +196,7 @@ class HomeController {
         if (this.pfHistory) { this.pfHistory.destroy(); this.pfHistory = null; }
         void this.flushSave();
         this.destroyAllCharts();
+        this.destroyChartWidget();
         document.removeEventListener('keydown', this.onKeydown);
         observer.disconnect();
       }
@@ -339,11 +349,13 @@ class HomeController {
       case 'accounts': this.renderAccounts(); break;
       case 'transfers': void this.loadTransfers(); break;
       case 'notes': this.bindNotes(); break;
+      case 'chart': void this.mountChartWidget(); break;
     }
   }
 
   private unmountWidget(w: DashWidget): void {
     if (w.type === 'live-data') this.destroyAllCharts();
+    if (w.type === 'chart') this.destroyChartWidget();
   }
 
   private resizeWidget(w: DashWidget): void {
@@ -1480,22 +1492,7 @@ class HomeController {
     const list = document.getElementById('add-crypto-list');
     if (!list) return;
 
-    // "xrp cad", "XRP/CAD" and "xrpcad" all find XRP/CAD; a single word like
-    // "btc" matches the coin or the currency it's priced in.
-    const q = query.toLowerCase().trim();
-    const words = q.split(/[\s/\-]+/).filter(Boolean);
-    const squashed = q.replace(/[\s/\-]+/g, '');
-    const watchedSymbols = new Set(this.watchlistSymbols);
-    const filtered = this.allPairs.filter((p: any) => {
-      if (watchedSymbols.has(p.symbol)) return false;
-      if (!q) return true;
-      const sym = String(p.symbol).toLowerCase();
-      if (words.length > 1) {
-        const [b, qt] = [String(p.base).toLowerCase(), String(p.quote || '').toLowerCase()];
-        return b.startsWith(words[0]) && qt.startsWith(words[1]);
-      }
-      return sym.includes(q) || sym.replace('/', '').includes(squashed);
-    });
+    const filtered = PairSearch.filter(this.allPairs, query, new Set(this.watchlistSymbols));
 
     if (filtered.length === 0) {
       list.innerHTML = '<p class="add-crypto-loading">No matching pairs</p>';
@@ -1556,6 +1553,106 @@ class HomeController {
     for (const [symbol, inst] of this.charts) {
       try { await this.loadChartData(symbol, inst.activeRange); } catch { /* skip */ }
     }
+  }
+
+  // ── Saved-chart widget ──────────────────────────────────────────
+
+  private async mountChartWidget(): Promise<void> {
+    const seq = ++this.chartWidgetSeq;
+    const select = document.getElementById('chart-widget-select') as HTMLSelectElement | null;
+    const openBtn = document.getElementById('chart-widget-open');
+    if (!select || !this.grid) return;
+    let list: ChartSummary[] = [];
+    let failed = false;
+    try {
+      list = (await ChartData.list()).data || [];
+    } catch {
+      failed = true;
+    }
+    if (seq !== this.chartWidgetSeq || !document.getElementById('chart-widget-body')) return;
+    if (!list.length) {
+      this.showChartWidgetEmpty(failed ? 'Couldn’t load your saved charts.' : 'No saved charts yet. Draw and save one on the Charts page.');
+      return;
+    }
+    const want = Number(this.grid.config('chart').chartId);
+    const id = list.some((c) => c.id === want) ? want : list[0].id;
+    select.innerHTML = list.map((c) =>
+      `<option value="${c.id}">${this.escapeHtml(c.name)}</option>`).join('');
+    select.value = String(id);
+    select.classList.toggle('d-none', list.length < 2);
+    select.onchange = () => {
+      const next = Number(select.value);
+      this.grid?.updateConfig('chart', { chartId: next });
+      void this.showChartInWidget(next);
+    };
+    if (openBtn) {
+      openBtn.onclick = () => {
+        if (this.chartWidgetId != null) void router.navigate('charts', { chartId: String(this.chartWidgetId) });
+      };
+    }
+    await this.showChartInWidget(id);
+  }
+
+  private async showChartInWidget(id: number): Promise<void> {
+    const seq = ++this.chartWidgetSeq;
+    let chart: SavedChart | undefined;
+    try {
+      chart = (await ChartData.get(id)).data;
+      await ChartWorkspace.loadSources();
+    } catch { /* shown below */ }
+    const body = document.getElementById('chart-widget-body');
+    if (seq !== this.chartWidgetSeq || !body) return;
+    if (!chart) { this.showChartWidgetEmpty('Couldn’t load that chart.'); return; }
+    document.getElementById('chart-widget-empty')?.classList.add('d-none');
+    body.classList.remove('d-none');
+    this.chartWidgetId = chart.id;
+    if (!this.chartWidget) this.chartWidget = new ChartWorkspace(body, { mode: 'view' });
+    const state = ChartWorkspace.sanitize(chart.state);
+    // Each compared coin and oscillator needs its own room.
+    const oscillators = state.panes.reduce((n, p) =>
+      n + p.indicators.filter((i) => !CustomIndicators.isOverlay(i)).length, 0);
+    body.style.setProperty('--cw-h', `${320 + (state.panes.length - 1) * 170 + oscillators * 90}px`);
+    this.chartWidget.loadState(state);
+    // The widget's own timeframe, when it differs from the saved chart's.
+    const tf = String(this.grid?.config('chart').tf || '');
+    if (tf && this.chartWidget.supportedTimeframes().includes(tf)) this.chartWidget.setTimeframe(tf);
+    this.renderChartWidgetTfs();
+  }
+
+  private renderChartWidgetTfs(): void {
+    const box = document.getElementById('chart-widget-tfs');
+    const ws = this.chartWidget;
+    if (!box || !ws) return;
+    const ok = ws.supportedTimeframes();
+    const labels: Record<string, string> = { '15m': '15m', '1h': '1H', '4h': '4H', '1d': '1D', '1w': '1W' };
+    const tfs = HomeController.CHART_WIDGET_TFS.includes(ws.timeframe)
+      ? HomeController.CHART_WIDGET_TFS : [ws.timeframe, ...HomeController.CHART_WIDGET_TFS];
+    box.innerHTML = tfs.map((tf) => `<button type="button" class="time-range-btn${tf === ws.timeframe ? ' active' : ''}" data-tf="${tf}"${ok.includes(tf) ? '' : ' disabled'}>${labels[tf] || tf}</button>`).join('');
+    box.querySelectorAll<HTMLButtonElement>('[data-tf]').forEach((b) => b.addEventListener('click', () => {
+      const tf = b.dataset.tf!;
+      this.chartWidget?.setTimeframe(tf);
+      this.grid?.updateConfig('chart', { tf });
+      this.renderChartWidgetTfs();
+    }));
+  }
+
+  private showChartWidgetEmpty(text: string): void {
+    this.destroyChartWidget();
+    document.getElementById('chart-widget-body')?.classList.add('d-none');
+    document.getElementById('chart-widget-select')?.classList.add('d-none');
+    const tfs = document.getElementById('chart-widget-tfs');
+    if (tfs) tfs.innerHTML = '';
+    document.getElementById('chart-widget-open')?.classList.add('d-none');
+    const p = document.getElementById('chart-widget-empty-text');
+    if (p) p.textContent = text;
+    document.getElementById('chart-widget-empty')?.classList.remove('d-none');
+  }
+
+  private destroyChartWidget(): void {
+    this.chartWidgetSeq++;
+    this.chartWidget?.destroy();
+    this.chartWidget = null;
+    this.chartWidgetId = null;
   }
 
   private destroyAllCharts(): void {

@@ -16,7 +16,9 @@ class UserModel:
                  smtp_password_encrypted: Optional[str] = None,
                  smtp_host: Optional[str] = None,
                  smtp_port: Optional[int] = None,
-                 anthropic_key_encrypted: Optional[str] = None):
+                 anthropic_key_encrypted: Optional[str] = None,
+                 alpaca_key_id_encrypted: Optional[str] = None,
+                 alpaca_secret_encrypted: Optional[str] = None):
         self.id = id
         self.username = username
         self.password_hash = password_hash
@@ -34,6 +36,9 @@ class UserModel:
         self.smtp_port = smtp_port
         # Also encrypted at rest; only to_dict's boolean ever leaves the server.
         self.anthropic_key_encrypted = anthropic_key_encrypted
+        # Alpaca market-data key for stock charts; encrypted the same way.
+        self.alpaca_key_id_encrypted = alpaca_key_id_encrypted
+        self.alpaca_secret_encrypted = alpaca_secret_encrypted
 
     @staticmethod
     def from_row(row: dict) -> 'UserModel':
@@ -56,6 +61,8 @@ class UserModel:
             smtp_host=row.get('smtp_host'),
             smtp_port=row.get('smtp_port'),
             anthropic_key_encrypted=row.get('anthropic_key_encrypted'),
+            alpaca_key_id_encrypted=row.get('alpaca_key_id_encrypted'),
+            alpaca_secret_encrypted=row.get('alpaca_secret_encrypted'),
         )
     
     def to_dict(self) -> dict:
@@ -82,4 +89,5 @@ class UserModel:
             'smtp_host': self.smtp_host,
             'smtp_port': self.smtp_port,
             'anthropic_key_set': bool(self.anthropic_key_encrypted),
+            'alpaca_key_set': bool(self.alpaca_key_id_encrypted and self.alpaca_secret_encrypted),
         }

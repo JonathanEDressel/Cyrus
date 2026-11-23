@@ -1,0 +1,146 @@
+<div class="page-container charts-page" id="charts-root">
+  <div class="overview-header charts-header">
+    <div>
+      <h1 class="page-title">Charts</h1>
+      <p class="page-subtitle">
+        Chart any coin or US stock, draw on it, stack symbols to compare them, and save your charts.
+      </p>
+    </div>
+    <button type="button" class="tut-launch" data-tutorial="charts" aria-expanded="false" title="Watch a walkthrough of this page"><i class="fa-solid fa-play" aria-hidden="true"></i>Tutorial <span class="tut-launch-dur"></span></button>
+  </div>
+
+  <div class="alert alert-warning d-none" id="charts-error"></div>
+
+  <div class="charts-toolbar" role="toolbar" aria-label="Chart controls">
+    <div class="ct-menu-wrap">
+      <button type="button" class="ct-btn ct-chart-btn" id="ct-chart-btn" aria-haspopup="true" aria-expanded="false" title="Your charts">
+        <i class="fa-solid fa-folder-open" aria-hidden="true"></i>
+        <span class="ct-chart-name" id="ct-chart-name">Untitled</span>
+        <span class="ct-dirty d-none" id="ct-dirty" title="Unsaved changes. They're kept until you save or discard them.">●</span>
+        <i class="fa-solid fa-chevron-down ct-caret" aria-hidden="true"></i>
+      </button>
+      <div class="ct-menu ct-chart-menu d-none" id="ct-chart-menu" role="menu">
+        <div class="ct-menu-list" id="ct-chart-list"></div>
+        <div class="ct-menu-sep"></div>
+        <button type="button" class="ct-menu-item" data-chart-act="new"><i class="fa-solid fa-plus"></i>New chart</button>
+        <button type="button" class="ct-menu-item" data-chart-act="saveas"><i class="fa-regular fa-copy"></i>Save a copy…</button>
+        <button type="button" class="ct-menu-item" data-chart-act="rename"><i class="fa-solid fa-pen"></i>Rename…</button>
+        <button type="button" class="ct-menu-item d-none" data-chart-act="discard"><i class="fa-solid fa-rotate-left"></i>Discard unsaved changes</button>
+        <button type="button" class="ct-menu-item ct-danger" data-chart-act="delete"><i class="fa-solid fa-trash-can"></i>Delete</button>
+      </div>
+    </div>
+    <button type="button" class="ct-btn ct-save" id="ct-save" title="Save (Ctrl+S)"><i class="fa-solid fa-floppy-disk" aria-hidden="true"></i>Save</button>
+
+    <span class="ct-sep" aria-hidden="true"></span>
+    <div class="ct-group" id="ct-timeframes" role="group" aria-label="Timeframe"></div>
+    <span class="ct-sep" aria-hidden="true"></span>
+
+    <select class="ct-select" id="ct-type" title="Chart type" aria-label="Chart type">
+      <option value="candles">Candles</option>
+      <option value="bars">Bars</option>
+      <option value="line">Line</option>
+      <option value="area">Area</option>
+    </select>
+    <button type="button" class="ct-btn" id="ct-compare" title="Add another symbol in its own pane"><i class="fa-solid fa-layer-group" aria-hidden="true"></i>Compare</button>
+    <select class="ct-select d-none" id="ct-compare-mode" title="How compared coins are shown" aria-label="Compare mode">
+      <option value="stacked">Stacked panes</option>
+      <option value="percent">Overlay in %</option>
+    </select>
+    <button type="button" class="ct-btn" id="ct-indicators" title="Add an indicator"><i class="fa-solid fa-wave-square" aria-hidden="true"></i>Indicators</button>
+    <button type="button" class="ct-btn ct-toggle" id="ct-pine" aria-pressed="false" title="Write your own indicators in Pine Script"><i class="fa-solid fa-code" aria-hidden="true"></i>Pine Editor</button>
+    <button type="button" class="ct-btn ct-toggle" id="ct-mine" aria-pressed="true" title="Show your open orders, past fills and average cost"><i class="fa-solid fa-receipt" aria-hidden="true"></i>My trades</button>
+
+    <span class="ct-spacer"></span>
+    <div class="ct-menu-wrap">
+      <button type="button" class="ct-btn" id="ct-alerts-btn" aria-haspopup="true" aria-expanded="false" title="Your price alerts"><i class="fa-regular fa-bell" aria-hidden="true"></i>Alerts<span class="ct-badge d-none" id="ct-alerts-count"></span></button>
+      <div class="ct-menu ct-alerts-menu d-none" id="ct-alerts-menu" role="menu"></div>
+    </div>
+    <button type="button" class="ct-icon-btn" id="ct-undo" title="Undo (Ctrl+Z)" aria-label="Undo"><i class="fa-solid fa-rotate-left"></i></button>
+    <button type="button" class="ct-icon-btn" id="ct-redo" title="Redo (Ctrl+Shift+Z)" aria-label="Redo"><i class="fa-solid fa-rotate-right"></i></button>
+    <button type="button" class="ct-icon-btn" id="ct-shot" title="Save a picture of the chart" aria-label="Save a picture"><i class="fa-solid fa-camera"></i></button>
+  </div>
+
+  <div class="charts-body">
+    <div class="charts-tools" id="ct-tools" role="toolbar" aria-label="Drawing tools" aria-orientation="vertical"></div>
+    <div class="charts-col">
+      <div class="charts-stage" id="ct-stage">
+        <div class="ct-stylebar d-none" id="ct-stylebar" role="toolbar" aria-label="Drawing style"></div>
+      </div>
+      <!-- Pine Editor (docked under the chart) -->
+      <div class="pine-editor d-none" id="ct-editor" aria-label="Pine Editor"></div>
+    </div>
+  </div>
+
+  <!-- Indicator menu (anchored to whatever opened it) -->
+  <div class="ct-menu ct-ind-menu d-none" id="ct-ind-menu" role="menu"></div>
+
+  <!-- Name dialog: new chart, save, save a copy, rename -->
+  <div class="edit-rule-overlay d-none" id="ct-name-overlay">
+    <div class="edit-rule-modal ct-name-modal" role="dialog" aria-modal="true" aria-labelledby="ct-name-title">
+      <div class="edit-rule-modal-header">
+        <h3 id="ct-name-title">Save chart</h3>
+        <button type="button" class="edit-rule-modal-close" data-name-act="cancel" title="Close"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="edit-rule-modal-body">
+        <label class="ct-field-label" for="ct-name-input">Name</label>
+        <input type="text" class="edit-rule-input" id="ct-name-input" maxlength="80" placeholder="e.g. BTC weekly levels" autocomplete="off">
+        <p class="ct-name-error d-none" id="ct-name-error"></p>
+      </div>
+      <div class="edit-rule-modal-footer">
+        <button type="button" class="btn-secondary" data-name-act="cancel">Cancel</button>
+        <button type="button" class="btn-primary" data-name-act="ok" id="ct-name-ok">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Create Alert: on a custom indicator's alertcondition() -->
+  <div class="edit-rule-overlay d-none" id="ct-salert-overlay">
+    <div class="edit-rule-modal ct-salert-modal" role="dialog" aria-modal="true" aria-labelledby="ct-salert-title">
+      <div class="edit-rule-modal-header">
+        <h3 id="ct-salert-title">Create alert</h3>
+        <button type="button" class="edit-rule-modal-close" data-salert-act="cancel" title="Close"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="edit-rule-modal-body">
+        <label class="ct-field-label" for="ct-salert-cond">Condition</label>
+        <div class="ct-salert-ind" id="ct-salert-ind"></div>
+        <select class="ct-select ct-salert-input" id="ct-salert-cond"></select>
+        <label class="ct-field-label">Market</label>
+        <div class="ct-salert-static" id="ct-salert-sym"></div>
+        <label class="ct-field-label" for="ct-salert-freq">Trigger</label>
+        <select class="ct-select ct-salert-input" id="ct-salert-freq">
+          <option value="bar_close">Once per bar close</option>
+          <option value="bar">Once per bar</option>
+          <option value="once">Only once</option>
+        </select>
+        <p class="ct-pair-hint" id="ct-salert-freq-hint"></p>
+        <label class="ct-field-label" for="ct-salert-msg">Message</label>
+        <textarea class="edit-rule-input ct-salert-msg" id="ct-salert-msg" rows="3" maxlength="500"></textarea>
+        <p class="ct-pair-hint">You can use {{ticker}}, {{exchange}}, {{interval}}, {{close}}, {{open}}, {{high}}, {{low}}, {{volume}}, {{time}}, {{plot_0}} or {{plot("Title")}}.</p>
+        <p class="ct-salert-note"><i class="fa-solid fa-circle-info" aria-hidden="true"></i> Checked once a minute while Cyrus is open or in the tray and you're signed in. You'll get a desktop notification, and an email too if email notifications are set up on your Profile. The alert keeps this version of the indicator and its settings.</p>
+        <p class="ct-name-error d-none" id="ct-salert-error"></p>
+      </div>
+      <div class="edit-rule-modal-footer">
+        <button type="button" class="btn-secondary" data-salert-act="cancel">Cancel</button>
+        <button type="button" class="btn-primary" data-salert-act="ok" id="ct-salert-ok">Create</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pair picker: change a pane's symbol, or compare another coin -->
+  <div class="edit-rule-overlay d-none" id="ct-pair-overlay">
+    <div class="edit-rule-modal ct-pair-modal" role="dialog" aria-modal="true" aria-labelledby="ct-pair-title">
+      <div class="edit-rule-modal-header">
+        <h3 id="ct-pair-title">Compare a symbol</h3>
+        <button type="button" class="edit-rule-modal-close" data-pair-act="cancel" title="Close"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="edit-rule-modal-body">
+        <div class="ct-pair-row">
+          <select class="ct-select" id="ct-pair-source" aria-label="Market"></select>
+          <input type="text" class="edit-rule-input" id="ct-pair-search" placeholder="Search pairs (e.g. ETH, XRP/CAD)…" autocomplete="off">
+        </div>
+        <p class="ct-pair-hint" id="ct-pair-hint"></p>
+        <div class="ct-pair-list" id="ct-pair-list"></div>
+      </div>
+    </div>
+  </div>
+</div>

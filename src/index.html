@@ -93,6 +93,7 @@
       <div class="nav-group" role="group" aria-label="Portfolio">
         <a href="#" data-route="home" class="nav-link" title="Overview" aria-label="Overview"><i class="fa-solid fa-table-cells-large" aria-hidden="true"></i><span>OVER</span></a>
         <a href="#" data-route="holdings" class="nav-link" title="Holdings" aria-label="Holdings"><i class="fa-solid fa-coins" aria-hidden="true"></i><span>HOLD</span></a>
+        <a href="#" data-route="charts" class="nav-link" title="Charts" aria-label="Charts"><i class="fa-solid fa-chart-simple" aria-hidden="true"></i><span>CHART</span></a>
         <a href="#" data-route="openorders" class="nav-link" title="Open Orders" aria-label="Open Orders"><i class="fa-solid fa-clock" aria-hidden="true"></i><span>OPEN</span></a>
         <a href="#" data-route="limitorders" class="nav-link" title="Limit Orders" aria-label="Limit Orders"><i class="fa-solid fa-arrow-right-arrow-left" aria-hidden="true"></i><span>LIMIT</span></a>
         <a href="#" data-route="transfers" class="nav-link" title="Transfers" aria-label="Transfers"><i class="fa-solid fa-right-left" aria-hidden="true"></i><span>XFER</span></a>
@@ -384,8 +385,12 @@
   <script src="../dist/app/services/automationdata.js"></script>
   <script src="../dist/app/services/marketdata.js"></script>
   <script src="../dist/app/services/watchlistdata.js"></script>
+  <script src="../dist/app/services/chartdata.js"></script>
+  <script src="../dist/app/services/alertdata.js"></script>
+  <script src="../dist/app/services/pairsearch.js"></script>
   <script src="../dist/app/services/reportdata.js"></script>
   <script src="../dist/app/services/aidata.js"></script>
+  <script src="../dist/app/services/stockkeydata.js"></script>
   <script src="../dist/app/services/controllers/authcontroller.js"></script>
   <script src="../dist/app/services/controllers/usercontroller.js"></script>
   <script src="../dist/app/services/controllers/exchangecontroller.js"></script>
@@ -402,6 +407,24 @@
   <script src="../dist/app/services/repaint.js"></script>
   <script src="../dist/app/services/filesave.js"></script>
   <script src="../dist/app/services/charttheme.js"></script>
+  <!-- Charts page + the Overview's Chart widget, in dependency order. -->
+  <script src="../dist/app/services/charting/chartgeometry.js"></script>
+  <script src="../dist/app/services/charting/chartindicators.js"></script>
+  <script src="../dist/app/services/charting/pine/pinecolor.js"></script>
+  <script src="../dist/app/services/charting/pine/pinelexer.js"></script>
+  <script src="../dist/app/services/charting/pine/pineparser.js"></script>
+  <script src="../dist/app/services/charting/pine/pinecompile.js"></script>
+  <script src="../dist/app/services/charting/pine/pinebuiltins.js"></script>
+  <script src="../dist/app/services/charting/pine/pineruntime.js"></script>
+  <script src="../dist/app/services/indicatordata.js"></script>
+  <script src="../dist/app/services/charting/customindicators.js"></script>
+  <script src="../dist/app/services/charting/scriptrender.js"></script>
+  <script src="../dist/app/services/charting/chartdrawings.js"></script>
+  <script src="../dist/app/services/charting/charttools.js"></script>
+  <script src="../dist/app/services/charting/chartworkspace.js"></script>
+  <script src="../dist/app/services/charting/pineeditor.js"></script>
+  <script src="../dist/app/services/scriptalertdata.js"></script>
+  <script src="../dist/app/services/scriptalerts.js"></script>
   <script src="../dist/app/services/flowmap.js"></script>
   <script src="../dist/app/services/ruleflow.js"></script>
   <script src="../dist/app/services/orderflow.js"></script>

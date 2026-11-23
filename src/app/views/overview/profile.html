@@ -246,6 +246,51 @@
       </form>
     </div>
 
+    <!-- Stocks on the Charts page: the user's own Alpaca market-data key. -->
+    <div class="profile-card key-setup-card" id="stocks-card">
+      <div class="card-head">
+        <i class="fa-solid fa-chart-line"></i>
+        <h2>Stock market data</h2>
+        <span class="ai-status-pill ai-status-off" id="stocks-key-status">Checking…</span>
+      </div>
+
+      <p class="card-lead">
+        Chart US stocks and ETFs on the Charts page with a free Alpaca market-data key.
+        Prices are real-time from IEX; volume counts IEX trades only. Stocks are for
+        charts and price alerts &mdash; Cyrus doesn't trade them.
+      </p>
+
+      <div class="form-group">
+        <label for="stocks-key-id" class="form-label">API Key ID</label>
+        <input id="stocks-key-id" type="text" class="form-control"
+               placeholder="PK… or AK…" autocomplete="off" spellcheck="false" />
+      </div>
+      <div class="form-group">
+        <label for="stocks-key-secret" class="form-label">Secret Key</label>
+        <input id="stocks-key-secret" type="password" class="form-control"
+               placeholder="Secret key" autocomplete="off" spellcheck="false" />
+        <small class="form-text text-muted">
+          Sign up free at
+          <a href="https://app.alpaca.markets/signup" target="_blank" rel="noopener noreferrer"
+             class="inline-link">alpaca.markets <i class="fa-solid fa-arrow-up-right-from-square"></i></a>,
+          then generate API keys from your dashboard (paper or live keys both work).
+          Cyrus verifies the key with Alpaca before saving it.
+        </small>
+      </div>
+
+      <div class="card-foot">
+        <button type="button" class="btn btn-primary" id="stocks-key-save">
+          Verify &amp; Save <i class="fa-solid fa-check"></i>
+        </button>
+        <button type="button" class="btn btn-danger d-none" id="stocks-key-remove">
+          Remove key <i class="fa-solid fa-trash"></i>
+        </button>
+        <small class="form-text text-muted">
+          <i class="fa-solid fa-lock"></i> Encrypted with the same key as your exchange credentials
+        </small>
+      </div>
+    </div>
+
     <!-- Sits at the end because this is the exact moment someone discovers
          they need an exchange account. -->
     <div class="partner-nudge">

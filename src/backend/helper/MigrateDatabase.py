@@ -229,6 +229,14 @@ def run_column_migrations():
             conn.commit()
             print("[MIGRATION] Added anthropic_key_encrypted column to users")
 
+        # Alpaca market-data key (key id + secret) for the Charts page's Stocks
+        # source. Both halves are Fernet-encrypted like the Anthropic key.
+        for col in ('alpaca_key_id_encrypted', 'alpaca_secret_encrypted'):
+            if not _has_column(conn, 'users', col):
+                conn.execute(f'ALTER TABLE users ADD COLUMN {col} TEXT')
+                conn.commit()
+                print(f"[MIGRATION] Added {col} column to users")
+
         # The Overview page's customised layout (which widgets, their order and
         # size), as a JSON document. NULL means "use the default layout".
         if not _has_column(conn, 'users', 'dashboard_layout'):

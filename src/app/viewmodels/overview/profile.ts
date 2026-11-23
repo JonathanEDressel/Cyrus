@@ -18,6 +18,7 @@ class ProfileController {
     this.loadConnections();
     this.loadSupportedExchanges();
     this.loadAiStatus();
+    this.loadStocksStatus();
     this.loadUsageStats();
     this.attachEventListeners();
   }
@@ -65,9 +66,20 @@ class ProfileController {
       show(tab.getAttribute('data-tab') || 'account');
     }));
 
-    const requested = (window as any).__routeParams?.tab;
+    const params = (window as any).__routeParams || {};
+    const requested = params.tab;
     if (requested && tabs.some(t => t.getAttribute('data-tab') === requested)) {
       show(requested);
+    }
+    // `focus` (a card id) scrolls to that card and flashes it, e.g. the Charts
+    // page's "Add Alpaca key" button lands on #stocks-card.
+    const focus = params.focus ? document.getElementById(String(params.focus)) : null;
+    if (focus) {
+      requestAnimationFrame(() => {
+        focus.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        focus.classList.add('card-flash');
+        window.setTimeout(() => focus.classList.remove('card-flash'), 1800);
+      });
     }
   }
 
@@ -75,6 +87,8 @@ class ProfileController {
     document.getElementById('save-username-btn')?.addEventListener('click', () => this.saveUsername());
     document.getElementById('ai-key-save')?.addEventListener('click', () => this.saveAiKey());
     document.getElementById('ai-key-remove')?.addEventListener('click', () => this.removeAiKey());
+    document.getElementById('stocks-key-save')?.addEventListener('click', () => this.saveStocksKey());
+    document.getElementById('stocks-key-remove')?.addEventListener('click', () => this.removeStocksKey());
     document.getElementById('save-password-btn')?.addEventListener('click', () => this.savePassword());
     document.getElementById('add-connection-btn')?.addEventListener('click', () => this.addConnection());
     document.getElementById('notifications-toggle')?.addEventListener('change', (e) => {
@@ -351,6 +365,84 @@ class ProfileController {
       this.showSuccess('ai', 'API key removed');
     } catch (error: any) {
       this.showError('ai', error.message || 'Failed to remove the API key');
+    }
+  }
+
+  // ── Stock market data (Alpaca key for the Charts page) ────────────────────
+
+  private async loadStocksStatus(): Promise<void> {
+    try {
+      const token = AuthController.getToken();
+      if (!token) return;
+      const res = await StockKeyData.getStatus(token);
+      this.setStocksStatus(res.data.configured);
+    } catch {
+      this.setStocksStatus(false);
+    }
+  }
+
+  private setStocksStatus(configured: boolean): void {
+    const pill = document.getElementById('stocks-key-status');
+    if (pill) {
+      pill.textContent = configured ? 'Connected · IEX feed' : 'Not connected';
+      pill.classList.toggle('ai-status-on', configured);
+      pill.classList.toggle('ai-status-off', !configured);
+    }
+    document.getElementById('stocks-key-remove')?.classList.toggle('d-none', !configured);
+
+    const keyId = document.getElementById('stocks-key-id') as HTMLInputElement | null;
+    const secret = document.getElementById('stocks-key-secret') as HTMLInputElement | null;
+    if (keyId) {
+      keyId.value = '';
+      keyId.placeholder = configured ? 'Saved — enter a new key to replace it' : 'PK… or AK…';
+    }
+    if (secret) {
+      secret.value = '';
+      secret.placeholder = configured ? 'Saved' : 'Secret key';
+    }
+  }
+
+  private async saveStocksKey(): Promise<void> {
+    const keyId = (document.getElementById('stocks-key-id') as HTMLInputElement | null)?.value.trim() || '';
+    const secret = (document.getElementById('stocks-key-secret') as HTMLInputElement | null)?.value.trim() || '';
+    if (!keyId || !secret) {
+      this.showError('stocks', 'Paste both your Alpaca API key ID and secret key');
+      return;
+    }
+
+    const btn = document.getElementById('stocks-key-save') as HTMLButtonElement;
+    const original = btn?.innerHTML;
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Verifying…';
+    }
+    try {
+      const token = AuthController.getToken();
+      if (!token) throw new Error('Not authenticated');
+      await StockKeyData.saveKey(keyId, secret, token);
+      ChartWorkspace.invalidateSources();
+      await this.loadStocksStatus();
+      this.showSuccess('stocks', 'Alpaca key verified and saved. Choose "Stocks" in the Charts page\'s symbol picker.');
+    } catch (error: any) {
+      this.showError('stocks', (typeof error === 'string' ? error : error?.message) || 'Failed to save the Alpaca key');
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        if (original) btn.innerHTML = original;
+      }
+    }
+  }
+
+  private async removeStocksKey(): Promise<void> {
+    try {
+      const token = AuthController.getToken();
+      if (!token) throw new Error('Not authenticated');
+      await StockKeyData.deleteKey(token);
+      ChartWorkspace.invalidateSources();
+      this.setStocksStatus(false);
+      this.showSuccess('stocks', 'Alpaca key removed');
+    } catch (error: any) {
+      this.showError('stocks', (typeof error === 'string' ? error : error?.message) || 'Failed to remove the Alpaca key');
     }
   }
 

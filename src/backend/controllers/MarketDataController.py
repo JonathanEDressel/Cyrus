@@ -3,11 +3,15 @@
 No API keys are required — all data comes from public endpoints.
 """
 
+import threading
 import time
 from flask import Blueprint, request
-from helper.Security import token_required, active_required
+from helper.Security import token_required, active_required, encrypt_api_key
 from helper.ErrorHandler import handle_error, bad_request
 from helper.Helper import success_response
+from helper.ExchangeRegistry import SUPPORTED_EXCHANGES, CHART_SOURCES, source_name
+from helper.PublicMarket import get_public, forget_user
+from helper.StockMarket import AlpacaMarket, StockKeyError, get_alpaca_keys, verify_keys, FEED as STOCK_FEED
 import ccxt
 
 market_data_bp = Blueprint('market_data', __name__)
@@ -16,28 +20,28 @@ market_data_bp = Blueprint('market_data', __name__)
 # limited and market caps don't move meaningfully inside ten minutes.
 MARKET_INFO_TTL = 600
 
-# Singleton public Kraken instance (no credentials needed)
-_kraken: ccxt.kraken | None = None
-_pairs_cache: list[dict] | None = None
-_pairs_cache_ts: float = 0
+_pairs_cache: dict[str, tuple[float, list[dict]]] = {}
 PAIRS_CACHE_TTL = 3600  # 1 hour
 
 
+def _get_public(source: str, user_id: int | None = None):
+    return get_public(source, user_id)
+
+
 def _get_kraken() -> ccxt.kraken:
-    global _kraken
-    if _kraken is None:
-        _kraken = ccxt.kraken({'enableRateLimit': True})
-    return _kraken
+    return _get_public('kraken')
 
 
-def _get_pairs_cached() -> list[dict]:
-    """Return available trading pairs, cached for 1 hour."""
-    global _pairs_cache, _pairs_cache_ts
+def _get_pairs_cached(source: str = 'kraken', user_id: int | None = None) -> list[dict]:
+    """Return a source's active spot pairs, cached for 1 hour."""
+    # Resolve the client first: for a keyed source this is what checks the
+    # user has a key, so the cache never serves a user without one.
+    exchange = _get_public(source, user_id)
     now = time.time()
-    if _pairs_cache is not None and (now - _pairs_cache_ts) < PAIRS_CACHE_TTL:
-        return _pairs_cache
+    cached = _pairs_cache.get(source)
+    if cached is not None and (now - cached[0]) < PAIRS_CACHE_TTL:
+        return cached[1]
 
-    exchange = _get_kraken()
     exchange.load_markets(True)  # force reload
     # Every active spot pair, whatever it's priced in (XRP/CAD, ETH/EUR,
     # SOL/BTC...): /ohlcv and /ticker take any Kraken market. Within a coin,
@@ -50,11 +54,13 @@ def _get_pairs_cached() -> list[dict]:
         base, quote = market.get('base', ''), market.get('quote', '')
         if not base or not quote:
             continue
-        pairs.append({'symbol': symbol, 'base': base, 'quote': quote})
+        pair = {'symbol': symbol, 'base': base, 'quote': quote}
+        if market.get('name'):
+            pair['name'] = market['name']
+        pairs.append(pair)
     pairs.sort(key=lambda p: (p['base'], quote_rank.get(p['quote'], len(quote_rank)), p['quote']))
-    _pairs_cache = pairs
-    _pairs_cache_ts = now
-    return _pairs_cache
+    _pairs_cache[source] = (now, pairs)
+    return pairs
 
 
 # Timeframe presets: maps UI range key → (ccxt timeframe, seconds lookback)
@@ -83,8 +89,285 @@ def _ytd_since() -> int:
 @token_required
 def pairs():
     try:
-        data = _get_pairs_cached()
+        source = (request.args.get('source') or 'kraken').strip().lower()
+        if source not in CHART_SOURCES:
+            return bad_request(f"Unknown source: {source}")
+        try:
+            data = _get_pairs_cached(source, request.user_id)
+        except ValueError as e:
+            return bad_request(str(e))
         return success_response(data=data)
+    except Exception as e:
+        return handle_error(e)
+
+
+# ---------------------------------------------------------------------------
+# Charts page: candles by timeframe from any public chart source
+# ---------------------------------------------------------------------------
+
+CHART_TIMEFRAMES = {
+    '1m': 60, '5m': 300, '15m': 900, '30m': 1_800,
+    '1h': 3_600, '4h': 14_400, '1d': 86_400, '1w': 604_800,
+}
+CANDLE_CACHE_LATEST_TTL = 15     # the newest page moves; panes poll it
+CANDLE_CACHE_HISTORY_TTL = 600   # closed bars never change
+CANDLE_CACHE_MAX = 400
+_candle_cache: dict[tuple, tuple[float, dict]] = {}
+_candle_lock = threading.Lock()
+
+
+@market_data_bp.route('/chart-sources', methods=['GET'])
+@token_required
+def chart_sources():
+    try:
+        has_stock_key = bool(get_alpaca_keys(request.user_id))
+        data = [
+            {
+                'id': sid,
+                'name': source_name(sid),
+                'kind': meta.get('kind', 'crypto'),
+                'requires_key': bool(meta.get('requires_key')),
+                'configured': has_stock_key if meta.get('requires_key') else True,
+                'can_page': meta['can_page'],
+                'max_limit': meta['max_limit'],
+                'timeframes': _source_timeframes(sid),
+            }
+            for sid, meta in CHART_SOURCES.items()
+        ]
+        return success_response(data=data)
+    except Exception as e:
+        return handle_error(e)
+
+
+# Timeframes a pageable feed lacks are built from a smaller one it has
+# (Coinbase has no 4h or 1w): timeframe -> (built from, bars per candle).
+SYNTH_TIMEFRAMES = {'4h': ('1h', 4), '1w': ('1d', 7)}
+# Weekly candles start on Monday 00:00 UTC, like the exchanges' own 1w bars
+# (the Unix epoch fell on a Thursday; 1970-01-05 was a Monday).
+WEEK_ANCHOR = 345_600
+
+
+def _synth_base(source: str, timeframe: str, have) -> str | None:
+    """The timeframe to build `timeframe` from, when the source must build it."""
+    if timeframe in have or timeframe not in SYNTH_TIMEFRAMES or not CHART_SOURCES[source]['can_page']:
+        return None
+    base = SYNTH_TIMEFRAMES[timeframe][0]
+    return base if base in have else None
+
+
+def _source_timeframes(source: str) -> list[str]:
+    """The chart timeframes this source serves, including ones built from smaller bars."""
+    if CHART_SOURCES[source].get('requires_key'):
+        have = AlpacaMarket.TIMEFRAMES  # known without a key
+    else:
+        have = _get_public(source).timeframes or {}
+    return [tf for tf in CHART_TIMEFRAMES if tf in have or _synth_base(source, tf, have)]
+
+
+def _bucket(t: int, timeframe: str) -> int:
+    sec = CHART_TIMEFRAMES[timeframe]
+    off = WEEK_ANCHOR if timeframe == '1w' else 0
+    return (t - off) // sec * sec + off
+
+
+def _synth_candles(exchange, source: str, symbol: str, timeframe: str,
+                   before: int | None, limit: int) -> dict:
+    """Build `limit` candles of `timeframe` ending before `before` from smaller bars."""
+    base_tf, _ = SYNTH_TIMEFRAMES[timeframe]
+    base_sec = CHART_TIMEFRAMES[base_tf]
+    tf_sec = CHART_TIMEFRAMES[timeframe]
+    page = CHART_SOURCES[source]['max_limit']
+    end_s = before if before is not None else int(time.time()) + 1
+    start_s = _bucket(end_s - 1, timeframe) - (limit - 1) * tf_sec
+
+    raw: list = []
+    since_s = start_s
+    # Enough requests to cover the window, plus a little slack for gaps.
+    for _ in range(-(-((end_s - start_s) // base_sec) // page) + 2):
+        if since_s >= end_s:
+            break
+        rows = exchange.fetch_ohlcv(symbol, timeframe=base_tf, since=since_s * 1000, limit=page)
+        rows = [r for r in rows if r[0] / 1000 >= since_s]
+        if not rows:
+            # Nothing traded in this stretch (or before listing): skip ahead.
+            since_s += page * base_sec
+            continue
+        raw.extend(rows)
+        since_s = int(rows[-1][0] / 1000) + base_sec
+
+    buckets: dict[int, dict] = {}
+    for c in sorted(raw, key=lambda c: c[0]):
+        t = int(c[0] / 1000)
+        if t < start_s or t >= end_s or c[4] is None:
+            continue
+        b = _bucket(t, timeframe)
+        bar = buckets.get(b)
+        if bar is None:
+            buckets[b] = {'time': b, 'open': c[1], 'high': c[2], 'low': c[3],
+                          'close': c[4], 'volume': c[5] or 0}
+        else:
+            bar['high'] = max(bar['high'], c[2])
+            bar['low'] = min(bar['low'], c[3])
+            bar['close'] = c[4]
+            bar['volume'] += c[5] or 0
+    candles = [buckets[k] for k in sorted(buckets)]
+    return {'candles': candles, 'has_more': bool(candles)}
+
+
+def _fetch_candles(source: str, symbol: str, timeframe: str, before: int | None, limit: int,
+                   user_id: int | None = None) -> dict:
+    """One page of candles ending before `before` (epoch s), or the latest page."""
+    meta = CHART_SOURCES[source]
+    tf_sec = CHART_TIMEFRAMES[timeframe]
+    exchange = _get_public(source, user_id)
+    have = exchange.timeframes or {}
+    synth = _synth_base(source, timeframe, have)
+    if timeframe not in have and not synth:
+        raise ValueError(f"{source_name(source)} has no {timeframe} candles")
+    exchange.load_markets()
+    if symbol not in exchange.markets:
+        raise ValueError(f"{symbol} isn't traded on {source_name(source)}")
+    if synth:
+        return _synth_candles(exchange, source, symbol, timeframe, before, limit)
+
+    if before is None:
+        raw = exchange.fetch_ohlcv(symbol, timeframe=timeframe, limit=limit)
+    elif meta.get('page_by_end'):
+        # Ask for the bars that end before `before`: market-hours feeds have
+        # gaps, so a since-based window would come back short.
+        raw = exchange.fetch_ohlcv(symbol, timeframe=timeframe, limit=limit,
+                                   params={'until': before * 1000})
+    elif not meta['can_page']:
+        # This feed only ever serves its latest window; there's nothing older.
+        return {'candles': [], 'has_more': False}
+    else:
+        since = (before - limit * tf_sec) * 1000
+        raw = exchange.fetch_ohlcv(symbol, timeframe=timeframe, since=since, limit=limit)
+
+    candles = []
+    seen = set()
+    for c in raw:
+        t = int(c[0] / 1000)
+        if (before is not None and t >= before) or t in seen or c[4] is None:
+            continue
+        seen.add(t)
+        candles.append({
+            'time': t, 'open': c[1], 'high': c[2], 'low': c[3],
+            'close': c[4], 'volume': c[5] or 0,
+        })
+    candles.sort(key=lambda c: c['time'])
+    has_more = bool(meta['can_page'] and candles)
+    return {'candles': candles, 'has_more': has_more}
+
+
+@market_data_bp.route('/candles', methods=['GET'])
+@token_required
+def candles():
+    try:
+        symbol = (request.args.get('symbol') or '').strip()
+        timeframe = (request.args.get('timeframe') or '1h').strip()
+        source = (request.args.get('source') or 'coinbase').strip().lower()
+        before_arg = (request.args.get('before') or '').strip()
+        limit_arg = (request.args.get('limit') or '').strip()
+
+        if not symbol:
+            return bad_request("symbol query parameter is required")
+        if timeframe not in CHART_TIMEFRAMES:
+            return bad_request(f"Invalid timeframe: {timeframe}. Use {', '.join(CHART_TIMEFRAMES)}")
+        if source not in CHART_SOURCES:
+            return bad_request(f"Unknown source: {source}")
+        try:
+            before = int(before_arg) if before_arg else None
+            limit = int(limit_arg) if limit_arg else CHART_SOURCES[source]['max_limit']
+        except ValueError:
+            return bad_request("before and limit must be integers")
+        limit = max(1, min(limit, CHART_SOURCES[source]['max_limit']))
+
+        if CHART_SOURCES[source].get('requires_key'):
+            # Checks the user has a key before anything cached is served.
+            try:
+                _get_public(source, request.user_id)
+            except ValueError as e:
+                return bad_request(str(e))
+
+        key = (source, symbol, timeframe, before, limit)
+        ttl = CANDLE_CACHE_LATEST_TTL if before is None else CANDLE_CACHE_HISTORY_TTL
+        now = time.time()
+        with _candle_lock:
+            hit = _candle_cache.get(key)
+        if hit is not None and now - hit[0] < ttl:
+            return success_response(data=hit[1])
+
+        try:
+            data = _fetch_candles(source, symbol, timeframe, before, limit, request.user_id)
+        except (ValueError, ccxt.BadSymbol) as e:
+            return bad_request(str(e))
+
+        with _candle_lock:
+            if len(_candle_cache) >= CANDLE_CACHE_MAX:
+                # Drop the oldest entries rather than tracking LRU order.
+                for k, _ in sorted(_candle_cache.items(), key=lambda kv: kv[1][0])[:CANDLE_CACHE_MAX // 4]:
+                    _candle_cache.pop(k, None)
+            _candle_cache[key] = (now, data)
+        return success_response(data=data)
+    except Exception as e:
+        return handle_error(e)
+
+
+# ---------------------------------------------------------------------------
+# Stocks source: the user's Alpaca market-data key (Profile → Exchanges).
+# Write-only like the Anthropic key: it goes in encrypted and only ever comes
+# back as `configured`.
+# ---------------------------------------------------------------------------
+
+@market_data_bp.route('/stocks/status', methods=['GET'])
+@token_required
+def stocks_status():
+    try:
+        return success_response(data={
+            'configured': bool(get_alpaca_keys(request.user_id)),
+            'feed': STOCK_FEED,
+        })
+    except Exception as e:
+        return handle_error(e)
+
+
+@market_data_bp.route('/stocks/key', methods=['PUT'])
+@token_required
+def save_stocks_key():
+    """Check a key pair with Alpaca, then store both halves encrypted."""
+    try:
+        from controllers.UserDbContext import UserDbContext
+
+        data = request.get_json(silent=True) or {}
+        key_id = (data.get('key_id') or '').strip()
+        secret = (data.get('secret') or '').strip()
+        if not key_id or not secret:
+            return bad_request("Both the API key ID and the secret key are required")
+
+        try:
+            verify_keys(key_id, secret)
+        except ValueError as e:
+            return bad_request(str(e))
+
+        UserDbContext.update_alpaca_keys(request.user_id, encrypt_api_key(key_id), encrypt_api_key(secret))
+        forget_user(request.user_id)
+        return success_response(data={'configured': True, 'feed': STOCK_FEED},
+                                message="Alpaca key saved and verified")
+    except Exception as e:
+        return handle_error(e)
+
+
+@market_data_bp.route('/stocks/key', methods=['DELETE'])
+@token_required
+def delete_stocks_key():
+    try:
+        from controllers.UserDbContext import UserDbContext
+
+        UserDbContext.update_alpaca_keys(request.user_id, None, None)
+        forget_user(request.user_id)
+        return success_response(data={'configured': False, 'feed': STOCK_FEED},
+                                message="Alpaca key removed")
     except Exception as e:
         return handle_error(e)
 

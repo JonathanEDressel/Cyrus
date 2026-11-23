@@ -1,12 +1,25 @@
 // Open Orders — every resting order on your exchanges, as a flow chart or a table.
 
 const FIRST_EX = '#orders-flow-chart .rf-exchange:first-child';
+const NODE = (coin, scope = FIRST_EX) => `${scope} .rf-node[data-key$="|A:${coin}"]`;
+// The Kraken account's AAVE sell order: the first chip on the left of the map.
+const AAVE_SELL = `${FIRST_EX} .rf-chip[data-item$=":OTCVEX-K4M6P-AAV14"]`;
 
-// The visible cursor is drawn by the overlay; the real mouse stays where the
-// last hover left it. This tells the chart the mouse has gone, so its tooltip
-// and highlighted lines clear before the next thing is shown.
-const unhover = h => h.eval(() => document.getElementById('orders-flow-chart')
-  ?.dispatchEvent(new MouseEvent('mouseleave')));
+// Drag the map sideways with the real mouse, gliding the visible cursor along.
+async function pan(h, [x0, y0], [x1, y1], steps = 18) {
+  await h.moveXY(x0, y0, 500);
+  await h.page.mouse.move(x0, y0);
+  await h.page.mouse.down();
+  for (let i = 1; i <= steps; i++) {
+    const t = i / steps, e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+    const x = x0 + (x1 - x0) * e, y = y0 + (y1 - y0) * e;
+    await h.page.mouse.move(x, y);
+    await h.eval(([a, b]) => window.__tut.moveTo(a, b, 40), [x, y]);
+    await h.wait(50);
+  }
+  await h.page.mouse.up();
+  await h.wait(300);
+}
 
 module.exports = {
   id: 'openorders',
@@ -50,37 +63,51 @@ module.exports = {
       act: async h => { await h.spot(`${FIRST_EX} .rf-exchange-title`); await h.wait(2200); await h.spot(null); },
     },
     {
-      say: "Each circle is a coin, and each line is one or more orders between two coins. The coins at the top are the ones your orders only spend.",
+      say: "The map reads from left to right. On the left are coins your orders spend. Next to each coin is a box for every order, with buy or sell, the amount and the price. A line then carries on to the coin that order brings in.",
       act: async h => {
-        await h.spot(`${FIRST_EX} .rf-row:first-child`);
-        await h.wait(3000);
+        await h.spot(NODE('AAVE'));
+        await h.wait(2200);
+        await h.spot(AAVE_SELL);
+        await h.wait(2600);
+        await h.spot(NODE('USD'));
+        await h.wait(2000);
         await h.spot(null);
       },
     },
     {
-      say: "Hover over a coin to see the orders behind it. Its lines light up and the others fade back, and a tooltip lists each order: buy or sell, the pair, the amount and the price.",
+      say: "Click an order to follow it. Its line lights up and the rest of the map fades back. Underneath, Cyrus spells the order out in plain English, with its status, its type, and when it was placed.",
       act: async h => {
-        await h.hover(`${FIRST_EX} .rf-node-source`);
+        await h.click(AAVE_SELL);
+        await h.wait(1800);
+        await h.scroll(130, { ms: 700 });
+        await h.spot('#orders-flow-chart .rf-detail');
         await h.wait(3500);
+        await h.spot(null);
       },
     },
     {
-      say: "Further down, the lines arrive at the coins you'd receive. A green outline marks a coin your orders only receive. Hover over one, and the tooltip tells you which coins it would come from.",
+      say: "A coin in the middle, like dollars here, is one your orders both pay into and spend. Its label counts the orders going in and coming out. The map is often wider than the screen, so drag it to look around. The buttons above it zoom in and out.",
       act: async h => {
-        await unhover(h);
-        await h.moveXY(640, 230, 400);
-        await h.scrollTo(`${FIRST_EX} .rf-node-terminal`, { offset: 330, ms: 1300 });
-        await h.hover(`${FIRST_EX} .rf-node-terminal`);
-        await h.wait(2500);
+        await h.click(AAVE_SELL);
+        await h.scroll(-6000, { ms: 700 });
+        await h.spot(NODE('USD'));
+        await h.wait(3000);
+        await h.spot(null);
+        await pan(h, [1000, 300], [350, 300]);
+        await h.wait(600);
+        await h.spot('#orders-flow-chart .rf-zoom');
+        await h.hover('#orders-flow-chart .rf-zoom button[data-rf-zoom="out"]');
+        await h.wait(700);
+        await h.hover('#orders-flow-chart .rf-zoom button[data-rf-zoom="in"]', 500);
+        await h.wait(600);
+        await h.spot(null);
       },
     },
     {
-      say: "The figure under a coin is how much of it you'd receive if every order flowing into it filled in full. For dollars and stablecoins, it's shown as a dollar amount.",
+      say: "On the far right, a green outline marks a coin your orders only receive. Under it is roughly how much would arrive if every order flowing into it filled in full. For dollars and stablecoins, that's shown as a dollar amount.",
       act: async h => {
-        await unhover(h);
-        await h.moveXY(640, 230, 400);
-        await h.spot(`${FIRST_EX} .rf-node-mid .rf-node-amount`);
-        await h.wait(3500);
+        await h.spot(NODE('XLM'));
+        await h.wait(3800);
         await h.spot(null);
       },
     },
@@ -109,11 +136,11 @@ module.exports = {
     {
       say: "Here it's easier to follow the story. The coins being sold feed into dollars, and dollars feed the coins being bought.",
       act: async h => {
-        const usd = '#orders-flow-chart .rf-node[data-key="A:USD"]';
-        await h.scrollTo(usd, { offset: 200, ms: 1200 });
-        await h.hover(usd);
-        await h.wait(3500);
-        await unhover(h);
+        await h.spot('#orders-flow-chart .rf-viewport');
+        await h.wait(1500);
+        await h.spot(NODE('USD', '#orders-flow-chart'));
+        await h.wait(3000);
+        await h.spot(null);
         await h.moveXY(640, 200, 400);
       },
     },

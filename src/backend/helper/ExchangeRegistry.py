@@ -373,6 +373,38 @@ SUPPORTED_EXCHANGES: dict[str, dict] = {
     },
 }
 
+# Candle feeds the Charts page can draw from, in the order the picker lists
+# them. Coinbase is the default: it pages back through history (Kraken only
+# ever returns its most recent window of bars, whatever `since` says), and its
+# missing 4h/1w are built from 1h/1d (MarketDataController.SYNTH_TIMEFRAMES).
+# Kraken stays because most users trade there; KuCoin covers the small coins.
+# OKX, Crypto.com, Gate and Gemini were dropped as redundant; saved charts and
+# alerts on them are moved by helper/ChartSourceRetire.py. Binance is absent
+# because its API refuses US connections (HTTP 451), and Robinhood has no
+# public candle feed.
+#   max_limit: the most bars one request returns (the server caps `limit`).
+#   kind: 'crypto' or 'stock' (the client formats prices and words by it).
+#   requires_key: the feed needs the user's own key (see helper/StockMarket.py);
+#     `get_public` then takes a user_id.
+#   page_by_end: page back by asking for the bars that end before a time,
+#     rather than by `since` (stock bars have overnight and weekend gaps).
+#   name: display name when the source isn't one of SUPPORTED_EXCHANGES.
+CHART_SOURCES: dict[str, dict] = {
+    'coinbase':  {'max_limit': 300,  'can_page': True,  'kind': 'crypto'},
+    'kraken':    {'max_limit': 720,  'can_page': False, 'kind': 'crypto'},
+    'kucoin':    {'max_limit': 1000, 'can_page': True,  'kind': 'crypto'},
+    # US stocks and ETFs from Alpaca Market Data (free IEX feed), with the
+    # user's own key from Profile.
+    'stocks':    {'max_limit': 1000, 'can_page': True,  'kind': 'stock',
+                  'requires_key': True, 'page_by_end': True, 'name': 'Stocks'},
+}
+
+
+def source_name(source: str) -> str:
+    """Display name of a chart source."""
+    meta = CHART_SOURCES.get(source) or {}
+    return meta.get('name') or SUPPORTED_EXCHANGES.get(source, {}).get('name') or source
+
 # Minimum withdrawal amounts per exchange per asset (with a 10% safety cushion).
 # Not all of these are available through CCXT, so we maintain them manually.
 WITHDRAWAL_MINIMUMS: dict[str, dict[str, float]] = {

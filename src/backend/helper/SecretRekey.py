@@ -24,6 +24,8 @@ ENCRYPTED_COLUMNS = [
     ('exchange_connections', 'passphrase_encrypted'),
     ('users', 'smtp_password_encrypted'),
     ('users', 'anthropic_key_encrypted'),
+    ('users', 'alpaca_key_id_encrypted'),
+    ('users', 'alpaca_secret_encrypted'),
 ]
 
 

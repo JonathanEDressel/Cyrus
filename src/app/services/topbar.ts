@@ -22,6 +22,7 @@ class TopBar {
   private static readonly PAGES: TopBarPage[] = [
     { route: 'home', label: 'Overview', icon: 'fa-table-cells-large', group: 'Portfolio', keywords: 'home dashboard portfolio' },
     { route: 'holdings', label: 'Holdings', icon: 'fa-coins', group: 'Portfolio', keywords: 'assets balances coins' },
+    { route: 'charts', label: 'Charts', icon: 'fa-chart-simple', group: 'Portfolio', keywords: 'chart candles drawing fibonacci fib channel trend line compare indicators rsi macd tradingview' },
     { route: 'openorders', label: 'Open Orders', icon: 'fa-clock', group: 'Portfolio', keywords: 'orders active' },
     { route: 'limitorders', label: 'Limit Orders', icon: 'fa-arrow-right-arrow-left', group: 'Portfolio', keywords: 'ladder staggered buy sell resting' },
     { route: 'transfers', label: 'Transfers', icon: 'fa-right-left', group: 'Portfolio', keywords: 'deposits withdrawals wallets' },
