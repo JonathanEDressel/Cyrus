@@ -1,6 +1,6 @@
 {
   "name": "cyrus",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "author": "Jonathan Dressel <jonathanedressel@gmail.com>",
   "license": "SEE LICENSE IN LICENSE",
   "description": "Automated trades and transfers for crypto exchanges",
